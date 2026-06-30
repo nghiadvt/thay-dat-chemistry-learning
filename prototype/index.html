@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Hóa Thầy Đạt — Học sinh</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=STIX+Two+Text&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/shared.css">
+  <link rel="stylesheet" href="css/student.css">
+</head>
+<body class="student-app">
+
+<div id="app">
+
+  <!-- Welcome -->
+  <section class="screen welcome-screen active" data-screen="welcome">
+    <div class="welcome-bg-pattern"></div>
+    <div class="welcome-inner">
+      <img src="logo.png" alt="Hóa Thầy Đạt" class="welcome-logo-img">
+      <h1 class="welcome-hero-title">ĐỐ VUI HÓA HỌC<br>REAL-TIME</h1>
+      <p class="welcome-hero-sub">Học vui – Nhớ lâu – Điểm cao</p>
+      <div class="welcome-hero-wrap">
+        <img src="teacher-hero.png" alt="" class="welcome-hero-img">
+      </div>
+      <div class="welcome-actions">
+        <button class="btn-join-room" onclick="showScreen('join')">Tham gia phòng</button>
+        <button class="btn-guide" onclick="showScreen('guide')">Hướng dẫn</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Join: PIN + QR -->
+  <section class="screen join-screen no-pad" data-screen="join">
+    <div class="join-top">
+      <div class="join-nav">
+        <button class="join-back" onclick="showScreen('welcome')" aria-label="Quay lại">←</button>
+        <h2>Tham gia phòng</h2>
+        <button class="join-profile-btn" aria-label="Hồ sơ">👤</button>
+      </div>
+      <div class="join-tabs-line">
+        <button class="join-tab-line active" id="tabPin" onclick="switchJoinTab('pin')">Nhập mã PIN</button>
+        <button class="join-tab-line" id="tabQr" onclick="switchJoinTab('qr')">Quét QR</button>
+      </div>
+    </div>
+    <div class="join-content" id="joinPinContent">
+      <p class="join-instruction">Nhập mã PIN 6 số do giáo viên cung cấp</p>
+      <div class="pin-display-row join-pin-row" id="pinDisplay"></div>
+      <button class="btn-join-room join-submit-btn" id="btnJoinSubmit" onclick="submitPinManual()" disabled>Tham gia</button>
+      <p class="join-footer-note"><span class="shield">🛡</span> Mã PIN gồm 6 chữ số</p>
+    </div>
+    <div class="join-content qr-content" id="joinQrContent" style="display:none">
+      <p class="join-instruction">Quét mã QR do giáo viên cung cấp</p>
+      <div class="qr-scanner-wrap" onclick="simulateQrScan()">
+        <div class="qr-frame">
+          <img src="qr-login.png" alt="QR Code" class="qr-mock-img">
+          <span class="qr-bracket tl"></span>
+          <span class="qr-bracket tr"></span>
+          <span class="qr-bracket bl"></span>
+          <span class="qr-bracket br"></span>
+        </div>
+      </div>
+      <p class="join-instruction qr-bottom">Hướng camera vào mã QR của giáo viên</p>
+    </div>
+    <div class="numpad join-numpad" id="numpadPin"></div>
+  </section>
+
+  <!-- Guide -->
+  <section class="screen" data-screen="guide">
+    <div class="screen-header">
+      <button class="back-btn" onclick="showScreen('welcome')">←</button>
+      <h2>Hướng dẫn</h2>
+    </div>
+    <div class="card" style="flex:1;overflow-y:auto">
+      <div class="guide-text">
+        <ol>
+          <li>Giáo viên tạo phòng tại <a href="teacher.html">teacher.html</a> và hiển thị mã QR / PIN.</li>
+          <li>Học sinh quét QR hoặc nhập PIN 6 số.</li>
+          <li>Nhập tên, chạm avatar để chụp ảnh (tùy chọn).</li>
+          <li>Chờ giáo viên bắt đầu — có thể sửa tên/ảnh trong lúc chờ.</li>
+        </ol>
+      </div>
+      <button class="btn-outline-dark" style="margin-top:20px" onclick="showScreen('welcome')">Quay lại</button>
+    </div>
+  </section>
+
+  <!-- Profile -->
+  <section class="screen" data-screen="profile">
+    <div class="screen-header">
+      <button class="back-btn" onclick="showScreen('join')">←</button>
+      <h2>Tham gia phòng</h2>
+    </div>
+    <div class="profile-body">
+      <div class="avatar-wrap" onclick="onAvatarClick()">
+        <div class="avatar-circle" id="profileAvatar">
+          <span id="profileEmoji">😀</span>
+          <video id="profileVideo" autoplay playsinline style="display:none"></video>
+          <img id="profileImg" style="display:none" alt="">
+        </div>
+        <div class="avatar-badge">📷</div>
+      </div>
+      <div class="capture-bar" id="captureBar">
+        <button style="background:var(--success);color:#fff" onclick="captureProfilePhoto()">Chụp</button>
+        <button style="background:rgba(255,255,255,0.2);color:#fff" onclick="cancelCapture()">Huỷ</button>
+      </div>
+      <input class="text-input" id="profileName" maxlength="20" placeholder="Tên của bạn" oninput="onProfileNameInput()">
+      <div class="char-count"><span id="profileCharCount">0</span>/20</div>
+      <button class="btn-primary" style="max-width:280px" id="btnProfileJoin" disabled onclick="submitProfile()">Vào phòng</button>
+    </div>
+  </section>
+
+  <!-- Waiting -->
+  <section class="screen waiting-screen" data-screen="waiting">
+    <div class="waiting-header">
+      <p class="room-name" id="waitingRoomName"></p>
+      <p class="room-teacher" id="waitingTeacher"></p>
+    </div>
+    <div class="waiting-qr-section">
+      <div class="room-qr-block">
+        <div class="qr-frame">
+          <img src="qr-login.png" alt="QR Code" class="qr-mock-img">
+          <span class="qr-bracket tl"></span>
+          <span class="qr-bracket tr"></span>
+          <span class="qr-bracket bl"></span>
+          <span class="qr-bracket br"></span>
+        </div>
+        <p class="room-qr-label">Mã PIN phòng</p>
+        <p class="room-pin-display" id="waitingPinDisplay"></p>
+      </div>
+      <p class="waiting-qr-hint">Bạn bè có thể quét mã để tham gia cùng phòng</p>
+    </div>
+    <p class="waiting-msg">Hãy chờ giáo viên bắt đầu trò chơi</p>
+    <p class="waiting-dots">Đang chờ<span id="waitingDots">...</span></p>
+    <div class="players-grid" id="playersGrid"></div>
+    <div class="edit-me" id="editMePanel">
+      <div style="font-size:13px;font-weight:600">Chỉnh sửa của bạn</div>
+      <div class="edit-me-row">
+        <input id="editNameInput" maxlength="20" placeholder="Tên">
+        <button class="btn-sm-save" onclick="saveEditName()">Lưu</button>
+      </div>
+      <div class="edit-me-btns">
+        <button class="btn-sm-photo" onclick="onAvatarClick(true)">📷 Chụp lại</button>
+        <button class="btn-sm-del" onclick="deleteMyPhoto()">Xóa ảnh</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question (MC + Tự luận) -->
+  <section class="screen question-screen no-pad" data-screen="question">
+    <div class="q-top-bar">
+      <span class="q-progress" id="qProgress">Câu 1/8</span>
+      <div class="q-timer-pill" id="qTimerPill">
+        <span class="q-timer-icon" aria-hidden="true">⏱</span>
+        <span id="qTimerText">00:20</span>
+      </div>
+    </div>
+
+    <div class="q-body">
+      <div class="q-card" id="qCard">
+        <span class="q-type-badge" id="qTypeBadge">Dạng: Trắc nghiệm</span>
+        <p class="q-prompt" id="qPrompt"></p>
+        <img class="q-media-img" id="qImage" alt="" hidden>
+        <div class="q-video-wrap" id="qVideoWrap" hidden>
+          <video id="qVideo" controls playsinline></video>
+        </div>
+        <div class="q-answer" id="qAnswer"></div>
+        <div class="q-eq-display" id="qEqDisplay" hidden></div>
+        <div class="q-card-footer">
+          <span class="q-id" id="qId">ID: —</span>
+          <button type="button" class="q-star-btn" id="qStarBtn" aria-label="Yêu thích">☆</button>
+        </div>
+      </div>
+
+      <div class="q-input-zone" id="qInputZone" hidden>
+        <div class="answer-actions" id="qInputActions">
+          <button type="button" class="btn-answer-clear" onclick="clearInputAnswer()">Xóa</button>
+          <button type="button" class="btn-answer-submit" onclick="submitAnswer()">Gửi đáp án</button>
+        </div>
+        <div class="q-kb-dock" id="qKbDock">
+          <div class="question-keyboard open" id="qKeyboard">
+            <div class="chem-kb" id="chemKb"></div>
+            <div class="coef-numpad" id="coefNumpad" hidden></div>
+          </div>
+          <button type="button" class="kb-toggle-btn" id="kbToggleBtn" onclick="toggleKeyboard()">
+            <span class="kb-toggle-icon" id="kbToggleIcon">▼</span>
+            <span id="kbToggleLabel">Thu nhỏ bàn phím</span>
+          </button>
+          <button type="button" class="kb-open-fab" id="kbOpenFab" hidden onclick="toggleKeyboard(true)">
+            ⌨ Mở bàn phím
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Submit -->
+  <section class="screen" data-screen="submit">
+    <div class="submit-content">
+      <div class="spinner"></div>
+      <h2 style="font-size:20px;font-weight:700">Đã nộp!</h2>
+      <p style="opacity:0.8">Chờ kết quả...</p>
+    </div>
+  </section>
+
+  <!-- Leaderboard -->
+  <section class="screen" data-screen="leaderboard">
+    <div class="lb-banner">🏆 Cập nhật bảng xếp hạng</div>
+    <div class="lb-wrap">
+      <div class="lb-list" id="lbList"></div>
+      <div class="lb-more" id="lbMore"></div>
+      <div class="lb-pinned" id="lbPinned" hidden></div>
+    </div>
+    <p class="lb-countdown" id="lbCountdown"></p>
+  </section>
+
+  <!-- Final -->
+  <section class="screen" data-screen="final">
+    <div class="screen-header" style="justify-content:center"><h2>🎉 Kết quả</h2></div>
+    <div class="podium" id="podium"></div>
+    <div class="btn-group" style="flex-shrink:0">
+      <button class="btn-primary" onclick="restartGame()">Chơi lại</button>
+      <button class="btn-secondary" onclick="showScreen('welcome')">Về trang chủ</button>
+    </div>
+  </section>
+
+</div>
+
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card">
+    <div class="result-circle" id="resultCircle">✓</div>
+    <div class="result-title" id="resultTitle"></div>
+    <div class="result-points" id="resultPoints"></div>
+    <div class="result-answer" id="resultAnswer"></div>
+  </div>
+</div>
+
+<div class="demo-nav" id="demoNav"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="js/shared.js"></script>
+<script src="js/equation-ui.js"></script>
+<script src="js/student.js"></script>
+</body>
+</html>

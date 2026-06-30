@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hóa Thầy Đạt — Giáo viên</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/shared.css">
+  <link rel="stylesheet" href="css/teacher.css">
+</head>
+<body class="teacher-app">
+
+<!-- Landing: chưa có phòng -->
+<section class="teacher-screen active" data-screen="setup">
+  <div class="teacher-landing">
+    <header class="teacher-landing-header">
+      <img src="logo.png" alt="Hóa Thầy Đạt" class="teacher-landing-logo">
+      <a href="index.html" class="teacher-link">Trang học sinh →</a>
+    </header>
+    <div class="teacher-landing-hero">
+      <div class="teacher-landing-copy">
+        <p class="teacher-landing-badge">Bảng điều khiển giáo viên</p>
+        <h1>Tạo phòng đố vui<br>hóa học real-time</h1>
+        <p class="teacher-landing-desc">
+          Chiếu mã QR và PIN lên màn hình lớp. Học sinh tham gia bằng điện thoại,
+          bạn theo dõi danh sách và bắt đầu trò chơi khi sẵn sàng.
+        </p>
+        <button class="btn-primary teacher-cta" onclick="createTeacherRoom()">Tạo phòng mới</button>
+      </div>
+      <div class="teacher-landing-visual">
+        <div class="teacher-preview-card">
+          <div class="qr-frame teacher-qr-preview">
+            <img src="qr-login.png" alt="QR Code" class="qr-mock-img">
+            <span class="qr-bracket tl"></span>
+            <span class="qr-bracket tr"></span>
+            <span class="qr-bracket bl"></span>
+            <span class="qr-bracket br"></span>
+          </div>
+          <p class="teacher-preview-pin">PIN · 123456</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Dashboard: đang có phòng -->
+<section class="teacher-screen" data-screen="dashboard">
+  <header class="teacher-topbar">
+    <div class="teacher-topbar-left">
+      <img src="logo.png" alt="" class="teacher-topbar-logo">
+      <div>
+        <p class="teacher-topbar-label">Phòng đang mở</p>
+        <h1 class="teacher-topbar-title" id="teacherRoomName"></h1>
+      </div>
+    </div>
+    <div class="teacher-topbar-actions">
+      <span class="teacher-status-pill" id="teacherStatusPill">Đang chờ</span>
+      <button class="btn-ghost" onclick="resetTeacherRoom()">Phòng mới</button>
+      <a href="index.html" class="btn-ghost">Trang học sinh</a>
+    </div>
+  </header>
+
+  <main class="teacher-dashboard">
+    <section class="teacher-panel teacher-panel-join">
+      <h2 class="teacher-panel-title">Tham gia phòng</h2>
+      <p class="teacher-panel-hint">Học sinh quét mã QR hoặc nhập PIN trên điện thoại</p>
+      <div class="teacher-join-card">
+        <div class="qr-frame teacher-qr-large">
+          <img src="qr-login.png" alt="QR Code" class="qr-mock-img">
+          <span class="qr-bracket tl"></span>
+          <span class="qr-bracket tr"></span>
+          <span class="qr-bracket bl"></span>
+          <span class="qr-bracket br"></span>
+        </div>
+        <div class="teacher-pin-block">
+          <p class="room-qr-label">Mã PIN phòng</p>
+          <p class="teacher-pin-big" id="teacherPinDisplay"></p>
+        </div>
+      </div>
+      <div class="teacher-started-banner" id="teacherStartedBanner" style="display:none">
+        Trò chơi đã bắt đầu — học sinh đang làm bài
+      </div>
+    </section>
+
+    <section class="teacher-panel teacher-panel-players">
+      <div class="teacher-panel-head">
+        <div>
+          <h2 class="teacher-panel-title">Danh sách học sinh</h2>
+          <p class="teacher-count" id="teacherCount">0 học sinh</p>
+        </div>
+        <button class="btn-primary teacher-btn-start" id="btnStartGame" onclick="teacherStartGame()" disabled>
+          Bắt đầu trò chơi
+        </button>
+      </div>
+      <div class="teacher-player-grid" id="teacherList"></div>
+    </section>
+  </main>
+</section>
+
+<div class="demo-nav teacher-demo-nav" id="demoNav"></div>
+
+<script src="js/shared.js"></script>
+<script src="js/teacher.js"></script>
+</body>
+</html>

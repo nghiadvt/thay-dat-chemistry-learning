@@ -1,0 +1,244 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-dark: #0D1B3E;
+  --bg-start: #0D1B3E;
+  --bg-end: #152a5e;
+  --primary: #2D46D6;
+  --primary-press: #2438b0;
+  --card: #fff;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --gold: #FFD700;
+  --silver: #C0C0C0;
+  --bronze: #CD7F32;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --join-bg: #f4f6fb;
+  --text-dark: #1a2340;
+  --text-muted: #6b7280;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  position: relative;
+}
+
+.screen {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100dvh;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  animation: fadeIn 0.3s ease;
+}
+.screen.active { display: flex; }
+.screen.no-pad { padding: 0; padding-bottom: 0; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.back-btn {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.screen-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.screen-header h2 { font-size: 18px; font-weight: 700; flex: 1; }
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  color: #333;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.08s, opacity 0.15s;
+}
+.btn-primary:active { transform: scale(0.98); opacity: 0.92; }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-secondary {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-outline-dark {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-group { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+
+.btn-join-room {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 700;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 6px 20px rgba(45,70,214,0.4);
+  transition: transform 0.08s, background 0.15s;
+}
+.btn-join-room:active { transform: scale(0.98); background: var(--primary-press); }
+.btn-join-room:disabled { opacity: 0.45; box-shadow: none; cursor: not-allowed; }
+
+/* QR + PIN block (dùng chung waiting + teacher) */
+.room-qr-block {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  text-align: center;
+  color: var(--text-dark);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+.room-qr-label { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+.room-pin-display {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  color: var(--primary);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* QR frame — dùng chung teacher + student */
+.qr-frame {
+  width: 260px;
+  height: 260px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  margin: 0 auto;
+}
+.qr-mock-img {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+}
+.qr-bracket {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 4px solid var(--primary);
+  pointer-events: none;
+}
+.qr-bracket.tl { top: 12px; left: 12px; border-right: none; border-bottom: none; }
+.qr-bracket.tr { top: 12px; right: 12px; border-left: none; border-bottom: none; }
+.qr-bracket.bl { bottom: 12px; left: 12px; border-right: none; border-top: none; }
+.qr-bracket.br { bottom: 12px; right: 12px; border-left: none; border-top: none; }
+
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+.result-overlay.show { display: flex; }
+.result-card { text-align: center; padding: 36px 28px; max-width: 300px; width: 90%; color: #fff; }
+.result-circle {
+  width: 90px; height: 90px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 42px; margin: 0 auto 16px;
+}
+.result-circle.correct { background: var(--success); }
+.result-circle.wrong { background: var(--error); }
+.result-title { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+.result-points { font-size: 18px; font-weight: 600; color: var(--warning); }
+
+.demo-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 480px;
+  width: calc(100% - 16px);
+  background: rgba(0,0,0,0.92);
+  padding: 4px 8px;
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  z-index: 400;
+  border-radius: 8px 8px 0 0;
+}
+.demo-nav button {
+  background: rgba(255,255,255,0.12);
+  border: none;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 9px;
+}
