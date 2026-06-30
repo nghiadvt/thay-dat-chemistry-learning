@@ -1,13 +1,18 @@
 /** Teacher app — website desktop, đồng bộ localStorage với student app */
 const teacherState = {
   poll: null,
+  dashboardUiReady: false,
 };
+const LS_SIDEBAR_COLLAPSED = 'htd_teacher_sidebar_collapsed';
+const LS_MAIN_SPLIT = 'htd_teacher_main_split';
 
 function showTeacherScreen(id) {
   document.querySelectorAll('.teacher-screen').forEach(s => s.classList.remove('active'));
   document.querySelector(`[data-screen="${id}"]`)?.classList.add('active');
 
   if (id === 'dashboard') {
+    initTeacherSidebar();
+    initTeacherDashboardUi();
     renderDashboard();
     startTeacherPoll();
   } else {
@@ -37,12 +42,23 @@ function createTeacherRoom() {
   showTeacherScreen('dashboard');
 }
 
+function renderTeacherPinDigits(pin) {
+  const el = document.getElementById('teacherPinDigits');
+  if (!el || !pin) return;
+  el.innerHTML = pin
+    .split('')
+    .map(d => `<span class="teacher-pin-digit">${d}</span>`)
+    .join('');
+}
+
 function renderDashboard() {
   const room = HTD.getRoom();
   if (!room) return;
 
   document.getElementById('teacherRoomName').textContent = room.name;
-  document.getElementById('teacherPinDisplay').textContent = room.pin;
+  const teacherEl = document.getElementById('teacherTeacherName');
+  if (teacherEl) teacherEl.textContent = 'Giáo viên: ' + (room.teacher || 'Thầy Đạt');
+  renderTeacherPinDigits(room.pin);
 
   const statusPill = document.getElementById('teacherStatusPill');
   const started = room.status === 'started';
@@ -55,15 +71,24 @@ function renderDashboard() {
   renderTeacherList();
 }
 
+function syncModalPinDigits() {
+  const src = document.getElementById('teacherPinDigits');
+  const dst = document.getElementById('teacherPinDigitsModal');
+  if (!src || !dst) return;
+  dst.innerHTML = src.innerHTML;
+}
+
 function renderTeacherList() {
   const room = HTD.getRoom();
-  const players = HTD.getPlayers();
+  const realPlayers = HTD.getPlayers();
+  const players = HTD.buildDisplayPlayers(realPlayers, null, 50);
 
   document.getElementById('teacherCount').textContent = `${players.length} học sinh`;
 
   const btnStart = document.getElementById('btnStartGame');
-  btnStart.disabled = players.length < 1 || room?.status === 'started';
-  btnStart.textContent = room?.status === 'started' ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
+  const started = room?.status === 'started';
+  btnStart.disabled = started;
+  btnStart.textContent = started ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
 
   document.getElementById('teacherList').innerHTML =
     players.length === 0
@@ -90,7 +115,7 @@ function startTeacherPoll() {
 
 function teacherStartGame() {
   const room = HTD.getRoom();
-  if (!room || HTD.getPlayers().length < 1) return;
+  if (!room || room.status === 'started') return;
   room.status = 'started';
   room.startedAt = Date.now();
   HTD.setRoom(room);
@@ -103,6 +128,102 @@ function resetTeacherRoom() {
   localStorage.removeItem(HTD.LS_PLAYERS);
   showTeacherScreen('setup');
 }
+
+function setTeacherSidebarCollapsed(collapsed) {
+  const sidebar = document.getElementById('teacherSidebar');
+  const layout = document.querySelector('.teacher-layout');
+  if (!sidebar) return;
+  sidebar.classList.toggle('collapsed', collapsed);
+  layout?.classList.toggle('sidebar-collapsed', collapsed);
+  localStorage.setItem(LS_SIDEBAR_COLLAPSED, collapsed ? '1' : '0');
+}
+
+function initTeacherSidebar() {
+  setTeacherSidebarCollapsed(localStorage.getItem(LS_SIDEBAR_COLLAPSED) === '1');
+}
+
+function toggleTeacherSidebar() {
+  const sidebar = document.getElementById('teacherSidebar');
+  if (!sidebar) return;
+  setTeacherSidebarCollapsed(!sidebar.classList.contains('collapsed'));
+}
+
+function initTeacherDashboardUi() {
+  if (teacherState.dashboardUiReady) return;
+  teacherState.dashboardUiReady = true;
+
+  document.getElementById('teacherQrEnlargeBtn')?.addEventListener('click', openTeacherQrModal);
+  document.getElementById('teacherQrModalBackdrop')?.addEventListener('click', closeTeacherQrModal);
+  document.getElementById('teacherQrModalClose')?.addEventListener('click', closeTeacherQrModal);
+
+  initTeacherMainResizer();
+}
+
+function initTeacherMainResizer() {
+  const grid = document.querySelector('.teacher-main-grid');
+  const resizer = document.getElementById('teacherMainResizer');
+  if (!grid || !resizer || resizer.dataset.bound === '1') return;
+  resizer.dataset.bound = '1';
+
+  const saved = parseFloat(localStorage.getItem(LS_MAIN_SPLIT));
+  if (!Number.isNaN(saved)) applyMainSplit(grid, saved);
+
+  let dragging = false;
+
+  function onMouseDown(e) {
+    dragging = true;
+    document.body.classList.add('teacher-resizing');
+    e.preventDefault();
+  }
+
+  function onMouseMove(e) {
+    if (!dragging) return;
+    const rect = grid.getBoundingClientRect();
+    let ratio = (e.clientX - rect.left) / rect.width;
+    ratio = Math.min(0.72, Math.max(0.28, ratio));
+    applyMainSplit(grid, ratio);
+  }
+
+  function onMouseUp() {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove('teacher-resizing');
+    const match = grid.style.gridTemplateColumns.match(/^([\d.]+)fr/);
+    if (match) localStorage.setItem(LS_MAIN_SPLIT, match[1]);
+  }
+
+  resizer.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+}
+
+function applyMainSplit(grid, leftRatio) {
+  const rightRatio = 1 - leftRatio;
+  grid.style.gridTemplateColumns = `${leftRatio}fr 20px ${rightRatio}fr`;
+}
+
+function openTeacherQrModal() {
+  const modal = document.getElementById('teacherQrModal');
+  if (!modal) return;
+  syncModalPinDigits();
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeTeacherQrModal() {
+  const modal = document.getElementById('teacherQrModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+window.openTeacherQrModal = openTeacherQrModal;
+window.closeTeacherQrModal = closeTeacherQrModal;
+window.toggleTeacherSidebar = toggleTeacherSidebar;
+window.resetTeacherRoom = resetTeacherRoom;
+window.teacherStartGame = teacherStartGame;
+window.createTeacherRoom = createTeacherRoom;
+window.demoTeacherGo = demoTeacherGo;
 
 // Demo nav
 const TEACHER_SCREENS = ['setup', 'dashboard'];
