@@ -24,6 +24,8 @@ const state = {
   cameraStream: null,
   waitingPoll: null,
   waitingJoinedAt: 0,
+  gamePoll: null,
+  lastGameQuestionIndex: -1,
 };
 
 const FAKE_QUESTIONS = HTD.FAKE_QUESTIONS;
@@ -47,6 +49,7 @@ function showScreen(id) {
   if (id === 'question') startQuestion();
   if (id === 'leaderboard') renderLeaderboard();
   if (id === 'final') renderFinal();
+  syncGamePoll();
 }
 
 // ─── Join PIN / QR ───
@@ -345,7 +348,10 @@ function startWaitingPoll() {
       clearInterval(state.waitingPoll);
       state.questionIndex = 0;
       state.myScore = 0;
+      state.lastGameQuestionIndex = -1;
       buildStudentsFromStorage();
+      const game = room.game;
+      if (game) state.questionIndex = game.questionIndex;
       showScreen('question');
     }
   }, 1000);
@@ -451,33 +457,113 @@ function toggleKeyboard(forceOpen) {
   toggleBtn.hidden = !open;
 }
 
-// ─── Timer ───
+// ─── Timer (đồng bộ với giáo viên qua localStorage) ───
 function formatTimer(sec) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return HTD.formatTimer(sec);
 }
 
-function startTimer(sec, onEnd) {
-  clearInterval(state.timerInterval);
-  state.timer = sec;
-  const total = sec;
+function updateSyncedTimerUI() {
+  const room = HTD.getRoom();
+  const game = room?.game;
   const text = document.getElementById('qTimerText');
   const pill = document.getElementById('qTimerPill');
-  function tick() {
-    text.textContent = formatTimer(state.timer);
-    pill.classList.remove('warn', 'danger');
-    if (state.timer <= 3) pill.classList.add('danger');
-    else if (state.timer <= 5) pill.classList.add('warn');
-    if (state.timer <= 0) {
+  if (!text || !pill || !game || game.phase !== 'question') return;
+
+  const sec = HTD.getQuestionTimeRemaining(game);
+  text.textContent = formatTimer(sec);
+  pill.classList.remove('warn', 'danger', 'paused');
+  if (game.paused) pill.classList.add('paused');
+  else if (sec <= 3) pill.classList.add('danger');
+  else if (sec <= 5) pill.classList.add('warn');
+  return sec;
+}
+
+function startSyncedTimer(onEnd) {
+  clearInterval(state.timerInterval);
+  updateSyncedTimerUI();
+  state.timerInterval = setInterval(() => {
+    const sec = updateSyncedTimerUI();
+    if (sec !== undefined && sec <= 0 && !HTD.getRoom()?.game?.paused) {
       clearInterval(state.timerInterval);
       onEnd();
-      return;
     }
-    state.timer--;
+  }, 200);
+}
+
+function syncGamePoll() {
+  clearInterval(state.gamePoll);
+  const room = HTD.getRoom();
+  if (!room || room.status !== 'started' || !room.game) return;
+
+  state.gamePoll = setInterval(syncGameState, 400);
+}
+
+function syncGameState() {
+  const room = HTD.getRoom();
+  const game = room?.game;
+  if (!room || room.status !== 'started' || !game) {
+    clearInterval(state.gamePoll);
+    return;
   }
-  tick();
-  state.timerInterval = setInterval(tick, 1000);
+
+  if (game.phase === 'question') {
+    if (game.questionIndex !== state.lastGameQuestionIndex) {
+      state.lastGameQuestionIndex = game.questionIndex;
+      if (game.questionIndex !== state.questionIndex) {
+        state.questionIndex = game.questionIndex;
+        state.submitted = false;
+        showScreen('question');
+        return;
+      }
+    }
+    if (state.screen === 'question') {
+      updateSyncedTimerUI();
+      const sec = HTD.getQuestionTimeRemaining(game);
+      if (sec <= 0 && !state.submitted && !game.paused) {
+        autoEndQuestion();
+      }
+    } else if (state.screen === 'leaderboard') {
+      state.questionIndex = game.questionIndex;
+      state.submitted = false;
+      showScreen('question');
+    }
+  } else if (game.phase === 'leaderboard') {
+    if (state.screen === 'question' && !state.submitted) {
+      autoEndQuestion();
+    } else if (state.screen === 'leaderboard') {
+      updateLbCountdownFromGame();
+    }
+  } else if (game.phase === 'final') {
+    if (state.screen !== 'final') {
+      clearInterval(state.lbInterval);
+      showScreen('final');
+    }
+  }
+
+  if (room.status === 'waiting' && !['waiting', 'welcome', 'join', 'profile'].includes(state.screen)) {
+    clearInterval(state.gamePoll);
+    state.questionIndex = 0;
+    state.myScore = 0;
+    state.fakeScores = {};
+    state.lastGameQuestionIndex = -1;
+    state.waitingJoinedAt = Date.now();
+    showScreen('waiting');
+  }
+}
+
+function autoEndQuestion() {
+  const q = FAKE_QUESTIONS[state.questionIndex];
+  if (!q) return;
+  if (q.type === 'mc') finishMC(-1);
+  else submitAnswer(true);
+}
+
+function updateLbCountdownFromGame() {
+  const game = HTD.getRoom()?.game;
+  const el = document.getElementById('lbCountdown');
+  if (!el || !game || game.phase !== 'leaderboard') return;
+  const sec = HTD.getPhaseTimeRemaining(game);
+  el.textContent = sec > 0 ? `Câu tiếp sau ${sec}s...` : '...';
 }
 
 // ─── Question (unified) ───
@@ -524,10 +610,12 @@ function startQuestion() {
   }
 
   document.getElementById('qStarBtn').classList.remove('active');
-  startTimer(q.timeLimit, () => {
+  state.lastGameQuestionIndex = HTD.getRoom()?.game?.questionIndex ?? state.questionIndex;
+  startSyncedTimer(() => {
     if (q.type === 'mc') finishMC(-1);
     else submitAnswer(true);
   });
+  syncGamePoll();
 }
 
 function renderQuestionMedia(q) {
@@ -631,10 +719,12 @@ function submitAnswer(timedOut) {
   state.submitted = true;
   clearInterval(state.timerInterval);
   const q = FAKE_QUESTIONS[state.questionIndex];
+  const game = HTD.getRoom()?.game;
+  const remaining = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
   showScreen('submit');
   setTimeout(() => {
     const ok = EquationUI.checkAnswer(q, state.inputValues);
-    const pts = ok ? Math.round(1000 * (state.timer / q.timeLimit)) : 0;
+    const pts = ok ? Math.round(1000 * (remaining / q.timeLimit)) : 0;
     if (ok) state.myScore += pts;
     const ans = EquationUI.formatCorrectAnswer(q);
     showResult(ok, pts, ans);
@@ -644,9 +734,12 @@ function submitAnswer(timedOut) {
 function finishMC(ans) {
   if (state.submitted) return;
   state.submitted = true;
+  clearInterval(state.timerInterval);
   const q = FAKE_QUESTIONS[state.questionIndex];
+  const game = HTD.getRoom()?.game;
+  const remaining = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
   const ok = ans === q.correct;
-  const pts = ok ? Math.round(1000 * (state.timer / q.timeLimit)) : 0;
+  const pts = ok ? Math.round(1000 * (remaining / q.timeLimit)) : 0;
   if (ok) state.myScore += pts;
   const correctText = q.options[q.correct] || '—';
   showResult(ok, pts, correctText);
@@ -753,17 +846,21 @@ function renderLeaderboard() {
       }
     });
   });
-  let cd = 5;
-  const el = document.getElementById('lbCountdown');
   clearInterval(state.lbInterval);
+  updateLbCountdownFromGame();
   state.lbInterval = setInterval(() => {
-    cd--;
-    el.textContent = cd > 0 ? `Câu tiếp sau ${cd}s...` : '...';
-    if (cd <= 0) {
+    updateLbCountdownFromGame();
+    const game = HTD.getRoom()?.game;
+    if (game?.phase === 'question' && game.questionIndex > state.questionIndex) {
       clearInterval(state.lbInterval);
-      nextQuestion();
+      state.questionIndex = game.questionIndex;
+      state.submitted = false;
+      showScreen('question');
+    } else if (game?.phase === 'final') {
+      clearInterval(state.lbInterval);
+      showScreen('final');
     }
-  }, 1000);
+  }, 400);
 }
 
 function nextQuestion() {
@@ -794,13 +891,16 @@ function renderFinal() {
 function restartGame() {
   const room = HTD.getRoom();
   if (room) {
-    room.status = 'waiting';
-    delete room.startedAt;
+    HTD.resetGame(room);
     HTD.setRoom(room);
   }
+  clearInterval(state.gamePoll);
+  clearInterval(state.timerInterval);
+  clearInterval(state.lbInterval);
   state.questionIndex = 0;
   state.myScore = 0;
   state.fakeScores = {};
+  state.lastGameQuestionIndex = -1;
   state.waitingJoinedAt = Date.now();
   initDisplayPlayers();
   showScreen('waiting');

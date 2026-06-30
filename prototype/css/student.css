@@ -458,6 +458,7 @@ body.student-app {
 }
 .q-timer-pill.warn { background: #fef3c7; color: #d97706; }
 .q-timer-pill.danger { background: #fee2e2; color: #dc2626; animation: shake 0.3s infinite; }
+.q-timer-pill.paused { background: #e5e7eb; color: #6b7280; animation: none; }
 .q-timer-icon { font-size: 13px; line-height: 1; }
 
 .q-body {

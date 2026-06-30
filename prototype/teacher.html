@@ -96,20 +96,21 @@
     <div class="teacher-main">
       <div class="teacher-main-grid">
 
-        <div class="teacher-room-card">
-          <header class="teacher-room-card-header">
-            <div class="teacher-room-card-info">
-              <p class="teacher-join-room-label">Phòng</p>
+        <div class="teacher-room-card" id="teacherRoomCard">
+          <header class="teacher-room-card-header" id="teacherRoomHeader">
+            <div class="teacher-room-card-info" id="teacherRoomInfo">
+              <span class="teacher-join-room-label">Phòng</span>
               <h1 class="teacher-join-room-name" id="teacherRoomName"></h1>
-              <p class="teacher-join-teacher" id="teacherTeacherName"></p>
+              <span class="teacher-join-teacher" id="teacherTeacherName"></span>
             </div>
             <div class="teacher-room-card-actions">
               <span class="teacher-status-pill" id="teacherStatusPill">Đang chờ</span>
-              <button type="button" class="btn-end-room" onclick="resetTeacherRoom()">Kết thúc phòng</button>
+              <button type="button" class="btn-end-room" id="btnEndRoom" onclick="resetTeacherRoom()">Kết thúc phòng</button>
             </div>
           </header>
 
           <div class="teacher-room-card-body">
+            <div class="teacher-waiting-view" id="teacherWaitingView">
             <div class="teacher-join-illustration-wrap">
               <img src="waiting-room.png" alt="" class="teacher-join-illustration">
             </div>
@@ -136,10 +137,62 @@
               <!-- <p class="teacher-pin-label">Mã PIN</p> -->
             </div>
             </div>
-          </div>
+            </div>
 
-          <div class="teacher-started-banner" id="teacherStartedBanner" style="display:none">
-            Trò chơi đã bắt đầu — học sinh đang làm bài
+            <div class="teacher-game-view" id="teacherGameView" hidden>
+              <div class="teacher-game-toolbar">
+                <div class="teacher-game-controls">
+                  <div class="teacher-game-controls-left">
+                    <div class="teacher-q-timer-pill" id="teacherTimerPill">
+                      <span class="teacher-q-timer-icon" aria-hidden="true">⏱</span>
+                      <span id="teacherTimerText">00:00</span>
+                    </div>
+                    <span class="teacher-q-type" id="teacherQType">Trắc nghiệm</span>
+                  </div>
+                  <div class="teacher-game-controls-right">
+                    <div class="teacher-zoom-controls" aria-label="Phóng to thu nhỏ đề bài">
+                      <button type="button" class="teacher-zoom-btn" onclick="teacherZoomOut()" aria-label="Thu nhỏ chữ">A−</button>
+                      <button type="button" class="teacher-zoom-btn" onclick="teacherZoomIn()" aria-label="Phóng to chữ">A+</button>
+                    </div>
+                    <button type="button" class="teacher-toggle-scores-btn" id="teacherToggleScoresBtn" onclick="toggleTeacherScorePanel()">Ẩn bảng điểm</button>
+                    <div class="teacher-action-wrap">
+                    <button type="button" class="teacher-action-btn" id="teacherActionBtn" aria-haspopup="true" aria-expanded="false">
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                      Hành động
+                    </button>
+                    <div class="teacher-action-menu" id="teacherActionMenu" hidden>
+                      <button type="button" id="teacherPauseBtn" onclick="teacherTogglePause()">Tạm dừng</button>
+                      <button type="button" onclick="teacherEndGame()">Kết thúc trò chơi</button>
+                      <button type="button" onclick="teacherPlayAgain()">Chơi lại</button>
+                      <button type="button" class="teacher-action-danger" onclick="resetTeacherRoom()">Kết thúc phòng</button>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="teacher-game-phase" id="teacherQuestionPhase">
+                <div class="teacher-q-card" id="teacherQCard">
+                  <div class="teacher-q-card-fit" id="teacherQCardFit">
+                    <div class="teacher-q-card-inner" id="teacherQCardInner">
+                      <p class="teacher-q-prompt" id="teacherQPrompt"></p>
+                      <img class="teacher-q-media" id="teacherQImage" alt="" hidden>
+                      <div class="teacher-q-video-wrap" id="teacherQVideoWrap" hidden>
+                        <video id="teacherQVideo" controls playsinline></video>
+                      </div>
+                      <div class="teacher-q-answers" id="teacherQAnswers"></div>
+                      <div class="teacher-q-eq" id="teacherQEq" hidden></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="teacher-q-timeline" id="teacherTimeline" aria-label="Tiến trình câu hỏi"></div>
+              </div>
+
+              <div class="teacher-game-phase" id="teacherFinalPhase" hidden>
+                <div class="teacher-final-banner">🎉 Kết thúc trò chơi</div>
+                <p class="teacher-final-hint">Học sinh đang xem kết quả trên thiết bị của mình.</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -151,10 +204,10 @@
           </span>
         </div>
 
-        <section class="teacher-panel teacher-panel-players">
+        <section class="teacher-panel teacher-panel-players" id="teacherPlayersPanel">
           <div class="teacher-panel-head">
             <div>
-              <h2 class="teacher-panel-title">Danh sách học sinh</h2>
+              <h2 class="teacher-panel-title" id="teacherPanelTitle">Danh sách học sinh</h2>
               <p class="teacher-count" id="teacherCount">0 học sinh</p>
             </div>
             <button class="btn-primary teacher-btn-start" id="btnStartGame" onclick="teacherStartGame()" disabled>
@@ -162,6 +215,7 @@
             </button>
           </div>
           <div class="teacher-player-grid" id="teacherList"></div>
+          <div class="teacher-score-list" id="teacherScoreList" hidden></div>
         </section>
 
       </div>
@@ -195,6 +249,7 @@
 <div class="demo-nav teacher-demo-nav" id="demoNav"></div>
 
 <script src="js/shared.js"></script>
+<script src="js/equation-ui.js"></script>
 <script src="js/teacher.js"></script>
 </body>
 </html>

@@ -216,4 +216,86 @@ const HTD = {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.querySelector(`[data-screen="${id}"]`)?.classList.add('active');
   },
+
+  LEADERBOARD_MS: 5000,
+
+  formatTimer(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  },
+
+  initGame(room) {
+    const q = this.FAKE_QUESTIONS[0];
+    room.game = {
+      phase: 'question',
+      questionIndex: 0,
+      timerEndsAt: Date.now() + q.timeLimit * 1000,
+      phaseEndsAt: null,
+      paused: false,
+      pauseRemainingMs: null,
+    };
+    return room.game;
+  },
+
+  getQuestionTimeRemaining(game) {
+    if (!game || game.phase !== 'question') return 0;
+    if (game.paused) return Math.ceil((game.pauseRemainingMs || 0) / 1000);
+    if (!game.timerEndsAt) return 0;
+    return Math.max(0, Math.ceil((game.timerEndsAt - Date.now()) / 1000));
+  },
+
+  getPhaseTimeRemaining(game) {
+    if (!game?.phaseEndsAt) return 0;
+    return Math.max(0, Math.ceil((game.phaseEndsAt - Date.now()) / 1000));
+  },
+
+  startQuestionPhase(room, index) {
+    const q = this.FAKE_QUESTIONS[index];
+    if (!room.game) this.initGame(room);
+    room.game.questionIndex = index;
+    room.game.phase = 'question';
+    room.game.timerEndsAt = Date.now() + q.timeLimit * 1000;
+    room.game.phaseEndsAt = null;
+    room.game.paused = false;
+    room.game.pauseRemainingMs = null;
+  },
+
+  startLeaderboardPhase(room) {
+    if (!room.game) return;
+    room.game.phase = 'leaderboard';
+    room.game.timerEndsAt = null;
+    room.game.phaseEndsAt = Date.now() + this.LEADERBOARD_MS;
+    room.game.paused = false;
+    room.game.pauseRemainingMs = null;
+  },
+
+  startFinalPhase(room) {
+    if (!room.game) return;
+    room.game.phase = 'final';
+    room.game.timerEndsAt = null;
+    room.game.phaseEndsAt = null;
+    room.game.paused = false;
+    room.game.pauseRemainingMs = null;
+  },
+
+  pauseGame(room) {
+    if (!room?.game || room.game.phase !== 'question' || room.game.paused) return;
+    room.game.pauseRemainingMs = Math.max(0, room.game.timerEndsAt - Date.now());
+    room.game.paused = true;
+    room.game.timerEndsAt = null;
+  },
+
+  resumeGame(room) {
+    if (!room?.game?.paused) return;
+    room.game.timerEndsAt = Date.now() + room.game.pauseRemainingMs;
+    room.game.paused = false;
+    room.game.pauseRemainingMs = null;
+  },
+
+  resetGame(room) {
+    delete room.game;
+    room.status = 'waiting';
+    delete room.startedAt;
+  },
 };
