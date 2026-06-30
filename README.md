@@ -49,3 +49,6 @@ prototype/
 - [x] Prototype UI giáo viên (`prototype/teacher.html`)
 - [ ] Bàn phím hóa học logic (token model) — sau khi chốt UI
 - [ ] Backend: PHP + WebSocket + Redis + MySQL
+
+http://localhost:8888/prototype/
+http://localhost:8888/prototype/teacher.html
