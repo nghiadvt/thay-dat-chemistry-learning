@@ -154,13 +154,14 @@
                       <button type="button" class="teacher-zoom-btn" onclick="teacherZoomOut()" aria-label="Thu nhỏ chữ">A−</button>
                       <button type="button" class="teacher-zoom-btn" onclick="teacherZoomIn()" aria-label="Phóng to chữ">A+</button>
                     </div>
-                    <button type="button" class="teacher-toggle-scores-btn" id="teacherToggleScoresBtn" onclick="toggleTeacherScorePanel()">Ẩn bảng điểm</button>
                     <div class="teacher-action-wrap">
                     <button type="button" class="teacher-action-btn" id="teacherActionBtn" aria-haspopup="true" aria-expanded="false">
                       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
                       Hành động
                     </button>
                     <div class="teacher-action-menu" id="teacherActionMenu" hidden>
+                      <button type="button" id="teacherPresentationMenuBtn" onclick="toggleTeacherPresentation()">Bật trình chiếu</button>
+                      <button type="button" id="teacherToggleScoresMenuBtn" onclick="toggleTeacherScorePanel()">Ẩn bảng điểm</button>
                       <button type="button" id="teacherPauseBtn" onclick="teacherTogglePause()">Tạm dừng</button>
                       <button type="button" onclick="teacherEndGame()">Kết thúc trò chơi</button>
                       <button type="button" onclick="teacherPlayAgain()">Chơi lại</button>
@@ -243,6 +244,57 @@
         <!-- <p class="teacher-pin-label teacher-pin-label-modal">Mã PIN</p> -->
       </div>
     </div>
+  </div>
+</div>
+
+<div class="teacher-presentation" id="teacherPresentation" hidden>
+  <div class="teacher-presentation-inner">
+    <div class="teacher-presentation-topbar">
+      <div class="teacher-presentation-topbar-right">
+        <div class="teacher-presentation-zoom" aria-label="Phóng to thu nhỏ chữ trình chiếu">
+          <button type="button" class="teacher-zoom-btn" onclick="teacherZoomOut()" aria-label="Thu nhỏ chữ trình chiếu">A−</button>
+          <button type="button" class="teacher-zoom-btn" onclick="teacherZoomIn()" aria-label="Phóng to chữ trình chiếu">A+</button>
+        </div>
+        <button type="button" class="teacher-presentation-exit" id="teacherPresentationExit" onclick="toggleTeacherPresentation()">Thoát trình chiếu</button>
+      </div>
+    </div>
+
+    <section class="teacher-presentation-screen" id="teacherPresentationQuestion" hidden>
+      <div class="teacher-presentation-question-head">
+        <div class="teacher-presentation-countdown teacher-presentation-countdown-q" id="teacherPresentationQuestionCountdown">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="teacher-presentation-ring-bg" cx="60" cy="60" r="52"></circle>
+            <circle class="teacher-presentation-ring-fg teacher-presentation-ring-fg-q" id="teacherPresentationQuestionRing" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <span id="teacherPresentationQuestionCountdownText">0</span>
+        </div>
+      </div>
+      <div class="teacher-presentation-question-wrap">
+        <p class="teacher-presentation-progress" id="teacherPresentationProgress">Câu 1/1</p>
+        <p class="teacher-presentation-prompt" id="teacherPresentationPrompt"></p>
+        <img class="teacher-presentation-media" id="teacherPresentationImage" alt="" hidden>
+        <div class="teacher-presentation-video-wrap" id="teacherPresentationVideoWrap" hidden>
+          <video id="teacherPresentationVideo" playsinline controls></video>
+        </div>
+        <div class="teacher-presentation-answers" id="teacherPresentationAnswers"></div>
+        <div class="teacher-presentation-eq" id="teacherPresentationEq" hidden></div>
+      </div>
+    </section>
+
+    <section class="teacher-presentation-screen" id="teacherPresentationLeaderboard" hidden>
+      <div class="teacher-presentation-leader-head">
+        <h2>Bảng điểm hiện tại</h2>
+        <div class="teacher-presentation-countdown" id="teacherPresentationCountdown">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="teacher-presentation-ring-bg" cx="60" cy="60" r="52"></circle>
+            <circle class="teacher-presentation-ring-fg" id="teacherPresentationRing" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <span id="teacherPresentationCountdownText">5</span>
+        </div>
+      </div>
+      <p class="teacher-presentation-next" id="teacherPresentationNext">Vào câu tiếp theo sau 5 giây</p>
+      <div class="teacher-presentation-score-list" id="teacherPresentationScoreList"></div>
+    </section>
   </div>
 </div>
 

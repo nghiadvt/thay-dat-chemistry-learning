@@ -19,6 +19,9 @@ const teacherState = {
   scorePanelOpen: true,
   fitTimer: null,
   fitObserver: null,
+  presentationOpen: false,
+  presentationAvailable: !!document.fullscreenEnabled,
+  leaderboardAnimSecond: null,
 };
 const LS_SIDEBAR_COLLAPSED = 'htd_teacher_sidebar_collapsed';
 const LS_MAIN_SPLIT = 'htd_teacher_main_split';
@@ -234,6 +237,216 @@ function renderTeacherIntermission(room) {
   renderTeacherScoreList();
 }
 
+function renderTeacherPresentationQuestion(room) {
+  const game = room?.game;
+  const q = FAKE_QUESTIONS[game?.questionIndex];
+  if (!q) return;
+
+  const progressEl = document.getElementById('teacherPresentationProgress');
+  const promptEl = document.getElementById('teacherPresentationPrompt');
+  const answersEl = document.getElementById('teacherPresentationAnswers');
+  const eqEl = document.getElementById('teacherPresentationEq');
+  const imgEl = document.getElementById('teacherPresentationImage');
+  const vidWrap = document.getElementById('teacherPresentationVideoWrap');
+  const vid = document.getElementById('teacherPresentationVideo');
+  if (!progressEl || !promptEl || !answersEl || !eqEl || !imgEl || !vidWrap || !vid) return;
+
+  progressEl.textContent = `Câu ${game.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
+  promptEl.textContent = q.prompt || '';
+  answersEl.innerHTML = '';
+  eqEl.hidden = true;
+
+  imgEl.hidden = true;
+  vidWrap.hidden = true;
+  vid.pause();
+  vid.removeAttribute('src');
+  vid.removeAttribute('poster');
+
+  if (q.media === 'image' && q.mediaUrl) {
+    imgEl.src = q.mediaUrl;
+    imgEl.hidden = false;
+  } else if (q.media === 'video' && q.mediaUrl) {
+    vid.src = q.mediaUrl;
+    if (q.mediaPoster) vid.poster = q.mediaPoster;
+    vidWrap.hidden = false;
+  }
+
+  if (q.type === 'mc') {
+    answersEl.innerHTML = `<div class="teacher-presentation-mc">${['A', 'B', 'C', 'D']
+      .map((label, i) => {
+        const optText = q.options[i] || '';
+        return `<div class="teacher-presentation-mc-item">
+          <span class="teacher-presentation-mc-label">${label}.</span>
+          <span>${EquationUI.chemToHtml(optText)}</span>
+        </div>`;
+      })
+      .join('')}</div>`;
+  } else if (q.template) {
+    eqEl.hidden = false;
+    const values = EquationUI.createInputState(q.template);
+    eqEl.innerHTML = EquationUI.renderEquation(q.template, values, null);
+  }
+}
+
+function renderTeacherPresentationLeaderboard(room) {
+  const listEl = document.getElementById('teacherPresentationScoreList');
+  if (!listEl) return;
+  const players = getTeacherDisplayPlayers();
+  initTeacherFakeScores(players);
+
+  const sorted = players
+    .map(p => ({ ...p, score: getTeacherPlayerScore(p) }))
+    .sort((a, b) => b.score - a.score);
+
+  if (sorted.length === 0) {
+    listEl.innerHTML = '<p class="teacher-score-empty">Chưa có học sinh</p>';
+    return;
+  }
+
+  listEl.innerHTML = sorted.map((p, i) => {
+    const av = p.avatarDataUrl ? `<img src="${p.avatarDataUrl}" alt="">` : p.avatarEmoji || '😀';
+    const prev = teacherState.prevRanks[p.id];
+    let stateCls = '';
+    let deltaHtml = '';
+    if (prev !== undefined && prev !== i) {
+      const up = prev > i;
+      stateCls = up ? ' up' : ' down';
+      deltaHtml = `<span class="teacher-presentation-delta ${up ? 'up' : 'down'}">${up ? '↑' : '↓'}${Math.abs(prev - i)}</span>`;
+    } else if (prev !== undefined) {
+      deltaHtml = '<span class="teacher-presentation-delta flat">—</span>';
+    }
+
+    return `<div class="teacher-presentation-score-item${stateCls}">
+      <span class="teacher-presentation-rank">${i + 1}</span>
+      <div class="teacher-presentation-av">${av}</div>
+      <div class="teacher-presentation-name">${p.name}</div>
+      <div class="teacher-presentation-pts">${p.score}${deltaHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateTeacherPresentationCountdown(room) {
+  const game = room?.game;
+  if (!game) return;
+
+  if (game.phase === 'leaderboard') {
+    const sec = HTD.getPhaseTimeRemaining(game);
+    const total = Math.max(1, Math.round(HTD.LEADERBOARD_MS / 1000));
+    const ratio = Math.max(0, Math.min(1, sec / total));
+
+    const textEl = document.getElementById('teacherPresentationCountdownText');
+    const nextEl = document.getElementById('teacherPresentationNext');
+    const ring = document.getElementById('teacherPresentationRing');
+    if (!textEl || !nextEl || !ring) return;
+
+    textEl.textContent = String(sec);
+    nextEl.textContent = `Vào câu tiếp theo sau ${sec} giây`;
+    updateTeacherPresentationRing(ring, ratio);
+  }
+
+  if (game.phase === 'question') {
+    const sec = HTD.getQuestionTimeRemaining(game);
+    const q = FAKE_QUESTIONS[game.questionIndex];
+    const total = Math.max(1, q?.timeLimit || 1);
+    const ratio = Math.max(0, Math.min(1, sec / total));
+    const qTextEl = document.getElementById('teacherPresentationQuestionCountdownText');
+    const qRing = document.getElementById('teacherPresentationQuestionRing');
+    if (!qTextEl || !qRing) return;
+    qTextEl.textContent = String(sec);
+    updateTeacherPresentationRing(qRing, ratio);
+  }
+}
+
+function updateTeacherPresentationRing(ring, ratio) {
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  ring.style.strokeDasharray = `${circumference}`;
+  ring.style.strokeDashoffset = `${circumference * (1 - ratio)}`;
+}
+
+function animateTeacherLeaderboardScores(sec) {
+  if (teacherState.leaderboardAnimSecond === sec || sec <= 0) return;
+  teacherState.leaderboardAnimSecond = sec;
+  const players = getTeacherDisplayPlayers();
+  if (!players.length) return;
+
+  teacherState.prevRanks = {};
+  const before = players
+    .map(p => ({ ...p, score: getTeacherPlayerScore(p) }))
+    .sort((a, b) => b.score - a.score);
+  before.forEach((p, i) => {
+    teacherState.prevRanks[p.id] = i;
+  });
+
+  players.forEach(p => {
+    const delta = Math.floor(Math.random() * 65) + 8;
+    teacherState.fakeScores[p.id] = getTeacherPlayerScore(p) + delta;
+  });
+}
+
+function renderTeacherPresentation(room) {
+  const wrap = document.getElementById('teacherPresentation');
+  const questionScreen = document.getElementById('teacherPresentationQuestion');
+  const lbScreen = document.getElementById('teacherPresentationLeaderboard');
+  if (!wrap || !questionScreen || !lbScreen) return;
+  if (!teacherState.presentationOpen) {
+    wrap.hidden = true;
+    return;
+  }
+
+  wrap.hidden = false;
+  if (!room?.game || room.game.phase === 'final') {
+    teacherState.presentationOpen = false;
+    wrap.hidden = true;
+    if (document.fullscreenElement === wrap && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+    questionScreen.hidden = true;
+    lbScreen.hidden = true;
+    return;
+  }
+
+  if (room.game.phase === 'question') {
+    questionScreen.hidden = false;
+    lbScreen.hidden = true;
+    renderTeacherPresentationQuestion(room);
+    updateTeacherPresentationCountdown(room);
+  } else if (room.game.phase === 'leaderboard') {
+    questionScreen.hidden = true;
+    lbScreen.hidden = false;
+    renderTeacherPresentationLeaderboard(room);
+    updateTeacherPresentationCountdown(room);
+  }
+}
+
+function toggleTeacherPresentation() {
+  const wrap = document.getElementById('teacherPresentation');
+  const room = HTD.getRoom();
+  if (!wrap || room?.status !== 'started' || !teacherState.presentationAvailable) return;
+
+  const targetOpen = !teacherState.presentationOpen;
+  teacherState.presentationOpen = targetOpen;
+  renderTeacherPresentation(room);
+  closeTeacherActionMenu();
+
+  if (targetOpen) {
+    if (document.fullscreenElement !== wrap && wrap.requestFullscreen) {
+      wrap.requestFullscreen().catch(() => {});
+    }
+  } else if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+function syncTeacherPresentationFullscreenState() {
+  const wrap = document.getElementById('teacherPresentation');
+  if (!wrap) return;
+  if (teacherState.presentationOpen && document.fullscreenElement !== wrap) {
+    teacherState.presentationOpen = false;
+    renderTeacherPresentation(HTD.getRoom());
+  }
+}
+
 function renderTeacherFinal() {
   document.getElementById('teacherQuestionPhase').hidden = true;
   document.getElementById('teacherFinalPhase').hidden = false;
@@ -265,6 +478,7 @@ function renderTeacherGame(room) {
 
   teacherState.lastRenderedPhase = game.phase;
   teacherState.lastRenderedIndex = game.questionIndex;
+  renderTeacherPresentation(room);
 }
 
 function teacherGameTick() {
@@ -284,8 +498,10 @@ function teacherGameTick() {
     if (teacherState.lastScoreTick !== game.questionIndex) {
       bumpTeacherScoresOnLeaderboard();
       teacherState.lastScoreTick = game.questionIndex;
+      teacherState.leaderboardAnimSecond = null;
     }
     const remaining = HTD.getPhaseTimeRemaining(game);
+    animateTeacherLeaderboardScores(remaining);
     if (remaining <= 0) {
       const next = game.questionIndex + 1;
       if (next >= FAKE_QUESTIONS.length) {
@@ -309,6 +525,7 @@ function teacherGameTick() {
   } else if (changed) {
     renderTeacherGame(room2);
   }
+  renderTeacherPresentation(room2);
 }
 
 function syncModalPinDigits() {
@@ -455,6 +672,8 @@ function teacherStartGame() {
   teacherState.fakeScores = {};
   teacherState.prevRanks = {};
   teacherState.lastScoreTick = -1;
+  teacherState.presentationOpen = false;
+  teacherState.leaderboardAnimSecond = null;
   closeTeacherActionMenu();
   renderDashboard();
 }
@@ -490,6 +709,8 @@ function teacherPlayAgain() {
   teacherState.fakeScores = {};
   teacherState.prevRanks = {};
   teacherState.lastScoreTick = -1;
+  teacherState.presentationOpen = false;
+  teacherState.leaderboardAnimSecond = null;
   closeTeacherActionMenu();
   renderDashboard();
 }
@@ -501,6 +722,13 @@ function resetTeacherRoom() {
   localStorage.removeItem(HTD.LS_PLAYERS);
   teacherState.fakeScores = {};
   teacherState.prevRanks = {};
+  teacherState.presentationOpen = false;
+  teacherState.leaderboardAnimSecond = null;
+  const presentation = document.getElementById('teacherPresentation');
+  if (presentation) presentation.hidden = true;
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
   showTeacherScreen('setup');
 }
 
@@ -552,6 +780,8 @@ function initTeacherQZoom() {
 function applyTeacherQZoom() {
   const card = document.getElementById('teacherQCard');
   if (card) card.style.setProperty('--q-zoom', teacherState.qZoom);
+  const presentationInner = document.querySelector('.teacher-presentation-inner');
+  if (presentationInner) presentationInner.style.setProperty('--presentation-zoom', teacherState.qZoom);
   scheduleFitTeacherQuestionCard();
 }
 
@@ -610,11 +840,18 @@ function toggleTeacherScorePanel() {
 }
 
 function updateTeacherScorePanelBtn() {
-  const btn = document.getElementById('teacherToggleScoresBtn');
-  if (!btn) return;
   const started = HTD.getRoom()?.status === 'started';
-  btn.hidden = !started;
-  btn.textContent = teacherState.scorePanelOpen ? 'Ẩn bảng điểm' : 'Hiện bảng điểm';
+
+  const presentMenuBtn = document.getElementById('teacherPresentationMenuBtn');
+  if (presentMenuBtn) {
+    presentMenuBtn.hidden = !started || !teacherState.presentationAvailable;
+    presentMenuBtn.textContent = teacherState.presentationOpen ? 'Tắt trình chiếu' : 'Bật trình chiếu';
+  }
+  const scoreMenuBtn = document.getElementById('teacherToggleScoresMenuBtn');
+  if (scoreMenuBtn) {
+    scoreMenuBtn.hidden = !started;
+    scoreMenuBtn.textContent = teacherState.scorePanelOpen ? 'Ẩn bảng điểm' : 'Hiện bảng điểm';
+  }
 }
 
 function initTeacherDashboardUi() {
@@ -630,6 +867,7 @@ function initTeacherDashboardUi() {
     toggleTeacherActionMenu();
   });
   document.addEventListener('click', () => closeTeacherActionMenu());
+  document.addEventListener('fullscreenchange', syncTeacherPresentationFullscreenState);
 
   initTeacherQuestionFitObserver();
   initTeacherMainResizer();
@@ -714,6 +952,7 @@ window.teacherStartGame = teacherStartGame;
 window.teacherTogglePause = teacherTogglePause;
 window.teacherEndGame = teacherEndGame;
 window.teacherPlayAgain = teacherPlayAgain;
+window.toggleTeacherPresentation = toggleTeacherPresentation;
 window.createTeacherRoom = createTeacherRoom;
 window.demoTeacherGo = demoTeacherGo;
 
