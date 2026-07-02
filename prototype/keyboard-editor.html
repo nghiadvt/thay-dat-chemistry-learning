@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chemical Keyboard Editor — Hóa Thầy Đạt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/shared.css">
+  <link rel="stylesheet" href="css/keyboard-editor.css">
+</head>
+<body class="kbe-app">
+
+<header class="kbe-header" id="kbeHeader">
+  <div class="kbe-header-left">
+    <a href="teacher.html" class="kbe-logo" title="Về trang giáo viên">
+      <span class="kbe-logo-icon" aria-hidden="true">⚗</span>
+      <span class="kbe-logo-text">CHEMICAL KEYBOARD EDITOR</span>
+    </a>
+    <input type="text" class="kbe-name-input" id="kbeNameInput" value="Bàn phím Hóa học" aria-label="Tên bàn phím">
+    <div class="kbe-history-btns">
+      <button type="button" class="kbe-icon-btn" id="kbeUndoBtn" title="Hoàn tác" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button type="button" class="kbe-icon-btn" id="kbeRedoBtn" title="Làm lại" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="kbe-header-center">
+    <div class="kbe-device-toggle" role="group" aria-label="Thiết bị xem trước">
+      <button type="button" class="kbe-device-btn active" data-device="phone">Phone</button>
+      <button type="button" class="kbe-device-btn" data-device="tablet">Tablet</button>
+    </div>
+    <div class="kbe-zoom-toggle" role="group" aria-label="Thu phóng">
+      <button type="button" class="kbe-zoom-btn" data-zoom="0.5">50%</button>
+      <button type="button" class="kbe-zoom-btn" data-zoom="0.75">75%</button>
+      <button type="button" class="kbe-zoom-btn active" data-zoom="1">100%</button>
+      <button type="button" class="kbe-zoom-btn" data-zoom="1.5">150%</button>
+    </div>
+  </div>
+  <div class="kbe-header-right">
+    <button type="button" class="kbe-btn kbe-btn-ghost" id="kbePreviewBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Preview
+    </button>
+    <button type="button" class="kbe-btn kbe-btn-ghost" id="kbeTestBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
+      Test
+    </button>
+    <button type="button" class="kbe-btn kbe-btn-ghost" id="kbeImportBtn">Import</button>
+    <button type="button" class="kbe-btn kbe-btn-ghost" id="kbeExportBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+    <button type="button" class="kbe-btn kbe-btn-primary" id="kbeSaveBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save
+    </button>
+  </div>
+</header>
+
+<div class="kbe-body" id="kbeBody">
+  <aside class="kbe-panel kbe-layout-panel" id="kbeLayoutPanel">
+    <div class="kbe-panel-head">
+      <h2>LAYOUT EDITOR</h2>
+      <p>Chỉnh sửa hàng và phím bàn phím</p>
+    </div>
+    <div class="kbe-row-list" id="kbeRowList"></div>
+    <button type="button" class="kbe-add-row-btn" id="kbeAddRowBtn">+ Thêm hàng mới</button>
+  </aside>
+
+  <main class="kbe-preview-area" id="kbePreviewArea">
+    <div class="kbe-preview-stage" id="kbePreviewStage">
+      <div class="kbe-phone-wrap" id="kbePhoneWrap">
+        <div class="kbe-phone-frame" id="kbePhoneFrame">
+          <div class="kbe-phone-screen" id="kbePhoneScreen">
+            <div class="kbe-phone-content" id="kbePhoneContent">
+              <p class="kbe-phone-placeholder">Xem trước bàn phím</p>
+            </div>
+            <div class="kbe-phone-kb" id="kbePhoneKb"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="kbe-validation-banner" id="kbeValidationBanner" hidden></div>
+  </main>
+
+  <aside class="kbe-panel kbe-props-panel" id="kbePropsPanel">
+    <div id="kbePropsContent"></div>
+  </aside>
+</div>
+
+<footer class="kbe-bottom" id="kbeBottom">
+  <div class="kbe-bottom-left">
+    <h3>KEY OPTIONS</h3>
+    <div class="kbe-key-options" id="kbeKeyOptions">
+      <div class="kbe-opt-group">
+        <label>Kích thước phím</label>
+        <div class="kbe-seg" data-opt="keySize">
+          <button type="button" data-val="S">S</button>
+          <button type="button" data-val="M" class="active">M</button>
+          <button type="button" data-val="L">L</button>
+        </div>
+      </div>
+      <div class="kbe-opt-group">
+        <label>Cỡ chữ</label>
+        <div class="kbe-seg" data-opt="fontSize">
+          <button type="button" data-val="S">A−</button>
+          <button type="button" data-val="M" class="active">A</button>
+          <button type="button" data-val="L">A+</button>
+        </div>
+      </div>
+      <div class="kbe-opt-group kbe-color-group">
+        <label>Màu chữ</label>
+        <input type="color" id="kbeDefaultTextColor" value="#000000">
+        <input type="text" class="kbe-hex-input" id="kbeDefaultTextHex" value="#000000" maxlength="7">
+      </div>
+      <div class="kbe-opt-group kbe-color-group">
+        <label>Nền phím</label>
+        <input type="color" id="kbeDefaultBgColor" value="#ffffff">
+        <input type="text" class="kbe-hex-input" id="kbeDefaultBgHex" value="#FFFFFF" maxlength="7">
+      </div>
+      <div class="kbe-opt-group kbe-color-group">
+        <label>Viền phím</label>
+        <input type="color" id="kbeDefaultBorderColor" value="#d0d0d0">
+        <input type="text" class="kbe-hex-input" id="kbeDefaultBorderHex" value="#D0D0D0" maxlength="7">
+      </div>
+    </div>
+  </div>
+  <div class="kbe-bottom-right">
+    <div class="kbe-lib-head">
+      <h3>AVAILABLE KEYS</h3>
+      <input type="search" class="kbe-search" id="kbeKeySearch" placeholder="Tìm phím…">
+    </div>
+    <p class="kbe-lib-hint">Kéo thả phím vào hàng bàn phím</p>
+    <div class="kbe-key-library" id="kbeKeyLibrary"></div>
+  </div>
+</footer>
+
+<!-- Row context menu -->
+<div class="kbe-context-menu" id="kbeRowMenu" hidden>
+  <button type="button" data-action="add-above">Thêm hàng phía trên</button>
+  <button type="button" data-action="add-below">Thêm hàng phía dưới</button>
+  <button type="button" data-action="duplicate">Nhân đôi hàng</button>
+  <button type="button" data-action="hide">Ẩn hàng</button>
+  <button type="button" data-action="lock">Khóa hàng</button>
+  <button type="button" data-action="copy">Sao chép hàng</button>
+  <button type="button" data-action="paste">Dán hàng</button>
+  <button type="button" data-action="delete" class="danger">Xóa hàng</button>
+</div>
+
+<!-- Preview overlay -->
+<div class="kbe-overlay" id="kbePreviewOverlay" hidden>
+  <button type="button" class="kbe-overlay-close" id="kbePreviewClose" aria-label="Đóng">×</button>
+  <div class="kbe-overlay-phone" id="kbeOverlayPhone"></div>
+</div>
+
+<!-- Test overlay -->
+<div class="kbe-overlay kbe-test-overlay" id="kbeTestOverlay" hidden>
+  <button type="button" class="kbe-overlay-close" id="kbeTestClose" aria-label="Đóng">×</button>
+  <div class="kbe-test-wrap">
+    <div class="kbe-test-output-wrap">
+      <label>Output</label>
+      <div class="kbe-test-output" id="kbeTestOutput"></div>
+      <button type="button" class="kbe-btn kbe-btn-ghost kbe-test-clear" id="kbeTestClear">Xóa</button>
+    </div>
+    <div class="kbe-overlay-phone" id="kbeTestPhone"></div>
+  </div>
+</div>
+
+<input type="file" id="kbeImportFile" accept="application/json,.json" hidden>
+
+<div class="kbe-toast" id="kbeToast" hidden></div>
+
+<script src="js/keyboard-editor.js"></script>
+</body>
+</html>
