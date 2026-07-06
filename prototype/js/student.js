@@ -26,9 +26,22 @@ const state = {
   waitingJoinedAt: 0,
   gamePoll: null,
   lastGameQuestionIndex: -1,
+  backendMode: false,
+  currentQuestion: null,
+  serverQuestionIndex: 0,
+  backendRoom: null,
 };
 
 const FAKE_QUESTIONS = HTD.FAKE_QUESTIONS;
+
+function isBackendMode() {
+  return Boolean(window.HTD_CONFIG?.useBackend);
+}
+
+function getCurrentQuestion() {
+  if (isBackendMode() && state.currentQuestion) return state.currentQuestion;
+  return FAKE_QUESTIONS[state.questionIndex];
+}
 
 function showScreen(id) {
   stopCamera();
@@ -108,6 +121,26 @@ function buildNumpad() {
 }
 
 function validatePinAndContinue() {
+  if (isBackendMode()) {
+    HTDApi.checkPin(state.pinDigits)
+      .then(data => {
+        state.backendRoom = {
+          pin: state.pinDigits,
+          name: data.game_name || 'PHÒNG QUIZ',
+          teacher: 'Giáo viên',
+          status: 'waiting',
+          backendMode: true,
+        };
+        HTD.setRoom(state.backendRoom);
+        showScreen('profile');
+      })
+      .catch(err => {
+        alert(err.message || 'PIN không hợp lệ.');
+        state.pinDigits = '';
+        renderPinDisplay();
+      });
+    return;
+  }
   const room = HTD.getRoom();
   if (!room || state.pinDigits !== room.pin) {
     alert(room ? 'PIN không đúng!' : 'Chưa có phòng. Giáo viên cần tạo phòng trước.');
@@ -249,6 +282,21 @@ function stopCamera() {
 function submitProfile() {
   state.studentName = document.getElementById('profileName').value.trim().slice(0, 20);
   if (!state.studentName) return;
+
+  if (isBackendMode()) {
+    const room = HTD.getRoom() || state.backendRoom;
+    HTDBridge.init()
+      .then(() => HTDBridge.joinRoom({ pin: room.pin, name: state.studentName, isHost: false }))
+      .then(() => {
+        state.playerId = state.studentName;
+        state.waitingJoinedAt = Date.now();
+        state.backendMode = true;
+        showScreen('waiting');
+      })
+      .catch(err => alert(err.message || 'Không vào được phòng.'));
+    return;
+  }
+
   state.playerId = HTD.genId();
   state.waitingJoinedAt = Date.now();
   saveMyPlayer();
@@ -297,6 +345,12 @@ function initDisplayPlayers() {
 }
 
 function getPlayersForWaiting() {
+  if (isBackendMode()) {
+    return (state.displayPlayers || []).map(p => ({
+      ...p,
+      isMe: p.name === state.studentName,
+    }));
+  }
   initDisplayPlayers();
   return state.displayPlayers.map(p => ({
     ...p,
@@ -339,6 +393,8 @@ function startWaitingPoll() {
     dots = (dots + 1) % 4;
     document.getElementById('waitingDots').textContent = '.'.repeat(dots);
     renderWaitingGrid();
+    if (isBackendMode()) return;
+
     const room = HTD.getRoom();
     const gameStarted =
       room?.status === 'started' &&
@@ -380,10 +436,26 @@ const CHEM_KB_ROWS = [
   ['7', '8', '9', '0', '(', ')'],
 ];
 
-function buildChemKeyboard() {
+function buildChemKeyboard(config) {
   const kb = document.getElementById('chemKb');
-  if (kb.dataset.built) return;
-  kb.dataset.built = '1';
+  const kbWrap = document.getElementById('qKeyboard');
+  if (!kb) return;
+
+  kb.dataset.built = '';
+  HTDKeyboardRuntime.clear(kb);
+  kbWrap?.classList.remove('has-dyn-kb');
+
+  if (config?.rows?.length) {
+    const ok = HTDKeyboardRuntime.render(kb, config, onDynamicKeyPress);
+    if (ok) {
+      kb.dataset.built = 'dynamic';
+      kbWrap?.classList.add('has-dyn-kb');
+      return;
+    }
+  }
+
+  if (kb.dataset.built === 'static') return;
+  kb.dataset.built = 'static';
   kb.innerHTML = CHEM_KB_ROWS.map(row =>
     `<div class="chem-kb-row">${row.map(k => {
       if (k === 'del') return '<button type="button" class="chem-key del" data-action="back">⌫</button>';
@@ -394,6 +466,26 @@ function buildChemKeyboard() {
   kb.querySelectorAll('.chem-key').forEach(key => {
     key.onclick = () => onChemKey(key.dataset.action === 'back' ? '⌫' : key.dataset.val);
   });
+}
+
+function onDynamicKeyPress(key) {
+  if (!key) return;
+  const type = key.type || 'normal';
+  const value = key.value ?? key.text ?? '';
+
+  if (type === 'send') {
+    submitAnswer();
+    return;
+  }
+  if (type === 'delete' || value === 'BACKSPACE') {
+    onChemKey('⌫');
+    return;
+  }
+  if (type === 'space' || value === ' ') {
+    onChemKey(' ');
+    return;
+  }
+  onChemKey(value);
 }
 
 function buildCoefNumpad() {
@@ -412,7 +504,7 @@ function buildCoefNumpad() {
 }
 
 function getFocusedSlotType() {
-  const q = FAKE_QUESTIONS[state.questionIndex];
+  const q = getCurrentQuestion();
   if (!state.focusedSlotId || !q?.template) return null;
   const part = q.template.find(
     p => (p.t === 'coef' || p.t === 'blank') && p.id === state.focusedSlotId
@@ -491,6 +583,7 @@ function startSyncedTimer(onEnd) {
 }
 
 function syncGamePoll() {
+  if (isBackendMode()) return;
   clearInterval(state.gamePoll);
   const room = HTD.getRoom();
   if (!room || room.status !== 'started' || !room.game) return;
@@ -552,7 +645,7 @@ function syncGameState() {
 }
 
 function autoEndQuestion() {
-  const q = FAKE_QUESTIONS[state.questionIndex];
+  const q = getCurrentQuestion();
   if (!q) return;
   if (q.type === 'mc') finishMC(-1);
   else submitAnswer(true);
@@ -568,7 +661,7 @@ function updateLbCountdownFromGame() {
 
 // ─── Question (unified) ───
 function startQuestion() {
-  const q = FAKE_QUESTIONS[state.questionIndex];
+  const q = getCurrentQuestion();
   if (!q) return;
 
   state.submitted = false;
@@ -577,8 +670,9 @@ function startQuestion() {
   screen.classList.toggle('mode-input', q.type === 'input');
   screen.classList.toggle('mode-mc', q.type === 'mc');
 
-  document.getElementById('qProgress').textContent =
-    `Câu ${state.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
+  document.getElementById('qProgress').textContent = isBackendMode()
+    ? `Câu ${state.questionIndex + 1}`
+    : `Câu ${state.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
   document.getElementById('qId').textContent = `ID: ${q.id || '—'}`;
 
   const badge = document.getElementById('qTypeBadge');
@@ -611,11 +705,42 @@ function startQuestion() {
 
   document.getElementById('qStarBtn').classList.remove('active');
   state.lastGameQuestionIndex = HTD.getRoom()?.game?.questionIndex ?? state.questionIndex;
-  startSyncedTimer(() => {
+  startQuestionTimer(q, () => {
     if (q.type === 'mc') finishMC(-1);
     else submitAnswer(true);
   });
   syncGamePoll();
+}
+
+function startQuestionTimer(q, onEnd) {
+  if (isBackendMode() && q.serverTime) {
+    clearInterval(state.timerInterval);
+    const offset = HTDSocket.getNtpOffset();
+    const tick = () => {
+      const now = Date.now() + offset;
+      const elapsed = (now - q.serverTime) / 1000;
+      const sec = Math.max(0, q.timeLimit - elapsed);
+      const text = document.getElementById('qTimerText');
+      const pill = document.getElementById('qTimerPill');
+      if (text) text.textContent = formatTimer(sec);
+      if (pill) {
+        pill.classList.remove('warn', 'danger', 'paused');
+        if (sec <= 3) pill.classList.add('danger');
+        else if (sec <= 5) pill.classList.add('warn');
+      }
+      return sec;
+    };
+    tick();
+    state.timerInterval = setInterval(() => {
+      const sec = tick();
+      if (sec <= 0 && !state.submitted) {
+        clearInterval(state.timerInterval);
+        onEnd();
+      }
+    }, 200);
+    return;
+  }
+  startSyncedTimer(onEnd);
 }
 
 function renderQuestionMedia(q) {
@@ -675,7 +800,6 @@ function submitMcAnswer() {
 }
 
 function setupInputQuestion(q) {
-  buildChemKeyboard();
   buildCoefNumpad();
   state.inputValues = EquationUI.createInputState(q.template);
   state.focusedSlotId = null;
@@ -688,6 +812,14 @@ function setupInputQuestion(q) {
 
   chemKb.style.display = showChem ? '' : 'none';
   coefPad.style.display = showCoef ? '' : 'none';
+  coefPad.hidden = !showCoef;
+
+  if (showChem) {
+    buildChemKeyboard(q.keyboardConfig);
+  } else {
+    HTDKeyboardRuntime.clear(chemKb);
+    chemKb.dataset.built = '';
+  }
 
   const onFocus = id => { state.focusedSlotId = id; };
   const onChange = () => {};
@@ -718,7 +850,21 @@ function submitAnswer(timedOut) {
   if (state.submitted) return;
   state.submitted = true;
   clearInterval(state.timerInterval);
-  const q = FAKE_QUESTIONS[state.questionIndex];
+  const q = getCurrentQuestion();
+
+  if (isBackendMode()) {
+    const answer = HTDGameAdapter.buildSubmitPayload(q, {
+      inputValues: state.inputValues,
+      selectedAnswer: state.selectedAnswer,
+    });
+    showScreen('submit');
+    HTDBridge.submitAnswer(q.id, answer).catch(err => {
+      alert(err.message || 'Không nộp được đáp án.');
+      state.submitted = false;
+    });
+    return;
+  }
+
   const game = HTD.getRoom()?.game;
   const remaining = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
   showScreen('submit');
@@ -735,7 +881,17 @@ function finishMC(ans) {
   if (state.submitted) return;
   state.submitted = true;
   clearInterval(state.timerInterval);
-  const q = FAKE_QUESTIONS[state.questionIndex];
+  const q = getCurrentQuestion();
+
+  if (isBackendMode()) {
+    showScreen('submit');
+    HTDBridge.submitAnswer(q.id, { index: ans }).catch(err => {
+      alert(err.message || 'Không nộp được đáp án.');
+      state.submitted = false;
+    });
+    return;
+  }
+
   const game = HTD.getRoom()?.game;
   const remaining = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
   const ok = ans === q.correct;
@@ -765,6 +921,7 @@ function showResult(ok, pts, ans) {
 }
 
 function updateScores() {
+  if (isBackendMode()) return;
   state.prevRanks = {};
   state.students.forEach((s, i) => {
     state.prevRanks[s.id] = i;
@@ -966,10 +1123,76 @@ function demoGo(s) {
   showScreen(s);
 }
 
-buildChemKeyboard();
 buildCoefNumpad();
 buildNumpad();
 renderPinDisplay();
+
+function setupStudentBackendBridge() {
+  if (!isBackendMode()) return;
+
+  HTDBridge.on('gameStarted', () => {
+    clearInterval(state.waitingPoll);
+    state.questionIndex = 0;
+    state.serverQuestionIndex = 0;
+    state.myScore = 0;
+    const room = HTD.getRoom();
+    if (room) {
+      room.status = 'started';
+      room.startedAt = Date.now();
+      HTD.setRoom(room);
+    }
+  });
+
+  HTDBridge.on('newQuestion', payload => {
+    state.serverQuestionIndex += 1;
+    state.questionIndex = state.serverQuestionIndex - 1;
+    state.currentQuestion = HTDGameAdapter.mapNewQuestion(payload, state.questionIndex);
+    state.submitted = false;
+    showScreen('question');
+  });
+
+  HTDBridge.on('questionResult', result => {
+    const ok = Boolean(result.correct);
+    const pts = Number(result.score_earned || 0);
+    state.myScore = Number(result.total_score ?? state.myScore);
+    let ans = '—';
+    if (typeof result.correct_answer === 'string') ans = result.correct_answer;
+    else if (result.correct_answer) ans = JSON.stringify(result.correct_answer);
+    showResult(ok, pts, ans);
+  });
+
+  HTDBridge.on('playersUpdate', data => {
+    state.displayPlayers = HTDGameAdapter.mapPlayersUpdate(data.players);
+    renderWaitingGrid();
+  });
+
+  HTDBridge.on('leaderboardUpdate', data => {
+    state.students = HTDGameAdapter.mapLeaderboard(data.top5).map((s, i) => ({
+      ...s,
+      isMe: s.name === state.studentName,
+      id: s.id || `lb-${i}`,
+    }));
+  });
+
+  HTDBridge.on('gameEnded', data => {
+    if (data.final_leaderboard) {
+      state.students = data.final_leaderboard.map((row, i) => ({
+        id: `final-${i}`,
+        name: row.name,
+        score: Number(row.score || 0),
+        avatarEmoji: '😀',
+        isMe: row.name === state.studentName,
+      }));
+    }
+    showScreen('final');
+  });
+
+  HTDBridge.on('roomError', data => {
+    alert(data.message || 'Lỗi phòng.');
+  });
+}
+
+setupStudentBackendBridge();
 
 document.getElementById('qStarBtn')?.addEventListener('click', function () {
   this.classList.toggle('active');

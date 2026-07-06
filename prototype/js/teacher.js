@@ -22,10 +22,69 @@ const teacherState = {
   presentationOpen: false,
   presentationAvailable: !!document.fullscreenEnabled,
   leaderboardAnimSecond: null,
+  currentQuestion: null,
+  serverQuestionIndex: 0,
+  playerScores: {},
+  finalLeaderboard: [],
+  presentationTick: null,
 };
 const LS_SIDEBAR_COLLAPSED = 'htd_teacher_sidebar_collapsed';
 const LS_MAIN_SPLIT = 'htd_teacher_main_split';
 const FAKE_QUESTIONS = HTD.FAKE_QUESTIONS;
+
+function isBackendMode() {
+  return Boolean(window.HTD_CONFIG?.useBackend);
+}
+
+function getTeacherCurrentQuestion() {
+  if (isBackendMode() && teacherState.currentQuestion) return teacherState.currentQuestion;
+  const room = HTD.getRoom();
+  if (room?.game) return FAKE_QUESTIONS[room.game.questionIndex];
+  return FAKE_QUESTIONS[0];
+}
+
+function ensureTeacherGameState(room) {
+  if (!room.game) {
+    room.game = {
+      phase: 'waiting',
+      questionIndex: 0,
+      paused: false,
+      phaseStartedAt: Date.now(),
+      phaseDuration: 5,
+      questionStartedAt: Date.now(),
+      questionDuration: 30,
+    };
+  }
+  return room.game;
+}
+
+function loadTeacherGamePicker() {
+  const wrap = document.getElementById('teacherSetupGame');
+  const select = document.getElementById('teacherGameSelect');
+  if (!wrap || !select || !isBackendMode()) return;
+
+  wrap.hidden = false;
+  HTDApi.listGames()
+    .then(games => {
+      if (!games.length) {
+        select.innerHTML = '<option value="">Chưa có game — tạo trong Admin</option>';
+        return;
+      }
+      select.innerHTML =
+        '<option value="">— Chọn game —</option>' +
+        games
+          .map(g => {
+            const count = g.quizzes_count ?? 0;
+            return `<option value="${g.id}">${g.name} (${count} quiz)</option>`;
+          })
+          .join('');
+      const urlGameId = new URLSearchParams(location.search).get('game_id');
+      if (urlGameId) select.value = urlGameId;
+    })
+    .catch(() => {
+      select.innerHTML = '<option value="">Không tải được danh sách game</option>';
+    });
+}
 
 function showTeacherScreen(id) {
   document.querySelectorAll('.teacher-screen').forEach(s => s.classList.remove('active'));
@@ -43,15 +102,102 @@ function showTeacherScreen(id) {
 }
 
 function initTeacherApp() {
+  const params = new URLSearchParams(location.search);
+  const pinFromUrl = (params.get('pin') || '').replace(/\D/g, '').slice(0, 6);
+
+  if (pinFromUrl.length === 6 && isBackendMode()) {
+    joinExistingRoomFromAdmin(pinFromUrl, params);
+    return;
+  }
+
   const room = HTD.getRoom();
   if (room && room.status !== 'ended') {
     showTeacherScreen('dashboard');
   } else {
     showTeacherScreen('setup');
+    loadTeacherGamePicker();
   }
 }
 
+function joinExistingRoomFromAdmin(pin, params) {
+  const gameId = parseInt(params.get('game_id'), 10) || null;
+  const sessionId = parseInt(params.get('session_id'), 10) || null;
+
+  HTDBridge.init()
+    .then(() => HTDApi.checkPin(pin))
+    .then(data => {
+      const roomData = data.data || data;
+      HTD.setRoom({
+        pin,
+        name: roomData.game_name || 'PHÒNG QUIZ',
+        teacher: 'Giáo viên',
+        status: roomData.status || 'waiting',
+        backendMode: true,
+        sessionId: sessionId || roomData.session_id,
+        gameId,
+        createdAt: Date.now(),
+      });
+      HTD.setPlayers([]);
+      return HTDBridge.joinRoom({
+        pin,
+        name: 'Host',
+        isHost: true,
+      });
+    })
+    .then(() => showTeacherScreen('dashboard'))
+    .catch(err => {
+      const msg = err.message || 'Không vào được phòng.';
+      if (/Unauthenticated|401|419|đăng nhập/i.test(msg)) {
+        location.href = HTDApi.loginUrl(location.pathname + location.search);
+        return;
+      }
+      alert(msg);
+      showTeacherScreen('setup');
+    });
+}
+
 function createTeacherRoom() {
+  if (isBackendMode()) {
+    const select = document.getElementById('teacherGameSelect');
+    const gameId = parseInt(select?.value, 10);
+    if (!gameId) {
+      alert('Chọn game trước khi tạo phòng (hoặc tạo phòng từ Admin).');
+      return;
+    }
+    HTDBridge.init()
+      .then(() => HTDApi.createGameSession(gameId))
+      .then(data => {
+        const session = data.session || data;
+        const pin = data.pin || session.pin;
+        HTD.setRoom({
+          pin,
+          name: session.game?.name || 'PHÒNG QUIZ',
+          teacher: session.host?.name || 'Giáo viên',
+          status: 'waiting',
+          backendMode: true,
+          sessionId: session.id,
+          gameId,
+          createdAt: Date.now(),
+        });
+        HTD.setPlayers([]);
+        return HTDBridge.joinRoom({
+          pin,
+          name: session.host?.name || 'Host',
+          isHost: true,
+        });
+      })
+      .then(() => showTeacherScreen('dashboard'))
+      .catch(err => {
+        const msg = err.message || 'Không tạo được phòng.';
+        if (/Unauthenticated|401|419|đăng nhập/i.test(msg)) {
+          location.href = HTDApi.loginUrl('/app/teacher.html');
+          return;
+        }
+        alert(msg);
+      });
+    return;
+  }
+
   const pin = HTD.genPin();
   HTD.setRoom({
     pin,
@@ -130,6 +276,19 @@ function renderDashboard() {
 function renderTeacherTimeline(game) {
   const el = document.getElementById('teacherTimeline');
   if (!el) return;
+
+  if (isBackendMode() && HTD.getRoom()?.backendMode) {
+    const count = Math.max(game.questionIndex + 1, teacherState.serverQuestionIndex || 1);
+    el.innerHTML = Array.from({ length: count }, (_, i) => {
+      let cls = 'teacher-timeline-item';
+      if (i < game.questionIndex) cls += ' done';
+      else if (i === game.questionIndex && game.phase !== 'final') cls += ' active';
+      else if (game.phase === 'final') cls += ' done';
+      return `<div class="${cls}" title="Câu ${i + 1}"><span>${i + 1}</span></div>`;
+    }).join('');
+    return;
+  }
+
   el.innerHTML = FAKE_QUESTIONS.map((q, i) => {
     let cls = 'teacher-timeline-item';
     if (i < game.questionIndex) cls += ' done';
@@ -142,7 +301,7 @@ function renderTeacherTimeline(game) {
 
 function renderTeacherQuestion(room) {
   const game = room.game;
-  const q = FAKE_QUESTIONS[game.questionIndex];
+  const q = getTeacherCurrentQuestion();
   if (!q) return;
 
   document.getElementById('teacherQuestionPhase').hidden = false;
@@ -239,7 +398,7 @@ function renderTeacherIntermission(room) {
 
 function renderTeacherPresentationQuestion(room) {
   const game = room?.game;
-  const q = FAKE_QUESTIONS[game?.questionIndex];
+  const q = getTeacherCurrentQuestion();
   if (!q) return;
 
   const progressEl = document.getElementById('teacherPresentationProgress');
@@ -251,7 +410,9 @@ function renderTeacherPresentationQuestion(room) {
   const vid = document.getElementById('teacherPresentationVideo');
   if (!progressEl || !promptEl || !answersEl || !eqEl || !imgEl || !vidWrap || !vid) return;
 
-  progressEl.textContent = `Câu ${game.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
+  progressEl.textContent = isBackendMode() && room?.backendMode
+    ? `Câu ${game.questionIndex + 1}`
+    : `Câu ${game.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
   promptEl.textContent = q.prompt || '';
   answersEl.innerHTML = '';
   eqEl.hidden = true;
@@ -346,7 +507,7 @@ function updateTeacherPresentationCountdown(room) {
 
   if (game.phase === 'question') {
     const sec = HTD.getQuestionTimeRemaining(game);
-    const q = FAKE_QUESTIONS[game.questionIndex];
+    const q = getTeacherCurrentQuestion();
     const total = Math.max(1, q?.timeLimit || 1);
     const ratio = Math.max(0, Math.min(1, sec / total));
     const qTextEl = document.getElementById('teacherPresentationQuestionCountdownText');
@@ -384,6 +545,27 @@ function animateTeacherLeaderboardScores(sec) {
   });
 }
 
+function startPresentationTick() {
+  clearInterval(teacherState.presentationTick);
+  teacherState.presentationTick = setInterval(() => {
+    if (!teacherState.presentationOpen) return;
+    const room = HTD.getRoom();
+    if (!room?.game) return;
+    updateTeacherPresentationCountdown(room);
+    if (room.game.phase === 'question') updateTeacherTimer(room);
+  }, 200);
+}
+
+function stopPresentationTick() {
+  clearInterval(teacherState.presentationTick);
+  teacherState.presentationTick = null;
+}
+
+function syncTeacherPresentationFromRoom() {
+  if (!teacherState.presentationOpen) return;
+  renderTeacherPresentation(HTD.getRoom());
+}
+
 function renderTeacherPresentation(room) {
   const wrap = document.getElementById('teacherPresentation');
   const questionScreen = document.getElementById('teacherPresentationQuestion');
@@ -395,8 +577,9 @@ function renderTeacherPresentation(room) {
   }
 
   wrap.hidden = false;
-  if (!room?.game || room.game.phase === 'final') {
+  if (!room?.game || room.game.phase === 'final' || room.status === 'ended') {
     teacherState.presentationOpen = false;
+    stopPresentationTick();
     wrap.hidden = true;
     if (document.fullscreenElement === wrap && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {});
@@ -433,8 +616,12 @@ function toggleTeacherPresentation() {
     if (document.fullscreenElement !== wrap && wrap.requestFullscreen) {
       wrap.requestFullscreen().catch(() => {});
     }
-  } else if (document.fullscreenElement && document.exitFullscreen) {
-    document.exitFullscreen().catch(() => {});
+    startPresentationTick();
+  } else {
+    stopPresentationTick();
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
   }
 }
 
@@ -451,6 +638,28 @@ function renderTeacherFinal() {
   document.getElementById('teacherQuestionPhase').hidden = true;
   document.getElementById('teacherFinalPhase').hidden = false;
   document.getElementById('teacherTimerText').textContent = '—';
+
+  const lbEl = document.getElementById('teacherFinalLeaderboard');
+  const rows = teacherState.finalLeaderboard || [];
+  if (lbEl) {
+    lbEl.innerHTML = rows.length
+      ? `<table class="teacher-final-table">
+          <thead><tr><th>Hạng</th><th>Học sinh</th><th>Điểm</th></tr></thead>
+          <tbody>${rows
+            .map(
+              r => `<tr>
+                <td>${r.rank ?? '—'}</td>
+                <td>${r.name}</td>
+                <td>${r.score ?? 0}</td>
+              </tr>`
+            )
+            .join('')}</tbody>
+        </table>`
+      : '<p class="teacher-final-hint">Chưa có dữ liệu xếp hạng.</p>';
+  }
+
+  const exportBtn = document.getElementById('btnExportCsv');
+  if (exportBtn) exportBtn.hidden = !HTD.getRoom()?.sessionId;
 }
 
 function renderTeacherGame(room) {
@@ -483,6 +692,7 @@ function renderTeacherGame(room) {
 
 function teacherGameTick() {
   const room = HTD.getRoom();
+  if (isBackendMode() && room?.backendMode) return;
   if (!room?.game || room.status !== 'started') return;
 
   const game = room.game;
@@ -549,6 +759,9 @@ function initTeacherFakeScores(players) {
 }
 
 function getTeacherPlayerScore(p) {
+  if (isBackendMode() && HTD.getRoom()?.backendMode) {
+    return teacherState.playerScores[p.name] ?? 0;
+  }
   if (p.isFake) return teacherState.fakeScores[p.id] || 0;
   return teacherState.fakeScores[p.id] || 0;
 }
@@ -626,6 +839,13 @@ function renderTeacherList() {
   btnStart.disabled = started;
   btnStart.textContent = started ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
 
+  const btnNext = document.getElementById('btnNextQuestion');
+  if (btnNext) {
+    btnNext.hidden = !(isBackendMode() && started);
+  }
+  const submitEl = document.getElementById('teacherSubmitCount');
+  if (submitEl) submitEl.hidden = !(isBackendMode() && started);
+
   if (started) {
     renderTeacherScoreList();
     return;
@@ -663,6 +883,23 @@ function startTeacherPoll() {
 function teacherStartGame() {
   const room = HTD.getRoom();
   if (!room || room.status === 'started') return;
+
+  if (isBackendMode()) {
+    HTDBridge.hostStartGame()
+      .then(() => {
+        room.status = 'started';
+        room.startedAt = Date.now();
+        room.backendMode = true;
+        HTD.setRoom(room);
+        teacherState.lastRenderedPhase = null;
+        teacherState.lastRenderedIndex = -1;
+        closeTeacherActionMenu();
+        renderDashboard();
+      })
+      .catch(err => alert(err.message || 'Không bắt đầu được game.'));
+    return;
+  }
+
   room.status = 'started';
   room.startedAt = Date.now();
   HTD.initGame(room);
@@ -690,6 +927,12 @@ function teacherTogglePause() {
 
 function teacherEndGame() {
   if (!confirm('Kết thúc trò chơi ngay?')) return;
+
+  if (isBackendMode()) {
+    HTDBridge.hostEndGame().catch(err => alert(err.message || 'Không kết thúc được game.'));
+    return;
+  }
+
   const room = HTD.getRoom();
   if (!room) return;
   HTD.startFinalPhase(room);
@@ -949,11 +1192,13 @@ window.closeTeacherQrModal = closeTeacherQrModal;
 window.toggleTeacherSidebar = toggleTeacherSidebar;
 window.resetTeacherRoom = resetTeacherRoom;
 window.teacherStartGame = teacherStartGame;
+window.teacherNextQuestion = teacherNextQuestion;
 window.teacherTogglePause = teacherTogglePause;
 window.teacherEndGame = teacherEndGame;
 window.teacherPlayAgain = teacherPlayAgain;
 window.toggleTeacherPresentation = toggleTeacherPresentation;
 window.createTeacherRoom = createTeacherRoom;
+window.teacherExportCsv = teacherExportCsv;
 window.demoTeacherGo = demoTeacherGo;
 
 const TEACHER_SCREENS = ['setup', 'dashboard'];
@@ -966,4 +1211,121 @@ function demoTeacherGo(s) {
   showTeacherScreen(s);
 }
 
+function teacherNextQuestion() {
+  if (!isBackendMode()) return;
+  HTDBridge.hostNextQuestion().catch(err => alert(err.message || 'Không chuyển câu được.'));
+}
+
+function teacherExportCsv() {
+  const sessionId = HTD.getRoom()?.sessionId;
+  if (!sessionId) {
+    alert('Không tìm thấy session. Đăng nhập admin trước khi tải CSV.');
+    return;
+  }
+  HTDApi.exportSessionCsv(sessionId);
+}
+
+function setupTeacherBackendBridge() {
+  if (!isBackendMode()) return;
+
+  HTDBridge.on('gameStarted', () => {
+    const room = HTD.getRoom();
+    if (!room) return;
+    room.status = 'started';
+    room.backendMode = true;
+    teacherState.serverQuestionIndex = 0;
+    teacherState.currentQuestion = null;
+    const game = ensureTeacherGameState(room);
+    game.phase = 'question';
+    game.questionIndex = 0;
+    room.startedAt = Date.now();
+    HTD.setRoom(room);
+    teacherState.lastRenderedPhase = null;
+    teacherState.lastRenderedIndex = -1;
+    if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
+      renderDashboard();
+    }
+    syncTeacherPresentationFromRoom();
+  });
+
+  HTDBridge.on('newQuestion', payload => {
+    const room = HTD.getRoom();
+    if (!room) return;
+    teacherState.serverQuestionIndex += 1;
+    teacherState.currentQuestion = HTDGameAdapter.mapNewQuestion(
+      payload,
+      teacherState.serverQuestionIndex - 1
+    );
+    const game = ensureTeacherGameState(room);
+    game.phase = 'question';
+    game.questionIndex = teacherState.serverQuestionIndex - 1;
+    const startedAt = Number(payload.server_time || Date.now());
+    const limit = Number(payload.time_limit || 30);
+    game.questionStartedAt = startedAt;
+    game.questionDuration = limit;
+    game.timerEndsAt = startedAt + limit * 1000;
+    game.phaseEndsAt = null;
+    game.paused = false;
+    room.backendMode = true;
+    room.status = 'started';
+    HTD.setRoom(room);
+    teacherState.lastRenderedPhase = null;
+    teacherState.lastRenderedIndex = -1;
+    if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
+      renderDashboard();
+    }
+    syncTeacherPresentationFromRoom();
+  });
+
+  HTDBridge.on('playersUpdate', data => {
+    const players = HTDGameAdapter.mapPlayersUpdate(data.players);
+    players.forEach(p => {
+      teacherState.playerScores[p.name] = p.score;
+    });
+    HTD.setPlayers(
+      players.map(p => ({
+        id: p.id,
+        name: p.name,
+        avatarEmoji: p.avatarEmoji,
+        joinedAt: Date.now(),
+      }))
+    );
+    if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
+      renderTeacherList();
+      if (HTD.getRoom()?.status === 'started') renderTeacherScoreList();
+    }
+  });
+
+  HTDBridge.on('leaderboardUpdate', data => {
+    (data.top5 || []).forEach(row => {
+      teacherState.playerScores[row.name] = Number(row.score || 0);
+    });
+    if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
+      renderTeacherScoreList();
+    }
+    syncTeacherPresentationFromRoom();
+  });
+
+  HTDBridge.on('submitCountUpdate', data => {
+    const el = document.getElementById('teacherSubmitCount');
+    if (el) el.textContent = `${data.submitted}/${data.total} đã nộp`;
+  });
+
+  HTDBridge.on('gameEnded', data => {
+    const room = HTD.getRoom();
+    if (!room) return;
+    room.status = 'ended';
+    const game = ensureTeacherGameState(room);
+    game.phase = 'final';
+    teacherState.finalLeaderboard = data.final_leaderboard || [];
+    (teacherState.finalLeaderboard || []).forEach(row => {
+      teacherState.playerScores[row.name] = Number(row.score || 0);
+    });
+    HTD.setRoom(room);
+    stopPresentationTick();
+    renderDashboard();
+  });
+}
+
+setupTeacherBackendBridge();
 initTeacherApp();

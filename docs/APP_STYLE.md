@@ -1,15 +1,17 @@
 # App Style — Hóa Thầy Đạt
 
-> Design tokens, layout, component patterns cho UI học sinh mobile-first.
-> Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0 + design mockup
+> Design tokens, layout, component patterns cho **UI học sinh (mobile only)**.
+> **Admin + Teacher:** web desktop — không dùng file này làm chuẩn chính; tham chiếu mockup `prototype/reference/teacher-website*.png` và layout Laravel admin.
 
-**Cập nhật lần cuối:** 2026-06-30
+**Cập nhật lần cuối:** 2026-07-06 (Phase 3B — UI polish)
 
 ---
 
 ## 1. Design principles
 
-- **Mobile-first:** thiết kế cho ≥375px, full viewport height
+> **Phạm vi:** chỉ áp dụng cho `prototype/index.html` (học sinh). Admin (`php-admin`) và teacher (`teacher.html`) là web desktop.
+
+- **Mobile-only:** thiết kế cho ≥375px, full viewport height — không target desktop cho học sinh
 - **Không scroll** trên màn Question (layout cố định theo %)
 - **1 ngón cái** thao tác được bàn phím hóa học
 - **Placeholder assets** cho đến khi user cung cấp icon/ảnh thật

@@ -1,0 +1,12 @@
+---
+description: Quy ước khi làm WebSocket server (Node.js + Socket.io + Redis)
+globs: ws-server/**/*
+alwaysApply: false
+---
+
+# WebSocket Server (Node.js + Socket.io + Redis)
+
+- Trước khi thêm/sửa event hoặc Redis key, mở `docs/API_CONTRACTS.md` để dùng đúng tên event/key/payload đã quy ước (đây là hợp đồng chung với frontend & PHP).
+- Dùng `socket.join(pin)` + `io.to(pin).emit(...)` với `@socket.io/redis-adapter`; **không tự viết pub/sub thủ công** cho broadcast đa-worker.
+- Không hardcode config — đọc từ `.env` (`REDIS_HOST`, `WS_PORT`...). Host Redis/MySQL dùng tên service Docker, không dùng `localhost`.
+- Thêm/đổi bất kỳ event WS, Redis key, hoặc payload → cập nhật `docs/API_CONTRACTS.md` ngay trong cùng lần sửa.

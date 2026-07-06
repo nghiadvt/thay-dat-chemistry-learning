@@ -1,0 +1,84 @@
+services:
+  mysql:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${MYSQL_HOST_PORT}:3306"
+    volumes:
+      - chem_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ws-server:
+    build: ./ws-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      WS_PORT: ${WS_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${WS_HOST_PORT}:${WS_PORT}"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  php-admin:
+    build: ./php-admin
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_NAME: "Hoa Thay Dat Admin"
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:${PHP_HOST_PORT}
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_DATABASE: ${DB_NAME}
+      DB_USERNAME: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_CLIENT: predis
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: 480
+      SESSION_SECRET: ${SESSION_SECRET}
+      APP_KEY: ${APP_KEY}
+    ports:
+      - "${PHP_HOST_PORT}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./prototype:/var/www/html/public/app:ro
+
+volumes:
+  chem_mysql_data:

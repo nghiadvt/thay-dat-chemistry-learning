@@ -1,9 +1,8 @@
 # System Design — Hóa Thầy Đạt
 
-> Website đố vui hóa học real-time dạng Kahoot. Mobile-first.
-> Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
+> Website đố vui hóa học real-time dạng Kahoot. **Học sinh: mobile only.** Admin + Giáo viên: web desktop.
 
-**Cập nhật lần cuối:** 2026-06-30
+**Cập nhật lần cuối:** 2026-07-06 (Phase 3C — admin UI priority)
 
 ---
 
@@ -13,22 +12,24 @@ Hệ thống cho phép giáo viên tạo phòng quiz hóa học realtime, học 
 
 ### Actor
 
-| Actor | Vai trò | Trạng thái |
-|---|---|---|
-| Học sinh | Join phòng, trả lời câu hỏi, xem kết quả | **Đang prototype UI** |
-| Giáo viên | Tạo game, host lobby, điều khiển câu hỏi | Chưa implement |
-| Admin | CRUD câu hỏi, quản lý tài khoản GV | Chưa implement |
+| Actor | Vai trò | Platform | Trạng thái |
+|---|---|---|---|
+| **Admin / GV** | CRUD keyboard, game, quiz, câu hỏi; tạo phòng; báo cáo | **Web desktop** (Laravel `/dashboard`) | API xong; **UI chưa có** (Phase 3C) |
+| **Giáo viên (host)** | Host lobby, PIN, điều khiển câu hỏi realtime | **Web desktop** (`/app/teacher.html`) | Integration 3A; polish 3B |
+| **Học sinh** | Join PIN, trả lời, leaderboard | **Mobile only** (`/app/index.html`) | Integration 3A; polish 3B |
+
+Admin tạo **source of truth** trong MySQL → teacher/student đọc qua WS/API khi chơi.
 
 ---
 
 ## 2. Stack production (mục tiêu)
 
-| Thành phần | Công nghệ | Port | Vai trò |
+| Thành phần | Công nghệ | Port (local dev) | Vai trò |
 |---|---|---|---|
-| Admin & API | PHP (Nginx + PHP-FPM) | 80/443 | CRUD câu hỏi, auth GV, tạo room → Redis |
-| Realtime | Node.js hoặc Go | 8080 | WebSocket multi-worker, gameplay |
-| Game state | Redis | — | Room state, leaderboard, TTL 2 giờ |
-| Persistence | MySQL / MariaDB | — | users, questions, game_sessions, game_results |
+| Admin & API | PHP (Laravel + Nginx) | **38480** | CRUD câu hỏi, auth GV, tạo room → Redis |
+| Realtime | Node.js + Socket.io | **38581** | WebSocket multi-worker, gameplay |
+| Game state | Redis | **38637** (host) | Room state, leaderboard, TTL 2 giờ |
+| Persistence | MySQL 8 | **38306** (host) | games, quizzes, questions (`content` HTML + `answer_type`), sessions, session_answers |
 
 ### Sơ đồ kiến trúc
 
@@ -63,7 +64,7 @@ Browser/Mobile (Học sinh)          Browser (Giáo viên)
 
 | Module | Mô tả |
 |---|---|
-| Quản lý câu hỏi | CRUD: text, hình ảnh, đáp án chuẩn hoá, thời gian. Import CSV/Excel |
+| Quản lý câu hỏi | CRUD: `content` HTML (text+ảnh+video), `answer_type` (mc/formula/structured), thời gian |
 | Quản lý bộ đề | Tạo/sửa/xoá bộ câu hỏi, tag môn/lớp, clone |
 | Lịch sử game | Danh sách game, kết quả HS, export CSV |
 | Auth giáo viên | Session, bcrypt, CSRF, role admin/teacher, expire 8h |
@@ -87,12 +88,18 @@ Browser/Mobile (Học sinh)          Browser (Giáo viên)
 
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
-| **0** | Docker Compose: Redis + MySQL + WS container | Chưa làm |
-| **1** | MySQL schema, PHP auth, CRUD câu hỏi | Chưa làm |
-| **2** | WebSocket server: room, NTP, scoring, Pub/Sub | Chưa làm |
-| **3.1–3.3** | Frontend học sinh + bàn phím + game UI | **Prototype UI** (`prototype/index.html`) |
-| **3.4** | Frontend giáo viên (host) | Chưa làm |
-| **4** | Integration test, load test 50 concurrent | Chưa làm |
+| **0** | Docker Compose: Redis + MySQL + WS + PHP | **Đã làm** |
+| **1** | MySQL schema, PHP auth, CRUD API | **Đã làm** |
+| **2** | WebSocket server: room, NTP, scoring | **Đã làm** |
+| **3A** | Integration layer (prototype ↔ API/WS) | **Đã làm** (plumbing) |
+| **3C** | **Admin UI web đầy đủ** (CRUD → data DB) | **Tiếp theo** |
+| **3D** | Teacher web + Student mobile — chức năng với data admin | Chưa làm |
+| **3B** | UI polish (teacher web + student mobile) | Chưa làm |
+| **4** | Integration test, load test | Sau Phase 3 xong |
+
+```
+3A (done) → 3C Admin → 3D Teacher+Student → 3B Polish → Phase 4 Test
+```
 
 ---
 
@@ -100,7 +107,7 @@ Browser/Mobile (Học sinh)          Browser (Giáo viên)
 
 | Khía cạnh | Prototype hiện tại | Production sau này |
 |---|---|---|
-| Vị trí | `prototype/index.html` | `public/` hoặc framework app |
+| Vị trí | `prototype/` (UI archive) | `public/` hoặc framework app (Phase 3) |
 | Stack | HTML + CSS + JS thuần, CDN | Vanilla JS hoặc framework (chưa quyết) |
 | Backend | Fake data, `setTimeout` giả event | PHP + WS + Redis + MySQL |
 | Join | PIN hardcode `123456` | PIN random từ Redis |
@@ -126,6 +133,7 @@ Browser/Mobile (Học sinh)          Browser (Giáo viên)
 
 ## 8. Tài liệu liên quan
 
+- [`docs/DATA_MODEL.md`](DATA_MODEL.md) — Schema DB, ERD, field definitions
 - [`docs/APP_LOGIC.md`](APP_LOGIC.md) — Luồng màn hình, scoring, keyboard logic
 - [`docs/APP_STYLE.md`](APP_STYLE.md) — Design tokens, layout, component CSS
 - [`prototype/index.html`](../prototype/index.html) — UI design sandbox học sinh

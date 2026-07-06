@@ -3,7 +3,7 @@
 > Logic ứng dụng: luồng màn hình, state, scoring, bàn phím, WebSocket events.
 > Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
 
-**Cập nhật lần cuối:** 2026-06-30
+**Cập nhật lần cuối:** 2026-07-06 (Phase 3C — admin priority, platform split)
 
 ---
 
@@ -41,7 +41,19 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 
 ---
 
-## 2. Luồng giáo viên (tham khảo — chưa implement)
+## 2. Luồng giáo viên (web desktop — host)
+
+| Màn hình | Hành động |
+|---|---|
+| Admin (Laravel) | CRUD nội dung, tạo phòng, xem báo cáo — **Phase 3C** |
+| Dashboard host | Lobby PIN/QR, danh sách HS, Start/Next/End — `teacher.html` |
+| Host | Điều khiển câu hỏi, submit count, trình chiếu — **Phase 3D/3B** |
+
+Platform: **web desktop only** — không thiết kế mobile cho teacher.
+
+---
+
+## 2b. Luồng giáo viên (tham khảo prototype cũ — trước 3C)
 
 | Màn hình | Hành động |
 |---|---|
@@ -66,6 +78,38 @@ streak bonus   : đúng liên tiếp ≥3 câu → +50 mỗi câu tiếp theo
 **Ví dụ:** Câu 30s, submit sau 3s, đúng → `1000 × (27/30) = 900 điểm`
 
 > Prototype hiện tại: hiển thị điểm fake, chưa tính theo công thức.
+
+---
+
+## 3.1 Loại câu hỏi & đáp án (schema — xem `DATA_MODEL.md`)
+
+### Nội dung câu hỏi — 1 cột `content`
+
+Đề bài (text, ảnh, video) gộp trong **`questions.content`** (LONGTEXT HTML).
+
+- Admin: rich text editor (Tiptap/TinyMCE) + upload ảnh/video
+- Server: **sanitize HTML** trước khi lưu
+- Client: render `content` trong vùng câu hỏi (không ghép field riêng)
+
+Ví dụ HTML lưu trong DB:
+
+```html
+<p>Cho mẫu dung dịch trong ống nghiệm như hình...</p>
+<img src="/storage/q42.png" alt="ống nghiệm">
+<video src="/storage/demo.mp4" poster="/storage/demo-poster.jpg" controls></video>
+```
+
+### Loại đáp án — `answer_type`
+
+| `answer_type` | Mô tả | UI học sinh | Field đáp án đúng |
+|---|---|---|---|
+| `mc` | Trắc nghiệm 2–6 đáp án | Chọn A–D (hoặc nhiều hơn) | `options` JSON + `correct_index` |
+| `formula` | Nhập công thức (bàn phím hóa học) | Bàn phím ảo | `correct_answer_normalized` |
+| `structured` | Điền blank / hệ số theo template | Ô blank trên phương trình | `input_mode`, `template`, `correct_answer` JSON |
+
+`input_mode` (structured): `product` | `balance` | `blank` | `blank_balance`
+
+Mọi câu đều có `content` HTML; `answer_type` quyết định phần tương tác phía dưới.
 
 ---
 
@@ -124,20 +168,44 @@ serialize(tokens) → '2H2O'  // plain text, server normalize
 
 ---
 
-## 5. WebSocket events (dự kiến — production)
+## 5. WebSocket events (production — đồng bộ `local-deployment-plan.md`)
 
 | Event | Direction | Payload | Mô tả |
 |---|---|---|---|
-| `JOIN` | C→S | `{ pin, name, avatar? }` | Học sinh vào phòng |
-| `JOINED` | S→C | `{ playerId, room }` | Xác nhận join |
-| `PLAYER_JOINED` | S→All | `{ player }` | Broadcast người mới |
-| `START` | S→All | `{ questionIndex }` | GV bắt đầu game |
-| `QUESTION` | S→All | `{ index, type, text, options?, timeLimit }` | Câu hỏi mới |
-| `SUBMIT` | C→S | `{ answer, timestamp }` | Nộp đáp án |
-| `SUBMITTED` | S→C | `{ ok }` | Xác nhận nộp |
-| `RESULT` | S→All | `{ correct, points, rank }` | Kết quả câu |
-| `LEADERBOARD` | S→All | `{ top5[], deltas[] }` | Bảng xếp hạng |
-| `END` | S→All | `{ finalRanking[] }` | Kết thúc game |
+| `join_room` | C→S | `{ pin, name }` | HS vào phòng |
+| `ntp_ping` / `ntp_pong` | both | `{ t0 }` / `{ t0, t1, t2 }` | Đồng bộ thời gian |
+| `game_started` | S→C | `{}` | GV bắt đầu |
+| `new_question` | S→C | xem payload bên dưới | Câu hỏi mới |
+| `submit_answer` | C→S | `{ question_id, answer, hybrid_timestamp }` | Nộp đáp án |
+| `question_result` | S→C | `{ correct, correct_answer, score_earned, rank }` | Kết quả câu |
+| `leaderboard_update` | S→C | `{ top5: [{ name, score, delta }] }` | Top 5 |
+| `game_ended` | S→C | `{ final_leaderboard }` | Kết thúc |
+| `submit_count_update` | S→C (host) | `{ submitted, total }` | Số người đã nộp |
+
+### Payload `new_question`
+
+```json
+{
+  "quiz_id": 1,
+  "question_id": 42,
+  "content": "<p>Đề bài...</p><img src=\"...\">",
+  "answer_type": "mc",
+  "options": ["A", "B", "C", "D"],
+  "template": null,
+  "keyboard_config": {
+    "schema_version": 1,
+    "defaults": { "keySize": "M", "fontSize": "M", "textColor": "#000000", "background": "#FFFFFF", "border": "#D0D0D0" },
+    "rows": [],
+    "smart_context": { "after_element": "subscript", "after_plus": "coefficient" }
+  },
+  "time_limit": 30,
+  "server_time": 1710000000000
+}
+```
+
+- `content`: HTML đã sanitize (text + ảnh + video)
+- `options` / `template`: gửi khi `answer_type` tương ứng; null nếu không dùng
+- `keyboard_config`: từ quiz → keyboard; client render bàn phím cho `formula` / `structured`
 
 ### NTP sync (production)
 
@@ -216,8 +284,63 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 
 ---
 
-## 8. Tài liệu liên quan
+## 8. Phase 3A — Integration layer (prototype ↔ backend)
 
+**Mục tiêu:** chạy end-to-end với UI hiện tại; **không** redesign CSS/HTML (Phase 3B polish sau).
+
+**Serve UI:** `http://localhost:38480/app/` (prototype mount vào `php-admin/public/app` qua Docker).
+
+**Demo mode (localStorage cũ):** thêm `?demo=1` vào URL.
+
+### File tích hợp (`prototype/js/`)
+
+| File | Vai trò |
+|---|---|
+| `config.js` | `HTD_CONFIG`: `apiBase`, `wsUrl`, `useBackend` |
+| `api.js` | `HTDApi`: check PIN, tạo session, CSRF/session |
+| `socket.js` | `HTDSocket`: Socket.io + NTP median offset |
+| `game-adapter.js` | Map `new_question` payload → model UI hiện tại |
+| `backend-bridge.js` | Đăng ký WS events → callbacks student/teacher |
+
+### Mapping prototype → backend
+
+| Prototype (demo) | Backend thật |
+|---|---|
+| `HTD.getRoom()` + polling | `GET /api/rooms/{pin}` + `join_room` + `players_update` |
+| `FAKE_QUESTIONS[i]` | `new_question` (qua `HTDGameAdapter.mapNewQuestion`) |
+| `type: 'mc'` | `answer_type: 'mc'` |
+| `prompt` (text) | `content` (HTML → strip text) |
+| Timer sync localStorage | `server_time` + NTP offset |
+| `teacherStartGame()` local | `host_start_game` |
+| Chuyển câu tự động (demo) | Host bấm **Câu tiếp theo** → `host_next_question` |
+
+### MVP Phase 3A
+
+- Ưu tiên **MC** chạy full luồng trước.
+- `formula` / `structured`: adapter cơ bản; polish input UI ở Phase 3B.
+- CSV export (3.5): dùng `/api/reports/sessions/{id}` — wire ở **3C.7** / **3D.3**.
+
+---
+
+## 9. Phase 3 — Thứ tự triển khai & platform
+
+| Phase | Nội dung | Platform |
+|---|---|---|
+| **3A** ✅ | Integration plumbing (API/WS) | prototype |
+| **3C** ⬜ | Admin UI đầy đủ — data thật trong DB | Laravel **web desktop** |
+| **3D** ⬜ | Teacher + Student chức năng với data admin | Teacher **web** · Student **mobile** |
+| **3B** ⬜ | UI polish theo mockup | Teacher web · Student mobile |
+| **4** | Test end-to-end | — |
+
+**Quy tắc:** Hoàn thành **3C trước** khi polish teacher/student. Phase 4 chỉ sau Phase 3 xong.
+
+Chi tiết checklist: [`local-deployment-plan.md`](../local-deployment-plan.md) — mục 3C, 3D, 3B.
+
+---
+
+## 10. Tài liệu liên quan
+
+- [`docs/DATA_MODEL.md`](DATA_MODEL.md) — Schema DB, ERD
 - [`docs/SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) — Kiến trúc hệ thống
 - [`docs/APP_STYLE.md`](APP_STYLE.md) — Design tokens, layout
 - [`prototype/index.html`](../prototype/index.html) — UI prototype

@@ -1,0 +1,104 @@
+/**
+ * Backend integration bridge — wires Socket.io events to UI callbacks.
+ */
+const HTDBridge = (function () {
+  const listeners = {
+    roomJoined: [],
+    roomError: [],
+    playersUpdate: [],
+    gameStarted: [],
+    newQuestion: [],
+    questionResult: [],
+    leaderboardUpdate: [],
+    submitCountUpdate: [],
+    gameEnded: [],
+  };
+
+  let roomMeta = null;
+  let isHost = false;
+
+  function on(event, fn) {
+    if (!listeners[event]) throw new Error(`Unknown bridge event: ${event}`);
+    listeners[event].push(fn);
+  }
+
+  function emitLocal(event, payload) {
+    (listeners[event] || []).forEach(fn => {
+      try {
+        fn(payload);
+      } catch (err) {
+        console.error(`HTDBridge listener error (${event})`, err);
+      }
+    });
+  }
+
+  function bindSocketEvents() {
+    HTDSocket.on('room_joined', data => emitLocal('roomJoined', data));
+    HTDSocket.on('room_error', data => emitLocal('roomError', data));
+    HTDSocket.on('players_update', data => emitLocal('playersUpdate', data));
+    HTDSocket.on('game_started', data => emitLocal('gameStarted', data));
+    HTDSocket.on('new_question', data => emitLocal('newQuestion', data));
+    HTDSocket.on('question_result', data => emitLocal('questionResult', data));
+    HTDSocket.on('leaderboard_update', data => emitLocal('leaderboardUpdate', data));
+    HTDSocket.on('submit_count_update', data => emitLocal('submitCountUpdate', data));
+    HTDSocket.on('game_ended', data => emitLocal('gameEnded', data));
+  }
+
+  async function init() {
+    if (!window.HTD_CONFIG?.useBackend) return false;
+    HTDSocket.connect();
+    bindSocketEvents();
+    return true;
+  }
+
+  async function joinRoom({ pin, name, isHost = false }) {
+    isHost = Boolean(isHost);
+    await HTDSocket.syncNtp();
+    const data = await HTDSocket.emit('join_room', { pin, name, is_host: isHost });
+    roomMeta = { pin, name, ...data };
+    return data;
+  }
+
+  async function hostStartGame() {
+    return HTDSocket.emit('host_start_game', {});
+  }
+
+  async function hostNextQuestion() {
+    return HTDSocket.emit('host_next_question', {});
+  }
+
+  async function hostEndGame() {
+    return HTDSocket.emit('host_end_game', {});
+  }
+
+  async function submitAnswer(questionId, answer) {
+    return HTDSocket.emit('submit_answer', {
+      question_id: questionId,
+      answer,
+      hybrid_timestamp: HTDSocket.hybridTimestamp(),
+    });
+  }
+
+  function getRoomMeta() {
+    return roomMeta;
+  }
+
+  function setRoomMeta(meta) {
+    roomMeta = meta;
+  }
+
+  return {
+    init,
+    on,
+    joinRoom,
+    hostStartGame,
+    hostNextQuestion,
+    hostEndGame,
+    submitAnswer,
+    getRoomMeta,
+    setRoomMeta,
+    isBackendEnabled() {
+      return Boolean(window.HTD_CONFIG?.useBackend);
+    },
+  };
+})();

@@ -1,25 +1,32 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg-dark: #0D1B3E;
-  --bg-start: #0D1B3E;
-  --bg-end: #152a5e;
-  --primary: #2D46D6;
-  --primary-press: #2438b0;
+  --bg-dark: #1a1a4e;
+  --bg-start: #1a1a4e;
+  --bg-end: #2D3192;
+  --primary: #3B5BDB;
+  --primary-press: #2D3192;
   --card: #fff;
   --success: #22c55e;
+  --success-dark: #1A5C38;
+  --success-light: #2ECC71;
   --error: #ef4444;
   --warning: #f59e0b;
   --gold: #FFD700;
   --silver: #C0C0C0;
   --bronze: #CD7F32;
+  --keyboard-key: #1F4E79;
+  --keyboard-key-shadow: #0D3052;
+  --formula-border: #2E75B6;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-pill: 999px;
   --join-bg: #f4f6fb;
   --text-dark: #1a2340;
-  --text-muted: #6b7280;
+  --text-muted: #666666;
+  --padding-screen: 20px;
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.15);
 }
 
 html, body {
@@ -94,9 +101,14 @@ html, body {
   width: 100%;
   cursor: pointer;
   font-family: inherit;
+  box-shadow: 0 4px 0 #1e3a8a;
   transition: transform 0.08s, opacity 0.15s;
 }
-.btn-primary:active { transform: scale(0.98); opacity: 0.92; }
+.btn-primary:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #1e3a8a;
+  opacity: 0.95;
+}
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-secondary {

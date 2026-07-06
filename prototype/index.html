@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=STIX+Two+Text&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/shared.css">
   <link rel="stylesheet" href="css/student.css">
+  <link rel="stylesheet" href="css/keyboard-runtime.css">
 </head>
 <body class="student-app">
 
@@ -17,11 +18,11 @@
   <section class="screen welcome-screen active" data-screen="welcome">
     <div class="welcome-bg-pattern"></div>
     <div class="welcome-inner">
-      <img src="logo.png" alt="Hóa Thầy Đạt" class="welcome-logo-img">
+      <img src="assets/logo.png" alt="Hóa Thầy Đạt" class="welcome-logo-img">
       <h1 class="welcome-hero-title">ĐỐ VUI HÓA HỌC<br>REAL-TIME</h1>
       <p class="welcome-hero-sub">Học vui – Nhớ lâu – Điểm cao</p>
       <div class="welcome-hero-wrap">
-        <img src="teacher-hero.png" alt="" class="welcome-hero-img">
+        <img src="assets/teacher-hero.png" alt="" class="welcome-hero-img">
       </div>
       <div class="welcome-actions">
         <button class="btn-join-room" onclick="showScreen('join')">Tham gia phòng</button>
@@ -53,7 +54,7 @@
       <p class="join-instruction">Quét mã QR do giáo viên cung cấp</p>
       <div class="qr-scanner-wrap" onclick="simulateQrScan()">
         <div class="qr-frame">
-          <img src="qr-login.png" alt="QR Code" class="qr-mock-img">
+          <img src="assets/qr-login.png" alt="QR Code" class="qr-mock-img">
           <span class="qr-bracket tl"></span>
           <span class="qr-bracket tr"></span>
           <span class="qr-bracket bl"></span>
@@ -118,7 +119,7 @@
     <div class="waiting-qr-section">
       <div class="room-qr-block">
         <div class="qr-frame">
-          <img src="qr-login.png" alt="QR Code" class="qr-mock-img">
+          <img src="assets/qr-login.png" alt="QR Code" class="qr-mock-img">
           <span class="qr-bracket tl"></span>
           <span class="qr-bracket tr"></span>
           <span class="qr-bracket bl"></span>
@@ -237,8 +238,15 @@
 <div class="demo-nav" id="demoNav"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/socket.js"></script>
+<script src="js/game-adapter.js"></script>
+<script src="js/backend-bridge.js"></script>
 <script src="js/shared.js"></script>
 <script src="js/equation-ui.js"></script>
+<script src="js/keyboard-runtime.js"></script>
 <script src="js/student.js"></script>
 </body>
 </html>

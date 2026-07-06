@@ -1,0 +1,5 @@
+.env
+php-admin/vendor/
+php-admin/node_modules/
+php-admin/.env
+ws-server/node_modules/

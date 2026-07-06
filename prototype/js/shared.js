@@ -22,7 +22,7 @@ const HTD = {
       id: '100002',
       type: 'mc',
       media: 'image',
-      mediaUrl: 'rocket.png',
+      mediaUrl: 'assets/rocket.png',
       prompt:
         'Giáo viên cho mẫu dung dịch trong ống nghiệm như hình. Dung dịch được chuẩn bị bằng cách hòa tan ' +
         'một chất tinh thể màu hồng trong nước cất, có thể dùng để nhận biết axit yếu trong phòng thí nghiệm.\n\n' +
@@ -36,7 +36,7 @@ const HTD = {
       type: 'mc',
       media: 'video',
       mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      mediaPoster: 'teacher-hero.png',
+      mediaPoster: 'assets/teacher-hero.png',
       prompt:
         'Quan sát video thí nghiệm: cho bột đồng(II) nitrat (Cu(NO₃)₂) nung trong ống nghiệm. ' +
         'Khi nhiệt độ cao, muối phân hủy sinh ra khí màu nâu đỏ, chất rắn màu đen bám thành ống nghiệm ' +

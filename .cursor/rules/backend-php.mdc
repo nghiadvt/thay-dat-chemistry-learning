@@ -1,0 +1,13 @@
+---
+description: Quy ước khi làm PHP admin (Laravel + MySQL)
+globs: php-admin/**/*,migrations/**/*,**/*.php
+alwaysApply: false
+---
+
+# PHP Admin (Laravel + MySQL)
+
+- Trước khi đụng schema/model, mở `docs/DATA_MODEL.md`; trước khi thêm endpoint, mở `docs/API_CONTRACTS.md`.
+- **Phase 3C:** Admin UI = **web desktop** Blade CRUD — xem `local-deployment-plan.md` §3C. API Phase 1 đã có; ưu tiên giao diện, không đổi contract.
+- Mọi API PHP trả JSON thống nhất: `{"success": true/false, "data": {...}, "error": "..."}`.
+- Redis qua `predis/predis`; đọc config từ `.env`, host DB/Redis dùng tên service Docker (`mysql`, `redis`).
+- Thêm/đổi bảng, field, quan hệ → cập nhật `docs/DATA_MODEL.md`. Thêm/đổi endpoint → cập nhật `docs/API_CONTRACTS.md`. Đổi cấu trúc JSON config bàn phím → cập nhật `docs/KEYBOARD_SCHEMA.md`. Luôn cùng lần sửa code.

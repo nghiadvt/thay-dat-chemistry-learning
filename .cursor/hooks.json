@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/remind-docs-sync.sh",
+        "matcher": "Write|StrReplace|ApplyPatch|EditNotebook"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/check-docs-on-stop.sh"
+      }
+    ]
+  }
+}

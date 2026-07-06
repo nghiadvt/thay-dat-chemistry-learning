@@ -1,0 +1,13 @@
+---
+description: Quy ước khi làm UI/CSS/JS frontend
+globs: prototype/**/*,public/**/*,**/*.css,**/*.html
+alwaysApply: false
+---
+
+# Frontend / UI
+
+**Platform:** `index.html` = **student mobile only** (`APP_STYLE.md`). `teacher.html` = **web desktop** (mockup `prototype/reference/`). Admin = Laravel Blade (`local-deployment-plan.md` §3C).
+
+- Student: trước khi sửa style, mở `docs/APP_STYLE.md` + `docs/APP_LOGIC.md`.
+- Teacher: không áp layout mobile HS; tham chiếu `teacher-website*.png`.
+- Dùng design token cho **student**; teacher/admin có style riêng (web desktop).

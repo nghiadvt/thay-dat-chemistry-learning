@@ -323,7 +323,7 @@ body.kbe-app {
 .kbe-phone-frame {
   width: 280px;
   aspect-ratio: 280 / 570;
-  background: url('../phone-empty.png') center / contain no-repeat;
+  background: url('../assets/phone-empty.png') center / contain no-repeat;
   position: relative;
   filter: drop-shadow(0 12px 40px rgba(0,0,0,0.18));
 }

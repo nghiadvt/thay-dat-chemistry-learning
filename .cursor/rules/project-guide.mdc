@@ -1,0 +1,37 @@
+---
+description: Bối cảnh dự án + bảng định tuyến tài liệu (đọc đầu mỗi phiên)
+alwaysApply: true
+---
+
+# Hóa Thầy Đạt — Chỉ dẫn ngữ cảnh cho AI
+
+Website đố vui hóa học real-time dạng Kahoot.
+**Admin + Teacher = web desktop. Student = mobile only.**
+Stack: **PHP (Laravel) + MySQL** (admin) · **Node.js (Socket.io) + Redis** (realtime).
+
+**Phase 3 tiếp theo:** 3C Admin UI đầy đủ (`local-deployment-plan.md`) — làm trước teacher/student polish.
+
+## Quy tắc vàng (BẮT BUỘC)
+
+1. **Đọc đúng 1 file docs liên quan TRƯỚC, đừng quét cả codebase.** Các file `docs/*.md` là nguồn thông tin duy nhất (single source of truth). Chỉ mở file code khi thật sự cần sửa/đọc chi tiết.
+2. **Sửa xong code làm lệch tài liệu → cập nhật file `docs/` tương ứng NGAY trong cùng lần sửa.** Coi việc cập nhật docs là một phần của "xong task", không phải việc làm thêm. Cập nhật cả dòng `Cập nhật lần cuối:` ở đầu file.
+3. **Không tạo file docs trùng lặp** ("v2", "final", "updated"...). Sửa thẳng vào file đã có. Trước khi tạo file docs mới, `ls docs/` để kiểm tra.
+4. Không tự đổi tech stack đã chốt. Thiếu thông tin → hỏi, không tự đoán.
+5. Hooks (`.cursor/hooks.json`) nhắc cập nhật `docs/` khi sửa code — coi đó là bắt buộc.
+
+## Bảng định tuyến — cần sửa/hiểu gì thì mở file nào
+
+| Chủ đề cần đụng tới | File nguồn (mở file này) |
+|---|---|
+| Kiến trúc, stack, port, phase, roadmap | `docs/SYSTEM_DESIGN.md` |
+| Luồng màn hình, state, scoring, keyboard token, WS events | `docs/APP_LOGIC.md` |
+| Màu, font, spacing, layout, component CSS, animation (**student mobile only**) | `docs/APP_STYLE.md` |
+| Admin UI web desktop (Laravel Blade CRUD) | `local-deployment-plan.md` §3C + `docs/DATA_MODEL.md` |
+| Teacher host web desktop | `docs/APP_LOGIC.md` §2 + `prototype/reference/teacher-website*.png` |
+| Schema DB, quan hệ bảng, ERD | `docs/DATA_MODEL.md` |
+| Event WebSocket, endpoint PHP, Redis key + payload mẫu | `docs/API_CONTRACTS.md` *(tạo ở task 2.1)* |
+| Cấu trúc JSON config bàn phím hóa học | `docs/KEYBOARD_SCHEMA.md` |
+| Tiến độ task, checklist triển khai backend | `ke-hoach-trien-khai-local.md` / `local-deployment-plan.md` |
+| Đặc tả gốc (tham khảo, không sửa) | `dac-ta-ky-thuat-v4.docx.md` |
+
+Nếu file "sẽ tạo sau" chưa tồn tại → tạo mới đúng tên trên, không đặt tên khác.
