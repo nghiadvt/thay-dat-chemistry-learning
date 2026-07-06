@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\GameSessionController;
 use App\Http\Controllers\Api\KeyboardController;
 use App\Http\Controllers\Api\QuestionController;
+use App\Http\Controllers\Api\QuestionImageController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoomController;
@@ -20,6 +21,15 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+Route::get('join/{pin}', function (string $pin) {
+    $pin = preg_replace('/\D/', '', $pin);
+    if (strlen($pin) !== 6) {
+        abort(404);
+    }
+
+    return redirect('/app/index.html?pin='.$pin);
+})->where('pin', '[0-9]{6}');
 
 Route::get('api/rooms/{pin}', [RoomController::class, 'show']);
 
@@ -36,14 +46,17 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
 
-        Route::resource('keyboards', AdminKeyboardController::class)->except(['show']);
+        Route::resource('keyboards', AdminKeyboardController::class)->except(['show', 'update']);
+        Route::get('keyboards/{keyboard}/editor', [AdminKeyboardController::class, 'editor'])->name('keyboards.editor');
         Route::resource('games', AdminGameController::class)->except(['show']);
         Route::resource('quizzes', AdminQuizController::class);
+        Route::patch('quizzes/{quiz}/active', [AdminQuizController::class, 'toggleActive'])->name('quizzes.toggle-active');
 
         Route::get('quizzes/{quiz}/questions/create', [AdminQuestionController::class, 'create'])->name('questions.create');
         Route::post('quizzes/{quiz}/questions', [AdminQuestionController::class, 'store'])->name('questions.store');
         Route::get('quizzes/{quiz}/questions/{question}/edit', [AdminQuestionController::class, 'edit'])->name('questions.edit');
         Route::put('quizzes/{quiz}/questions/{question}', [AdminQuestionController::class, 'update'])->name('questions.update');
+        Route::patch('quizzes/{quiz}/questions/{question}/active', [AdminQuestionController::class, 'toggleActive'])->name('questions.toggle-active');
         Route::delete('quizzes/{quiz}/questions/{question}', [AdminQuestionController::class, 'destroy'])->name('questions.destroy');
 
         Route::get('sessions/create', [AdminSessionController::class, 'create'])->name('sessions.create');
@@ -57,8 +70,11 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('api')->group(function () {
         Route::apiResource('keyboards', KeyboardController::class);
+        Route::post('keyboards/{keyboard}/preview', [KeyboardController::class, 'uploadPreview'])->name('keyboards.preview');
         Route::apiResource('games', GameController::class);
         Route::apiResource('quizzes', QuizController::class);
+
+        Route::post('question-content-images', [QuestionImageController::class, 'store'])->name('question-images.store');
 
         Route::get('quizzes/{quiz}/questions', [QuestionController::class, 'index']);
         Route::post('quizzes/{quiz}/questions', [QuestionController::class, 'store']);

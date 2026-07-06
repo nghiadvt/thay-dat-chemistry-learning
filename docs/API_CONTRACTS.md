@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-06 (Phase 3D — teacher/student + admin data)
+**Cập nhật lần cuối:** 2026-07-06 (Admin native — Blade + `public/htd-admin/`)
 
 ---
 
@@ -31,6 +31,8 @@ Lỗi:
 
 **Auth:** session cookie + CSRF (`@csrf` form hoặc header `X-XSRF-TOKEN` từ cookie `XSRF-TOKEN`).
 
+**Headless / script client:** `POST /login` phải gửi kèm **session cookie** lấy từ `GET /login` (nếu không → 419 CSRF). Sau login thành công (302), dùng cookie mới + `X-XSRF-TOKEN` cho mọi `/api/*`. Script mẫu: `ws-server/scripts/ws-smoke-test.js`, `ws-server/scripts/phase4-test.js`.
+
 **Base URL local:** `http://localhost:38480`
 
 ---
@@ -47,19 +49,24 @@ Lỗi:
 
 ### 2.2 Admin web UI (session auth, Blade)
 
+Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/app/teacher.html`, `/app/keyboard-editor.html`.
+
 | Method | Path | Mô tả |
 |---|---|---|
-| GET/POST | `/admin/keyboards` | CRUD bàn phím |
+| GET/POST | `/admin/keyboards` | Tạo tên bàn phím → redirect editor |
+| GET | `/admin/keyboards/{id}/editor` | Trình chỉnh sửa layout (Blade + `public/htd-admin/js/keyboard-editor.js`) |
 | GET/POST | `/admin/games` | CRUD game |
 | GET/POST | `/admin/quizzes` | CRUD quiz (+ `show` xem câu hỏi) |
 | GET/POST | `/admin/quizzes/{quiz}/questions` | CRUD câu hỏi nested |
-| GET/POST | `/admin/sessions` | Tạo phòng + PIN |
-| GET | `/admin/sessions/{id}` | Chi tiết PIN + link host/student |
+| GET/POST | `/admin/sessions` | Tạo phòng |
+| GET | `/admin/sessions/{id}` | Điều khiển phòng (host Blade + WS) |
 | GET | `/admin/reports` | Lịch sử session `ended` |
 | GET | `/admin/reports/{id}` | Chi tiết điểm |
-| GET | `/admin/reports/{id}/export` | Tải CSV UTF-8 (hạng, học sinh, điểm) |
+| GET | `/admin/reports/{id}/export` | Tải CSV UTF-8 |
 
-Link host sau tạo phòng: `/app/teacher.html?pin={pin}&game_id={id}&session_id={id}&from=admin`
+| GET | `/join/{pin}` | Redirect học sinh → `/app/index.html?pin=` |
+
+Học sinh tham gia: `http://localhost:38480/join/123456` (hoặc nhập PIN trên `/app/`).
 
 Tài khoản seed: `teacher@hoadat.local` / `password123`
 
@@ -223,6 +230,15 @@ TTL room:482910   → ~7200
 | `host_end_game` | `{}` | **Host only** — kết thúc sớm, lưu `game_results` |
 | `submit_answer` | `{ question_id, answer, hybrid_timestamp }` | **Student only** |
 
+**Lỗi `submit_answer` (ack `{ success: false, error }` hoặc `room_error`):**
+
+| Điều kiện | `error` mẫu |
+|---|---|
+| Nộp lại cùng câu | `Bạn đã nộp câu này rồi.` |
+| `\|hybrid_timestamp - server_now\| > 500ms` | `Đồng hồ lệch {N}ms (cho phép tối đa 500ms). Hãy đồng bộ NTP lại.` |
+
+Guard double-submit: Redis set `submitted:<PIN>:<question_id>` (xem §10).
+
 **`answer` theo `answer_type`:**
 
 | `answer_type` | `answer` mẫu |
@@ -282,7 +298,7 @@ Callback ack (tùy chọn): client truyền function làm tham số cuối → `
 2. Mỗi lần nhận `ntp_pong { t0, t1, t2 }`, tính `offset = ((t1 - t0) + (t2 - t0)) / 2`
 3. Lấy **median** của 3 offset
 4. Khi submit: `hybrid_timestamp = Date.now() + offset`
-5. Server reject nếu `|hybrid_timestamp - server_now| > 500ms` với message rõ ràng
+5. Server reject nếu `|hybrid_timestamp - server_now| > 500ms` — message: `Đồng hồ lệch …ms (cho phép tối đa 500ms). Hãy đồng bộ NTP lại.`
 
 ### 9.5 Scoring
 
@@ -302,8 +318,18 @@ POST /api/game-sessions (Laravel) → Redis room:{pin}
   → host_start_game → game_started + new_question
   → students submit_answer → question_result + leaderboard_update
   → host_next_question → new_question (lặp)
-  → host_end_game hoặc hết câu → game_ended + lưu MySQL game_results
+  → host_end_game hoặc hết câu → game_ended + lưu MySQL
 ```
+
+**Persist khi `game_ended` (ws-server `endGame` → `db.saveGameResults`):**
+
+1. `game_sessions.status` → `ended`, `ended_at` = now
+2. `session_answers` — đã ghi từng câu khi `submit_answer`
+3. `game_results` — xóa bản ghi cũ theo `session_id`, insert lại từ leaderboard Redis:
+   - `(session_id, student_name, player_token, score, rank)` — cột `rank` là reserved word MySQL, INSERT dùng backtick `` `rank` ``
+   - `rank` = 1-based theo thứ tự điểm giảm dần
+
+Sau khi kết thúc, client/teacher có thể đọc `GET /api/reports/sessions/{id}` (`status: ended`, kèm `results`, `answers`).
 
 ---
 
@@ -317,6 +343,56 @@ POST /api/game-sessions (Laravel) → Redis room:{pin}
 | `submitted:<PIN>:<question_id>` | Set | 2h | Double-submit guard |
 
 | `room:<PIN>:plan` | String (JSON) | 2h | Game plan cache (quizzes + questions) — nội bộ ws-server |
+
+---
+
+## 12. Automated tests (`ws-server`)
+
+**Yêu cầu:** `docker compose up`, DB seeded (`teacher@hoadat.local` / `password123`). Cần **Node ≥18** (`fetch`, `getSetCookie`). Host Node cũ: chạy trong container Node 20.
+
+```bash
+cd ws-server
+npm install          # cài deps gồm socket.io-client (cho scripts test)
+npm run test:smoke   # Phase 2 smoke
+npm run test:phase4  # Phase 4: 4.4 → 4.3 → 4.1
+npm run test:phase4:load   # thêm 4.2 load 10 phòng × 50 HS
+```
+
+Hoặc từ repo root (không cần Node local):
+
+```bash
+docker run --rm --network host -v "$PWD/ws-server:/app" -w /app node:20-alpine \
+  sh -c "npm install --omit=dev -q && npm run test:phase4"
+```
+
+### Biến môi trường
+
+| Biến | Mặc định | Mô tả |
+|---|---|---|
+| `PHP_URL` | `http://localhost:38480` | Laravel admin |
+| `WS_URL` | `http://localhost:38581` | Socket.io |
+| `GAME_ID` | `1` | Game seed dùng trong test |
+| `LOAD_ROOMS` | `10` | Số phòng (4.2) |
+| `LOAD_STUDENTS` | `50` | HS mỗi phòng (4.2) |
+
+### `scripts/ws-smoke-test.js` (Phase 2)
+
+1. Login Laravel → `POST /api/game-sessions` → PIN
+2. Host + 2 HS `join_room`
+3. `host_start_game` → `new_question` (đăng ký listener **trước** khi host start)
+4. 1× `submit_answer` MC → `question_result`, `submit_count_update`
+5. Double-submit bị chặn; `hybrid_timestamp` lệch >500ms bị chặn
+
+### `scripts/phase4-test.js` (Phase 4)
+
+| Mục | Nội dung verify |
+|---|---|
+| **4.4** | Double-submit + clock skew (như smoke) |
+| **4.3** | HS disconnect socket → `join_room` cùng tên → `reconnected: true`, `score` không giảm |
+| **4.1** | Host + 3 HS, chơi hết câu seed (`GET /api/quizzes?game_id=` + questions), `host_next_question` đến `game_ended`, `GET /api/reports/sessions/{id}` → `status: ended` |
+| **4.2** (`--load`) | `LOAD_ROOMS` × `LOAD_STUDENTS` join + submit burst; báo dropped joins và p99 latency |
+
+**Lưu ý khi viết client test:** WS events (`game_started`, `new_question`, `game_ended`) có thể emit trong cùng tick với ack `host_start_game` / `host_next_question` — phải `socket.once(...)` **trước** khi host emit.
 
 ---
 

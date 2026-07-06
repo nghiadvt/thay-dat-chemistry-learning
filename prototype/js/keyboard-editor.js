@@ -1,6 +1,11 @@
-/** Chemical Keyboard Editor — data in localStorage */
+/** Chemical Keyboard Editor — localStorage hoặc API admin khi có keyboard_id */
 const LS_KEYBOARD = 'htd_chemical_keyboard';
 const MAX_UNITS = 10;
+
+const editorParams = new URLSearchParams(location.search);
+const editorKeyboardId = parseInt(editorParams.get('keyboard_id'), 10) || null;
+const editorEmbedded = editorParams.get('embedded') === 'admin';
+const editorBackendMode = (window.HTD_CONFIG || {}).useBackend !== false && !editorParams.has('demo');
 
 const KEY_LIBRARY = [
   'H', 'O', 'C', 'N', 'Cl', 'Na', 'K', 'Ca', 'Mg', 'Al', 'Fe', 'Cu', 'Zn', 'Ag', 'Ba', 'P', 'S',
@@ -122,6 +127,9 @@ function cloneData(data) {
 }
 
 function loadKeyboard() {
+  if (editorKeyboardId && editorBackendMode && window.HTDApi) {
+    return null;
+  }
   try {
     const raw = localStorage.getItem(LS_KEYBOARD);
     if (raw) {
@@ -132,10 +140,66 @@ function loadKeyboard() {
   return defaultKeyboard();
 }
 
+function editorDataFromKeyboard(keyboard) {
+  const cfg = keyboard.config || {};
+  const data = defaultKeyboard();
+  data.name = keyboard.name || data.name;
+  data.keyboardId = keyboard.id;
+  data.subject = keyboard.subject || 'chemistry';
+  if (cfg.defaults) data.defaults = { ...data.defaults, ...cfg.defaults };
+  if (cfg.rows?.length) data.rows = cloneData(cfg.rows);
+  if (cfg.smart_context) data.smart_context = cloneData(cfg.smart_context);
+  return data;
+}
+
+function configForApi(data) {
+  return {
+    schema_version: 1,
+    defaults: data.defaults || {},
+    rows: data.rows || [],
+    smart_context: data.smart_context || {
+      after_element: 'subscript',
+      after_plus: 'coefficient',
+    },
+  };
+}
+
 function saveKeyboard(silent) {
   editor.data.updatedAt = Date.now();
-  localStorage.setItem(LS_KEYBOARD, JSON.stringify(editor.data));
-  if (!silent) showToast('Đã lưu bản nháp');
+  if (!(editorKeyboardId && editorBackendMode)) {
+    localStorage.setItem(LS_KEYBOARD, JSON.stringify(editor.data));
+    if (!silent) showToast('Đã lưu bản nháp');
+  }
+}
+
+async function saveKeyboardToApi() {
+  if (!editorKeyboardId || !editorBackendMode || !window.HTDApi) {
+    saveKeyboard();
+    showToast('Đã lưu bản nháp');
+    return;
+  }
+  const issues = validateKeyboard();
+  if (issues.length) {
+    showToast('Lỗi: ' + issues[0]);
+    return;
+  }
+  const name = document.getElementById('kbeNameInput')?.value?.trim() || editor.data.name;
+  try {
+    await HTDApi.updateKeyboard(editorKeyboardId, {
+      name,
+      subject: editor.data.subject || 'chemistry',
+      config: configForApi(editor.data),
+    });
+    editor.data.name = name;
+    showToast('Đã lưu vào admin');
+  } catch (err) {
+    const msg = err.message || 'Không lưu được.';
+    if (/Unauthenticated|401|419|đăng nhập/i.test(msg)) {
+      location.href = HTDApi.loginUrl(location.pathname + location.search);
+      return;
+    }
+    showToast(msg);
+  }
 }
 
 function pushHistory() {
@@ -924,6 +988,10 @@ function importJson(file) {
 }
 
 function validateAndSave() {
+  if (editorKeyboardId && editorBackendMode) {
+    saveKeyboardToApi();
+    return;
+  }
   const issues = validateKeyboard();
   if (issues.length) {
     showToast('Lỗi: ' + issues[0]);
@@ -947,8 +1015,38 @@ function applyDevice() {
 }
 
 function initEditor() {
-  editor.data = loadKeyboard();
-  renderAll();
+  if (editorEmbedded) {
+    document.body.classList.add('admin-embedded');
+    const logo = document.querySelector('.kbe-logo');
+    if (logo) {
+      logo.href = '/admin/keyboards';
+      logo.title = 'Về danh sách bàn phím';
+    }
+  }
+
+  const boot = () => {
+    editor.data = loadKeyboard() || defaultKeyboard();
+    renderAll();
+  };
+
+  if (editorKeyboardId && editorBackendMode && window.HTDApi) {
+    HTDApi.getKeyboard(editorKeyboardId)
+      .then((keyboard) => {
+        editor.data = editorDataFromKeyboard(keyboard);
+        renderAll();
+      })
+      .catch((err) => {
+        const msg = err.message || 'Không tải được bàn phím.';
+        if (/Unauthenticated|401|419|đăng nhập/i.test(msg)) {
+          location.href = HTDApi.loginUrl(location.pathname + location.search);
+          return;
+        }
+        showToast(msg);
+        boot();
+      });
+  } else {
+    boot();
+  }
 
   document.getElementById('kbeUndoBtn').addEventListener('click', undo);
   document.getElementById('kbeRedoBtn').addEventListener('click', redo);

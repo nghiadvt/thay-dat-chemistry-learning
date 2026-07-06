@@ -25,8 +25,9 @@
             <p class="hint">Game cần có ít nhất 1 quiz đang kích hoạt.</p>
             @error('game_id')<div class="field-error">{{ $message }}</div>@enderror
         </div>
-        <button type="submit" class="btn btn-primary">Tạo phòng + PIN</button>
+        <button type="submit" class="btn btn-primary">Tạo phòng</button>
     </form>
+    <p class="hint" style="margin-top:12px;">Sau khi tạo, mở phòng để lấy link cho học sinh tham gia.</p>
 </div>
 
 @if ($recentSessions->isNotEmpty())
@@ -52,7 +53,7 @@
                     <td>{{ $session->host?->name }}</td>
                     <td><span class="badge badge-{{ $session->status }}">{{ $session->status }}</span></td>
                     <td>{{ $session->created_at?->format('d/m/Y H:i') }}</td>
-                    <td><a href="{{ route('admin.sessions.show', $session) }}" class="btn btn-secondary btn-sm">Chi tiết</a></td>
+                    <td><a href="{{ route('admin.sessions.show', $session) }}" class="btn btn-primary btn-sm">Vào phòng</a></td>
                 </tr>
                 @endforeach
             </tbody>

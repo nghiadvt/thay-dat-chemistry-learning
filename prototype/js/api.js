@@ -1,7 +1,7 @@
 /**
  * Laravel API client (session cookie + CSRF).
  */
-const HTDApi = (function () {
+window.HTDApi = (function () {
   const cfg = () => window.HTD_CONFIG || {};
 
   function apiUrl(path) {
@@ -68,6 +68,19 @@ const HTDApi = (function () {
     },
     async exportSessionCsv(sessionId) {
       window.open(apiUrl(`/admin/reports/${sessionId}/export`), '_blank');
+    },
+    async getKeyboard(id) {
+      await ensureCsrf();
+      const data = await request(`/api/keyboards/${id}`);
+      return data.keyboard || data;
+    },
+    async updateKeyboard(id, body) {
+      await ensureCsrf();
+      const data = await request(`/api/keyboards/${id}`, {
+        method: 'PUT',
+        body,
+      });
+      return data.keyboard || data;
     },
     loginUrl(redirectPath) {
       const redirect = encodeURIComponent(redirectPath || location.pathname);

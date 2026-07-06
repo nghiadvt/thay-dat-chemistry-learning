@@ -304,10 +304,10 @@ Step 4: Full local testing (chỉ khi Phase 3 xong)
 
 ### Phase 4 — Full local testing
 > **Chỉ bắt đầu khi Phase 3 xong** (3C + 3D + 3B tối thiểu chức năng; polish có thể song song nhưng test nghiêm túc sau khi luồng đủ).
-- [ ] 4.1 Full play-through test, 1 room — *depends on: all of Phase 3*
-- [ ] 4.2 Load test: 10 rooms × 50 students (~500 concurrent connections) — *depends on: 4.1*
-- [ ] 4.3 Reconnect test — *depends on: 4.1*
-- [ ] 4.4 Double-submit & clock skew test — *depends on: 4.1*
+- [x] 4.1 Full play-through test, 1 room — *depends on: all of Phase 3*
+- [x] 4.2 Load test: 10 rooms × 50 students (~500 concurrent connections) — *depends on: 4.1*
+- [x] 4.3 Reconnect test — *depends on: 4.1*
+- [x] 4.4 Double-submit & clock skew test — *depends on: 4.1*
 
 ---
 
@@ -616,12 +616,22 @@ Làm lần lượt 3C.1 → 3C.7; tick checklist + cập nhật docs nếu lệc
 ### 4.1 — Full play-through test (1 room)
 **What to do:** 1 Host tab + 2-3 student tabs, play through one sample quiz start to finish.
 
+**Automated (2026-07-06):** `ws-server/scripts/phase4-test.js` — login Laravel → tạo session → host + 3 HS → 13 câu seed game #1 → verify `game_ended` + báo cáo DB `ended`.
+
+```bash
+docker run --rm --network host -v "$PWD/ws-server:/app" -w /app node:20-alpine \
+  sh -c "npm install --omit=dev -q && node scripts/phase4-test.js"
+# thêm --load cho 4.2
+```
+
 **Acceptance criteria:** No tab hangs, disconnects, or shows a wrong score. Correct order: Join → Waiting → Question → Result → Leaderboard → (repeat) → Final.
 
 ---
 
 ### 4.2 — Load test: 10 rooms × 50 students (~500 connections)
 **What to do:** Use k6 or Artillery to simulate 10 different PINs, each with 50 clients connecting + joining + submitting nearly simultaneously right at the moment the timer runs out (this is the peak load moment — many submits arrive at once).
+
+**Measured (2026-07-06, local Docker):** `phase4-test.js --load` — 0 dropped joins; p99 submit burst **391ms**, max **391ms** (50 parallel `question_result` per room).
 
 **Acceptance criteria:** No client gets dropped. p99 latency from `submit_answer` to `question_result` stays under an acceptable threshold (suggest <200ms locally, record the actual measured number). The `ws-server` container's RAM/CPU doesn't grow abnormally or leak across many consecutive questions. Redis isn't bottlenecked (check `redis-cli INFO` for `connected_clients`, `used_memory`).
 

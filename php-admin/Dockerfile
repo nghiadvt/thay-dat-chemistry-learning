@@ -9,6 +9,7 @@ COPY --chown=www-data:www-data . .
 
 RUN composer install --no-dev --optimize-autoloader --no-interaction \
     && php artisan package:discover --ansi \
+    && php artisan storage:link --force \
     && chown -R www-data:www-data storage bootstrap/cache
 
 ENV AUTORUN_ENABLED=false

@@ -4,13 +4,17 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test:smoke": "node scripts/ws-smoke-test.js",
+    "test:phase4": "node scripts/phase4-test.js",
+    "test:phase4:load": "node scripts/phase4-test.js --load"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
     "express": "^4.21.2",
     "ioredis": "^5.6.1",
     "mysql2": "^3.14.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
   }
 }

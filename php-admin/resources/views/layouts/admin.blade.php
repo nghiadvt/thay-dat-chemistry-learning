@@ -3,11 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin — Hóa Thầy Đạt')</title>
-    <link rel="stylesheet" href="{{ asset('css/admin.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ file_exists(public_path('css/admin.css')) ? filemtime(public_path('css/admin.css')) : time() }}">
     @stack('head')
 </head>
-<body class="admin-body">
+<body class="admin-body @yield('body-class')">
 <div class="admin-shell">
     <aside class="admin-sidebar">
         <div class="admin-brand">
@@ -21,11 +22,11 @@
             <a href="{{ route('admin.quizzes.index') }}" class="{{ request()->routeIs('admin.quizzes.*') || request()->routeIs('admin.questions.*') ? 'active' : '' }}">Quiz</a>
             <a href="{{ route('admin.sessions.create') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Báo cáo</a>
-            <a href="/app/teacher.html" target="_blank" rel="noopener">Màn host →</a>
         </nav>
     </aside>
 
     <div class="admin-main">
+        @unless(request()->routeIs('admin.keyboards.editor', 'admin.questions.create', 'admin.questions.edit'))
         <header class="admin-topbar">
             <h2>@yield('page-title', 'Admin')</h2>
             <div class="admin-user">
@@ -36,18 +37,32 @@
                 </form>
             </div>
         </header>
+        @endunless
 
-        <main class="admin-content">
-            @if (session('success'))
-                <div class="alert alert-success">{{ session('success') }}</div>
-            @endif
-            @if (session('error'))
-                <div class="alert alert-error">{{ session('error') }}</div>
-            @endif
+        <main class="admin-content @yield('content-class')">
             @yield('content')
         </main>
     </div>
 </div>
+<div id="adminToastHost" class="admin-toast-host" aria-live="polite"></div>
+@if (session('success') || session('error'))
+<script>
+window.__ADMIN_FLASH__ = @json(array_filter([
+    'type' => session('error') ? 'error' : 'success',
+    'message' => session('error') ?? session('success'),
+]));
+</script>
+@endif
+<script src="{{ asset('js/admin-toast.js') }}?v={{ file_exists(public_path('js/admin-toast.js')) ? filemtime(public_path('js/admin-toast.js')) : time() }}"></script>
+@if (session('success') || session('error'))
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.__ADMIN_FLASH__ && window.AdminToast) {
+        AdminToast.show(window.__ADMIN_FLASH__.message, window.__ADMIN_FLASH__.type);
+    }
+});
+</script>
+@endif
 @stack('scripts')
 </body>
 </html>

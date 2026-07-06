@@ -63,7 +63,7 @@ async function getQuizQuestions(quizId) {
             correct_answer_normalized, input_mode, template, correct_answer,
             time_limit_seconds, sort_order
      FROM questions
-     WHERE quiz_id = ?
+     WHERE quiz_id = ? AND is_active = 1
      ORDER BY sort_order ASC, id ASC`,
     [quizId]
   );
@@ -124,7 +124,7 @@ async function saveGameResults(sessionId, leaderboardEntries) {
       const entry = leaderboardEntries[i];
       await conn.execute(
         `INSERT INTO game_results
-           (session_id, student_name, player_token, score, rank, created_at, updated_at)
+           (session_id, student_name, player_token, score, \`rank\`, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
         [sessionId, entry.name, entry.player_token || null, entry.score, i + 1]
       );

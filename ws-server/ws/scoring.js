@@ -16,6 +16,11 @@ function normalizeFormula(value) {
     .toUpperCase();
 }
 
+function normalizeEssay(value) {
+  if (value == null) return '';
+  return String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 function checkAnswer(question, answer) {
   switch (question.answer_type) {
     case 'mc': {
@@ -28,46 +33,20 @@ function checkAnswer(question, answer) {
         correctAnswer: question.options?.[question.correct_index] ?? question.correct_index,
       };
     }
-    case 'formula': {
+    case 'essay': {
       const submitted = typeof answer === 'object' && answer !== null && 'text' in answer
         ? answer.text
         : answer;
-      const normalized = normalizeFormula(submitted);
-      const expected = normalizeFormula(question.correct_answer_normalized);
+      const normalized = normalizeEssay(submitted);
+      const expected = normalizeEssay(question.correct_answer_normalized);
       return {
         correct: normalized === expected,
         correctAnswer: question.correct_answer_normalized,
       };
     }
-    case 'structured': {
-      const correct = deepEqualStructured(answer, question.correct_answer);
-      return {
-        correct,
-        correctAnswer: question.correct_answer,
-      };
-    }
     default:
       return { correct: false, correctAnswer: null };
   }
-}
-
-function deepEqualStructured(a, b) {
-  return JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
-}
-
-function sortKeys(value) {
-  if (Array.isArray(value)) {
-    return value.map(sortKeys);
-  }
-  if (value && typeof value === 'object') {
-    return Object.keys(value)
-      .sort()
-      .reduce((acc, key) => {
-        acc[key] = sortKeys(value[key]);
-        return acc;
-      }, {});
-  }
-  return value;
 }
 
 /**
@@ -95,6 +74,7 @@ function calculateScore({ timeLimitSeconds, questionStartedAt, hybridTimestamp, 
 
 module.exports = {
   normalizeFormula,
+  normalizeEssay,
   checkAnswer,
   calculateScore,
 };

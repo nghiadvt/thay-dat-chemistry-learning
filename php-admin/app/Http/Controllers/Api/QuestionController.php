@@ -27,7 +27,8 @@ class QuestionController extends Controller
     {
         $validated = $request->validate([
             'content' => ['required', 'string'],
-            'answer_type' => ['required', 'in:mc,formula,structured'],
+            'explanation' => ['nullable', 'string'],
+            'answer_type' => ['required', 'in:mc,essay'],
             'options' => ['nullable', 'array'],
             'correct_index' => ['nullable', 'integer', 'min:0'],
             'correct_answer_normalized' => ['nullable', 'string', 'max:255'],
@@ -35,6 +36,7 @@ class QuestionController extends Controller
             'template' => ['nullable', 'array'],
             'correct_answer' => ['nullable', 'array'],
             'time_limit_seconds' => ['nullable', 'integer', 'min:5', 'max:300'],
+            'points' => ['nullable', 'integer', 'min:1', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
@@ -48,6 +50,7 @@ class QuestionController extends Controller
             ...$prepared,
             'sort_order' => $prepared['sort_order'] ?? 0,
             'time_limit_seconds' => $prepared['time_limit_seconds'] ?? 30,
+            'points' => $prepared['points'] ?? 1,
         ]);
 
         return $this->jsonSuccess(['question' => $question], 201);
@@ -66,7 +69,8 @@ class QuestionController extends Controller
 
         $validated = $request->validate([
             'content' => ['sometimes', 'required', 'string'],
-            'answer_type' => ['sometimes', 'required', 'in:mc,formula,structured'],
+            'explanation' => ['nullable', 'string'],
+            'answer_type' => ['sometimes', 'required', 'in:mc,essay'],
             'options' => ['nullable', 'array'],
             'correct_index' => ['nullable', 'integer', 'min:0'],
             'correct_answer_normalized' => ['nullable', 'string', 'max:255'],
@@ -74,6 +78,7 @@ class QuestionController extends Controller
             'template' => ['nullable', 'array'],
             'correct_answer' => ['nullable', 'array'],
             'time_limit_seconds' => ['nullable', 'integer', 'min:5', 'max:300'],
+            'points' => ['nullable', 'integer', 'min:1', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 

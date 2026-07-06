@@ -7,6 +7,7 @@ use App\Models\Keyboard;
 use App\Services\KeyboardValidator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class KeyboardController extends Controller
@@ -27,10 +28,7 @@ class KeyboardController extends Controller
 
     public function create(): View
     {
-        return view('admin.keyboards.form', [
-            'keyboard' => null,
-            'configJson' => json_encode($this->defaultConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-        ]);
+        return view('admin.keyboards.create');
     }
 
     public function store(Request $request): RedirectResponse
@@ -38,71 +36,50 @@ class KeyboardController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'subject' => ['nullable', 'string', 'max:64'],
-            'config_json' => ['required', 'string'],
         ]);
 
-        $config = $this->parseConfig($validated['config_json']);
-        if ($config === null) {
-            return back()->withInput()->withErrors(['config_json' => 'JSON không hợp lệ.']);
-        }
-
-        $config = $this->validator->normalizeConfig($config);
+        $config = $this->validator->normalizeConfig($this->defaultConfig());
         $issues = $this->validator->validate($config);
         if ($issues !== []) {
-            return back()->withInput()->withErrors(['config_json' => implode(' ', $issues)]);
+            return back()->withInput()->withErrors(['name' => implode(' ', $issues)]);
         }
 
-        Keyboard::create([
+        $keyboard = Keyboard::create([
             'name' => $validated['name'],
             'subject' => $validated['subject'] ?? 'chemistry',
             'config' => $config,
         ]);
 
-        return redirect()->route('admin.keyboards.index')
-            ->with('success', 'Đã tạo bàn phím.');
+        return redirect()->route('admin.keyboards.editor', $keyboard)
+            ->with('success', 'Đã tạo bàn phím. Chỉnh layout bên dưới.');
     }
 
-    public function edit(Keyboard $keyboard): View
+    public function edit(Keyboard $keyboard): RedirectResponse
     {
-        return view('admin.keyboards.form', [
-            'keyboard' => $keyboard,
-            'configJson' => json_encode($keyboard->config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-        ]);
+        return redirect()->route('admin.keyboards.editor', $keyboard);
     }
 
-    public function update(Request $request, Keyboard $keyboard): RedirectResponse
+    public function editor(Keyboard $keyboard): View
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'subject' => ['nullable', 'string', 'max:64'],
-            'config_json' => ['required', 'string'],
-        ]);
+        $keyboardBoot = [
+            'id' => $keyboard->id,
+            'name' => $keyboard->name,
+            'subject' => $keyboard->subject,
+            'config' => $keyboard->config,
+            'preview_url' => $keyboard->preview_url,
+        ];
 
-        $config = $this->parseConfig($validated['config_json']);
-        if ($config === null) {
-            return back()->withInput()->withErrors(['config_json' => 'JSON không hợp lệ.']);
-        }
-
-        $config = $this->validator->normalizeConfig($config);
-        $issues = $this->validator->validate($config);
-        if ($issues !== []) {
-            return back()->withInput()->withErrors(['config_json' => implode(' ', $issues)]);
-        }
-
-        $keyboard->update([
-            'name' => $validated['name'],
-            'subject' => $validated['subject'] ?? 'chemistry',
-            'config' => $config,
-        ]);
-
-        return redirect()->route('admin.keyboards.index')
-            ->with('success', 'Đã cập nhật bàn phím.');
+        return view('admin.keyboards.editor', compact('keyboard', 'keyboardBoot'));
     }
 
     public function destroy(Keyboard $keyboard): RedirectResponse
     {
         if ($keyboard->quizzes()->exists()) {
             return back()->with('error', 'Không thể xóa bàn phím đang được quiz sử dụng.');
+        }
+
+        if ($keyboard->preview_path) {
+            Storage::disk('public')->delete($keyboard->preview_path);
         }
 
         $keyboard->delete();
@@ -217,14 +194,5 @@ class KeyboardController extends Controller
             'disabled' => false,
         ];
     }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function parseConfig(string $json): ?array
-    {
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? $decoded : null;
-    }
 }
+

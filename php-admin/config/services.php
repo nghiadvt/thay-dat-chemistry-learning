@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'ws' => [
+        'url' => env('WS_PUBLIC_URL', 'http://localhost:'.env('WS_HOST_PORT', 38581)),
+    ],
+
 ];

@@ -103,6 +103,10 @@ function showTeacherScreen(id) {
 
 function initTeacherApp() {
   const params = new URLSearchParams(location.search);
+  if (params.get('embedded') === 'admin') {
+    document.body.classList.add('admin-embedded');
+  }
+
   const pinFromUrl = (params.get('pin') || '').replace(/\D/g, '').slice(0, 6);
 
   if (pinFromUrl.length === 6 && isBackendMode()) {

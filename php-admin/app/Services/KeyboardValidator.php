@@ -82,7 +82,7 @@ class KeyboardValidator
                 if ($type === 'send') {
                     $hasSend = true;
                 }
-                if ($type === 'normal' && empty($key['text'])) {
+                if ($type === 'normal' && (! array_key_exists('text', $key) || ! is_string($key['text']) || $key['text'] === '')) {
                     $issues[] = "Phím trống ở hàng \"{$rowName}\"";
                 }
             }

@@ -18,9 +18,9 @@ class QuestionValidator
     public function validateAndPrepare(array $data, ?Question $existing = null): array
     {
         $answerType = $data['answer_type'] ?? $existing?->answer_type;
-        if (! in_array($answerType, ['mc', 'formula', 'structured'], true)) {
+        if (! in_array($answerType, ['mc', 'essay'], true)) {
             throw ValidationException::withMessages([
-                'answer_type' => 'answer_type phải là mc, formula hoặc structured.',
+                'answer_type' => 'answer_type phải là mc hoặc essay.',
             ]);
         }
 
@@ -28,10 +28,21 @@ class QuestionValidator
             $data['content'] = $this->htmlSanitizer->sanitize($data['content']);
         }
 
+        if (array_key_exists('explanation', $data)) {
+            if ($data['explanation'] === null || $data['explanation'] === '') {
+                $data['explanation'] = null;
+            } else {
+                $data['explanation'] = $this->htmlSanitizer->sanitize($data['explanation']);
+            }
+        }
+
+        if (isset($data['points'])) {
+            $data['points'] = max(1, min(100, (int) $data['points']));
+        }
+
         match ($answerType) {
             'mc' => $this->validateMultipleChoice($data, $existing),
-            'formula' => $this->validateFormula($data, $existing),
-            'structured' => $this->validateStructured($data, $existing),
+            'essay' => $this->validateEssay($data, $existing),
         };
 
         return $data;
@@ -61,34 +72,12 @@ class QuestionValidator
     /**
      * @param  array<string, mixed>  $data
      */
-    private function validateFormula(array $data, ?Question $existing): void
+    private function validateEssay(array $data, ?Question $existing): void
     {
         $answer = $data['correct_answer_normalized'] ?? $existing?->correct_answer_normalized;
-        if (empty($answer)) {
+        if (empty(trim((string) $answer))) {
             throw ValidationException::withMessages([
-                'correct_answer_normalized' => 'Câu công thức cần correct_answer_normalized.',
-            ]);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function validateStructured(array $data, ?Question $existing): void
-    {
-        $inputMode = $data['input_mode'] ?? $existing?->input_mode;
-        $template = $data['template'] ?? $existing?->template;
-        $correctAnswer = $data['correct_answer'] ?? $existing?->correct_answer;
-
-        if (empty($inputMode)) {
-            throw ValidationException::withMessages([
-                'input_mode' => 'Câu structured cần input_mode.',
-            ]);
-        }
-
-        if (empty($template) || empty($correctAnswer)) {
-            throw ValidationException::withMessages([
-                'template' => 'Câu structured cần template và correct_answer.',
+                'correct_answer_normalized' => 'Câu tự luận cần đáp án mẫu.',
             ]);
         }
     }

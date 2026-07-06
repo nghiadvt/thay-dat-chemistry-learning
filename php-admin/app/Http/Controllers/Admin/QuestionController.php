@@ -39,6 +39,8 @@ class QuestionController extends Controller
             ...$prepared,
             'sort_order' => $prepared['sort_order'] ?? 0,
             'time_limit_seconds' => $prepared['time_limit_seconds'] ?? 30,
+            'points' => $prepared['points'] ?? 1,
+            'is_active' => true,
         ]);
 
         return redirect()->route('admin.quizzes.show', $quiz)
@@ -79,6 +81,17 @@ class QuestionController extends Controller
             ->with('success', 'Đã xóa câu hỏi.');
     }
 
+    public function toggleActive(Quiz $quiz, Question $question): RedirectResponse
+    {
+        $this->ensureBelongsToQuiz($quiz, $question);
+        $question->update(['is_active' => ! $question->is_active]);
+
+        $label = $question->is_active ? 'đã bật' : 'đã tắt';
+
+        return redirect()->route('admin.quizzes.show', $quiz)
+            ->with('success', "Câu hỏi #{$question->sort_order} {$label}.");
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -86,65 +99,49 @@ class QuestionController extends Controller
     {
         $validated = $request->validate([
             'content' => ['required', 'string'],
-            'answer_type' => ['required', 'in:mc,formula,structured'],
+            'explanation' => ['nullable', 'string'],
+            'answer_type' => ['required', 'in:mc,essay'],
             'time_limit_seconds' => ['nullable', 'integer', 'min:5', 'max:300'],
+            'points' => ['nullable', 'integer', 'min:1', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'correct_index' => ['nullable', 'integer', 'min:0'],
-            'correct_answer_normalized' => ['nullable', 'string', 'max:255'],
-            'input_mode' => ['nullable', 'string', 'max:32'],
-            'options_text' => ['nullable', 'string'],
-            'template_json' => ['nullable', 'string'],
-            'correct_answer_json' => ['nullable', 'string'],
+            'correct_answer_normalized' => ['nullable', 'string', 'max:10000'],
+            'options' => ['nullable', 'array'],
+            'options.*' => ['nullable', 'string', 'max:500'],
         ]);
 
         $data = [
             'content' => $validated['content'],
+            'explanation' => $validated['explanation'] ?? null,
             'answer_type' => $validated['answer_type'],
             'time_limit_seconds' => $validated['time_limit_seconds'] ?? 30,
+            'points' => $validated['points'] ?? 1,
             'sort_order' => $validated['sort_order'] ?? 0,
         ];
 
         if ($validated['answer_type'] === 'mc') {
             $options = array_values(array_filter(
-                array_map('trim', explode("\n", $validated['options_text'] ?? '')),
+                array_map('trim', $validated['options'] ?? []),
                 fn ($o) => $o !== ''
             ));
             $data['options'] = $options;
             $data['correct_index'] = (int) ($validated['correct_index'] ?? 0);
+            $data['correct_answer_normalized'] = null;
+            $data['input_mode'] = null;
+            $data['template'] = null;
+            $data['correct_answer'] = null;
         }
 
-        if ($validated['answer_type'] === 'formula') {
+        if ($validated['answer_type'] === 'essay') {
             $data['correct_answer_normalized'] = trim($validated['correct_answer_normalized'] ?? '');
-        }
-
-        if ($validated['answer_type'] === 'structured') {
-            $data['input_mode'] = $validated['input_mode'] ?? '';
-            $template = $this->parseJson($validated['template_json'] ?? '');
-            $correctAnswer = $this->parseJson($validated['correct_answer_json'] ?? '');
-            if ($template === null || $correctAnswer === null) {
-                throw ValidationException::withMessages([
-                    'template' => 'Template và correct_answer phải là JSON hợp lệ.',
-                ]);
-            }
-            $data['template'] = $template;
-            $data['correct_answer'] = $correctAnswer;
+            $data['options'] = null;
+            $data['correct_index'] = null;
+            $data['input_mode'] = null;
+            $data['template'] = null;
+            $data['correct_answer'] = null;
         }
 
         return $data;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function parseJson(string $json): ?array
-    {
-        if (trim($json) === '') {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? $decoded : null;
     }
 
     private function ensureBelongsToQuiz(Quiz $quiz, Question $question): void

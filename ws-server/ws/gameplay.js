@@ -192,8 +192,6 @@ async function emitCurrentQuestion(io, redis, pin) {
     content: question.content,
     answer_type: question.answer_type,
     options: question.answer_type === 'mc' ? question.options : null,
-    template: question.answer_type === 'structured' ? question.template : null,
-    input_mode: question.answer_type === 'structured' ? question.input_mode : null,
     keyboard_config: quiz.keyboard_config,
     time_limit: question.time_limit_seconds,
     server_time: startedAt,

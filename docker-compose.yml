@@ -51,6 +51,8 @@ services:
   php-admin:
     build: ./php-admin
     restart: unless-stopped
+    user: "0:0"
+    entrypoint: ["/bin/bash", "-c", "cd /var/www/html && mkdir -p storage/app/public/keyboards && chown -R www-data:www-data storage/app/public && chmod -R ug+rwX storage/app/public && php artisan storage:link --force >/dev/null 2>&1 || true; exec docker-php-serversideup-entrypoint /init"]
     env_file: .env
     environment:
       APP_NAME: "Hoa Thay Dat Admin"
@@ -79,6 +81,11 @@ services:
         condition: service_healthy
     volumes:
       - ./prototype:/var/www/html/public/app:ro
+      - ./php-admin/public/htd-admin:/var/www/html/public/htd-admin:ro
+      - ./php-admin/public/css:/var/www/html/public/css:ro
+      - ./php-admin/public/js:/var/www/html/public/js:ro
+      - ./php-admin/resources/views:/var/www/html/resources/views:ro
+      - ./php-admin/storage/app/public:/var/www/html/storage/app/public
 
 volumes:
   chem_mysql_data:

@@ -7,6 +7,7 @@ use App\Models\Keyboard;
 use App\Services\KeyboardValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class KeyboardController extends Controller
 {
@@ -73,6 +74,39 @@ class KeyboardController extends Controller
         return $this->jsonSuccess(['keyboard' => $keyboard->fresh()]);
     }
 
+    public function uploadPreview(Request $request, Keyboard $keyboard): JsonResponse
+    {
+        $validated = $request->validate([
+            'image' => ['required', 'string'],
+        ]);
+
+        if (! preg_match('/^data:image\/png;base64,(.+)$/s', $validated['image'], $matches)) {
+            return $this->jsonError('Ảnh preview phải là PNG base64.', 422);
+        }
+
+        $binary = base64_decode($matches[1], true);
+        if ($binary === false || strlen($binary) > 2 * 1024 * 1024) {
+            return $this->jsonError('Ảnh preview không hợp lệ hoặc quá lớn (tối đa 2MB).', 422);
+        }
+
+        $path = $keyboard->buildPreviewStoragePath();
+        $written = Storage::disk('public')->put($path, $binary);
+        if ($written === false) {
+            return $this->jsonError('Không ghi được file preview. Kiểm tra quyền thư mục storage/app/public.', 500);
+        }
+
+        if ($keyboard->preview_path && $keyboard->preview_path !== $path) {
+            Storage::disk('public')->delete($keyboard->preview_path);
+        }
+
+        $keyboard->update(['preview_path' => $path]);
+
+        return $this->jsonSuccess([
+            'keyboard' => $keyboard->fresh(),
+            'preview_url' => $keyboard->preview_url,
+        ]);
+    }
+
     public function destroy(Keyboard $keyboard): JsonResponse
     {
         if ($keyboard->quizzes()->exists()) {
@@ -80,6 +114,10 @@ class KeyboardController extends Controller
                 'Không thể xóa bàn phím đang được quiz sử dụng. Gán quiz sang bàn phím khác trước.',
                 409
             );
+        }
+
+        if ($keyboard->preview_path) {
+            Storage::disk('public')->delete($keyboard->preview_path);
         }
 
         $keyboard->delete();

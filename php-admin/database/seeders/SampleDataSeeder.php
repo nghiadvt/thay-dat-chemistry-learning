@@ -101,16 +101,14 @@ class SampleDataSeeder extends Seeder
             ],
             [
                 'content' => '<p>Công thức hóa học của nước là gì?</p>',
-                'answer_type' => 'formula',
+                'answer_type' => 'essay',
                 'correct_answer_normalized' => 'H2O',
                 'sort_order' => 2,
             ],
             [
-                'content' => '<p>Điền hệ số cân bằng phương trình:</p><p>__ H₂ + __ O₂ → __ H₂O</p>',
-                'answer_type' => 'structured',
-                'input_mode' => 'balance',
-                'template' => ['coef' => ['c0', 'c1', 'c2']],
-                'correct_answer' => ['coef' => ['c0' => '2', 'c1' => '1', 'c2' => '2']],
+                'content' => '<p>Viết phương trình cân bằng: H₂ + O₂ → H₂O</p>',
+                'answer_type' => 'essay',
+                'correct_answer_normalized' => '2H2 + O2 -> 2H2O',
                 'sort_order' => 3,
             ],
             [
@@ -122,7 +120,7 @@ class SampleDataSeeder extends Seeder
             ],
             [
                 'content' => '<p>Công thức của axit clohidric loãng?</p>',
-                'answer_type' => 'formula',
+                'answer_type' => 'essay',
                 'correct_answer_normalized' => 'HCl',
                 'sort_order' => 5,
             ],
@@ -148,7 +146,7 @@ class SampleDataSeeder extends Seeder
             ],
             [
                 'content' => '<p>Công thức của etanol?</p>',
-                'answer_type' => 'formula',
+                'answer_type' => 'essay',
                 'correct_answer_normalized' => 'C2H5OH',
                 'sort_order' => 2,
             ],
@@ -161,7 +159,7 @@ class SampleDataSeeder extends Seeder
             ],
             [
                 'content' => '<p>Công thức metan?</p>',
-                'answer_type' => 'formula',
+                'answer_type' => 'essay',
                 'correct_answer_normalized' => 'CH4',
                 'sort_order' => 4,
             ],
@@ -194,7 +192,7 @@ class SampleDataSeeder extends Seeder
             ],
             [
                 'content' => '<p>Công thức muối ăn?</p>',
-                'answer_type' => 'formula',
+                'answer_type' => 'essay',
                 'correct_answer_normalized' => 'NaCl',
                 'sort_order' => 2,
             ],

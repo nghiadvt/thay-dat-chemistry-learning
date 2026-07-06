@@ -3,42 +3,74 @@
 @section('title', 'Phòng '.$session->pin.' — Hóa Thầy Đạt')
 @section('page-title', 'Phòng chơi')
 
+@push('head')
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ asset('htd-admin/css/shared.css') }}">
+<link rel="stylesheet" href="{{ asset('htd-admin/css/session-host.css') }}">
+<style>
+.session-top-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px;
+    margin-bottom: 12px;
+}
+.session-top-bar .pin-display {
+    font-size: 2rem; font-weight: 800; letter-spacing: 0.2em; color: #2D46D6;
+}
+.admin-host-wrap .teacher-layout { height: calc(100vh - 220px); min-height: 560px; max-height: none; }
+.admin-host-wrap .teacher-sidebar { display: none; }
+</style>
+@endpush
+
 @section('content')
-<div class="card" style="text-align:center;">
-    <h3 style="margin-top:0;">PIN phòng</h3>
-    <div class="pin-display">{{ $session->pin }}</div>
-    <p style="color:#6b7280;">
-        Game: <strong>{{ $session->game?->name }}</strong> ·
-        Trạng thái: <span class="badge badge-{{ $session->status }}">{{ $session->status }}</span>
-    </p>
-</div>
-
-<div class="card">
-    <h3>Bước tiếp theo</h3>
-    <div class="actions" style="margin-bottom:16px;">
-        <a href="{{ $hostUrl }}" class="btn btn-primary" target="_blank" rel="noopener">Mở màn host</a>
-        <a href="{{ $studentUrl }}" class="btn btn-secondary" target="_blank" rel="noopener">Trang học sinh (demo PIN)</a>
+<div class="card session-top-bar">
+    <div>
+        <div class="hint" style="margin:0 0 4px;">PIN — học sinh nhập tại link bên phải</div>
+        <div class="pin-display">{{ $session->pin }}</div>
     </div>
-    <p class="hint" style="margin:0;">
-        Link host: <code>{{ $hostUrl }}</code><br>
-        Học sinh nhập PIN <strong>{{ $session->pin }}</strong> tại <code>/app/index.html</code>
-    </p>
+    <div>
+        <div class="hint" style="margin:0 0 4px;">Game</div>
+        <strong>{{ $session->game?->name }}</strong>
+        <span class="badge badge-{{ $session->status }}" style="margin-left:8px;">{{ $session->status }}</span>
+    </div>
+    <div class="actions" style="margin:0;">
+        <a href="{{ $joinUrl }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">Link học sinh tham gia</a>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(@json($joinUrl))">Copy link</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('{{ $session->pin }}')">Copy PIN</button>
+        @if ($session->status === 'ended')
+            <a href="{{ route('admin.reports.show', $session) }}" class="btn btn-primary btn-sm">Báo cáo</a>
+        @endif
+    </div>
 </div>
 
-<div class="card">
-    <h3>Thông tin session</h3>
-    <table class="data-table">
-        <tr><th>Session ID</th><td>{{ $session->id }}</td></tr>
-        <tr><th>Game ID</th><td>{{ $session->game_id }}</td></tr>
-        <tr><th>Host</th><td>{{ $session->host?->name }}</td></tr>
-        <tr><th>Tạo lúc</th><td>{{ $session->created_at?->format('d/m/Y H:i:s') }}</td></tr>
-    </table>
+<div class="admin-host-wrap">
+    @include('admin.sessions._host-panel')
 </div>
 
-<div class="actions">
+<div class="actions" style="margin-top:12px;">
     <a href="{{ route('admin.sessions.create') }}" class="btn btn-secondary">Tạo phòng khác</a>
-    @if ($session->status === 'ended')
-        <a href="{{ route('admin.reports.show', $session) }}" class="btn btn-primary">Xem báo cáo</a>
-    @endif
 </div>
 @endsection
+
+@push('scripts')
+<script>
+window.ADMIN_BOOT = {
+    session: {
+        pin: @json($session->pin),
+        gameId: {{ (int) $session->game_id }},
+        sessionId: {{ (int) $session->id }},
+        gameName: @json($session->game?->name),
+    },
+    apiBase: @json(url('/')),
+    wsUrl: @json(config('services.ws.url')),
+};
+</script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="{{ asset('htd-admin/js/admin-boot.js') }}"></script>
+<script src="{{ asset('htd-admin/js/shared.js') }}"></script>
+<script src="{{ asset('htd-admin/js/api.js') }}"></script>
+<script src="{{ asset('htd-admin/js/socket.js') }}"></script>
+<script src="{{ asset('htd-admin/js/game-adapter.js') }}"></script>
+<script src="{{ asset('htd-admin/js/backend-bridge.js') }}"></script>
+<script src="{{ asset('htd-admin/js/teacher.js') }}"></script>
+<script src="{{ asset('htd-admin/js/admin-session-init.js') }}"></script>
+@endpush

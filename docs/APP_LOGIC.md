@@ -3,7 +3,7 @@
 > Logic ứng dụng: luồng màn hình, state, scoring, bàn phím, WebSocket events.
 > Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
 
-**Cập nhật lần cuối:** 2026-07-06 (Phase 3C — admin priority, platform split)
+**Cập nhật lần cuối:** 2026-07-06 (Admin native Blade — không iframe prototype)
 
 ---
 
@@ -41,25 +41,28 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 
 ---
 
-## 2. Luồng giáo viên (web desktop — host)
+## 2. Luồng giáo viên (Laravel `/admin`)
 
-| Màn hình | Hành động |
-|---|---|
-| Admin (Laravel) | CRUD nội dung, tạo phòng, xem báo cáo — **Phase 3C** |
-| Dashboard host | Lobby PIN/QR, danh sách HS, Start/Next/End — `teacher.html` |
-| Host | Điều khiển câu hỏi, submit count, trình chiếu — **Phase 3D/3B** |
+| Bước | Path | Hành động |
+|---|---|---|
+| Soạn nội dung | `/admin/keyboards`, `/admin/games`, … | CRUD trong Blade |
+| Tạo phòng | `/admin/sessions/create` | Chọn game → PIN |
+| Vào phòng | `/admin/sessions/{id}` | Host native (Blade + `public/htd-admin/js/teacher.js`) |
+| Link HS | `/join/{pin}` | Redirect → `/app/index.html?pin=` |
 
-Platform: **web desktop only** — không thiết kế mobile cho teacher.
+**Không dùng** `/app/teacher.html` hay `/app/keyboard-editor.html` cho GV — logic đã chuyển vào `php-admin/public/admin/` + views `resources/views/admin/`.
 
----
+### Bàn phím
 
-## 2b. Luồng giáo viên (tham khảo prototype cũ — trước 3C)
+1. `/admin/keyboards/create` — nhập tên
+2. `/admin/keyboards/{id}/editor` — kéo thả layout, **Save** → `PUT /api/keyboards/{id}`
+3. Không import/export JSON trong admin
 
-| Màn hình | Hành động |
-|---|---|
-| Dashboard | Tạo game, chọn bộ câu hỏi, cấu hình thời gian/số câu |
-| Lobby | Nhận PIN + QR, chờ HS join, Start khi ≥2 người, kick |
-| Host | Điều khiển câu hỏi, xem submit count, Next/End |
+### Host phòng
+
+- Blade: `admin/sessions/_host-panel.blade.php` (markup từ prototype, asset trong `public/htd-admin/assets/`)
+- Init: `admin-session-init.js` → `joinExistingRoomFromAdmin()`
+- Config: `window.ADMIN_BOOT` (pin, gameId, sessionId, wsUrl)
 
 ---
 
@@ -297,10 +300,12 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 | File | Vai trò |
 |---|---|
 | `config.js` | `HTD_CONFIG`: `apiBase`, `wsUrl`, `useBackend` |
-| `api.js` | `HTDApi`: check PIN, tạo session, CSRF/session |
+| `api.js` | `HTDApi`: check PIN, session, keyboard CRUD, CSRF/session |
 | `socket.js` | `HTDSocket`: Socket.io + NTP median offset |
 | `game-adapter.js` | Map `new_question` payload → model UI hiện tại |
 | `backend-bridge.js` | Đăng ký WS events → callbacks student/teacher |
+| `keyboard-editor.js` | Editor bàn phím; API save khi `keyboard_id` + `embedded=admin` |
+| `teacher.js` | Host lobby/gameplay; `embedded=admin` → join phòng từ admin |
 
 ### Mapping prototype → backend
 
@@ -320,6 +325,13 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 - `formula` / `structured`: adapter cơ bản; polish input UI ở Phase 3B.
 - CSV export (3.5): dùng `/api/reports/sessions/{id}` — wire ở **3C.7** / **3D.3**.
 
+### `HTDApi` bổ sung (keyboard)
+
+| Method | API |
+|---|---|
+| `getKeyboard(id)` | `GET /api/keyboards/{id}` |
+| `updateKeyboard(id, body)` | `PUT /api/keyboards/{id}` |
+
 ---
 
 ## 9. Phase 3 — Thứ tự triển khai & platform
@@ -327,14 +339,14 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 | Phase | Nội dung | Platform |
 |---|---|---|
 | **3A** ✅ | Integration plumbing (API/WS) | prototype |
-| **3C** ⬜ | Admin UI đầy đủ — data thật trong DB | Laravel **web desktop** |
-| **3D** ⬜ | Teacher + Student chức năng với data admin | Teacher **web** · Student **mobile** |
-| **3B** ⬜ | UI polish theo mockup | Teacher web · Student mobile |
-| **4** | Test end-to-end | — |
+| **3C** ✅ | Admin UI — CRUD + embed editor/host | Laravel **web desktop** |
+| **3D** ✅ | Teacher + Student với data admin | Teacher embed · Student **mobile** |
+| **3B** ✅ | UI polish theo mockup | Teacher web · Student mobile |
+| **4** ✅ | Test end-to-end (`phase4-test.js`) | — |
 
-**Quy tắc:** Hoàn thành **3C trước** khi polish teacher/student. Phase 4 chỉ sau Phase 3 xong.
+**Quy tắc:** Teacher host + keyboard editor chạy **trong** `/admin` (iframe). Học sinh luôn `/app/index.html`.
 
-Chi tiết checklist: [`local-deployment-plan.md`](../local-deployment-plan.md) — mục 3C, 3D, 3B.
+Chi tiết checklist: [`local-deployment-plan.md`](../local-deployment-plan.md).
 
 ---
 

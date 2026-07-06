@@ -33,12 +33,23 @@ async function createSessionPin() {
   const token = (html.match(/name="_token" value="([^"]+)"/) || [])[1];
   if (!token) throw new Error('CSRF token not found');
 
+  const pageCookies = loginPage.headers.getSetCookie
+    ? loginPage.headers.getSetCookie().map((c) => c.split(';')[0])
+    : [];
+  const pageCookie = pageCookies.join('; ');
+
   const loginRes = await fetch(`${PHP_URL}/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: pageCookie,
+    },
     body: `email=teacher@hoadat.local&password=password123&_token=${token}`,
     redirect: 'manual',
   });
+  if (loginRes.status !== 302 && loginRes.status !== 200) {
+    throw new Error(`Login failed with status ${loginRes.status}`);
+  }
   const setCookie = loginRes.headers.getSetCookie ? loginRes.headers.getSetCookie() : [];
   const cookie = setCookie.map((c) => c.split(';')[0]).join('; ');
   const xsrfMatch = setCookie.find((c) => c.startsWith('XSRF-TOKEN='));
@@ -86,12 +97,15 @@ async function main() {
   await waitForEvent(s2, 'room_joined');
   console.log('Students joined');
 
+  const gameStartedP = waitForEvent(s1, 'game_started');
+  const firstQuestionP = waitForEvent(s1, 'new_question');
   await emitAck(host, 'host_start_game');
-  await waitForEvent(s1, 'game_started');
-  const q = await waitForEvent(s1, 'new_question');
+  await gameStartedP;
+  const q = await firstQuestionP;
   console.log('new_question id:', q.question_id, 'type:', q.answer_type);
 
   const hybridTs = Date.now();
+  const submitCountP = waitForEvent(host, 'submit_count_update');
   s1.emit('submit_answer', {
     question_id: q.question_id,
     answer: 0,
@@ -100,7 +114,7 @@ async function main() {
   const result = await waitForEvent(s1, 'question_result');
   console.log('question_result:', result);
 
-  const submitCount = await waitForEvent(host, 'submit_count_update');
+  const submitCount = await submitCountP;
   console.log('submit_count_update:', submitCount);
 
   // Double submit should error

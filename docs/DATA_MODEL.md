@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-06 (migrations implemented — Laravel `2026_07_06_*`)
+**Cập nhật lần cuối:** 2026-07-06 (`tags`, `quiz_tag` — migration `2026_07_06_140000`)
 
 ---
 
@@ -16,6 +16,7 @@ erDiagram
   GAMES ||--o{ QUIZZES : contains
   KEYBOARDS ||--o{ QUIZZES : "used by"
   QUIZZES ||--o{ QUESTIONS : contains
+  QUIZZES }o--o{ TAGS : "tagged with"
   GAMES ||--o{ GAME_SESSIONS : "played as"
   GAME_SESSIONS ||--o{ GAME_RESULTS : "final scores"
   GAME_SESSIONS ||--o{ SESSION_ANSWERS : "per question"
@@ -58,7 +59,10 @@ Giữ nguyên: `id`, `name`, `email` UNIQUE, `password`, `remember_token`, `emai
 | `name` | VARCHAR(255) | VD: "Bàn phím hóa vô cơ" |
 | `subject` | VARCHAR(64) NULL | VD: "chemistry" — chuẩn bị v2.0 đa môn |
 | `config` | JSON | Layout bàn phím — cấu trúc `rows[]` + `defaults` + `smart_context` — xem [`KEYBOARD_SCHEMA.md`](KEYBOARD_SCHEMA.md) |
+| `preview_path` | VARCHAR(255) NULL | Đường dẫn tương đối file PNG preview (disk `public`) — VD: `keyboards/06-07-2026-ban-phim-hoa-vo-co.png` |
 | `created_at`, `updated_at` | TIMESTAMP | |
+
+**Preview ảnh:** Admin editor chụp DOM bàn phím (`html2canvas`) khi **Save** hoặc lần đầu mở editor (nếu chưa có ảnh) → `POST /api/keyboards/{id}/preview` → lưu `storage/app/public/keyboards/{dd-mm-YYYY}-{slug-ten-ban-phim}.png` (trùng tên trong ngày → thêm `-{id}`). Truy cập qua `/storage/...` (cần `php artisan storage:link`). Model expose `preview_url` (accessor, không lưu DB). Xóa bàn phím → xóa file preview tương ứng.
 
 ### Lưu từ Keyboard Editor
 
@@ -67,6 +71,7 @@ Giữ nguyên: `id`, `name`, `email` UNIQUE, `password`, `remember_token`, `emai
 | `data.name` | `keyboards.name` |
 | `(chưa có UI)` | `keyboards.subject` — mặc định `chemistry` |
 | `{ defaults, rows, smart_context }` | `keyboards.config` |
+| Chụp `#kbePhoneKb` (html2canvas) | `keyboards.preview_path` — PNG qua API upload |
 | `data.id`, `data.updatedAt` | **Không lưu** — dùng `keyboards.id`, `updated_at` |
 
 Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Production: tách `name` → cột, phần còn lại → `config` JSON.
@@ -99,6 +104,17 @@ Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Pr
 | `is_active` | BOOLEAN NOT NULL DEFAULT true | Ẩn quiz không dùng |
 | `created_at`, `updated_at` | TIMESTAMP | |
 
+**Chủ đề (tag):** quan hệ N–N qua `quiz_tag` — xem §6.1.
+
+### 6.1 Bảng `tags` & `quiz_tag`
+
+| Bảng | Cột | Ghi chú |
+|---|---|---|
+| `tags` | `id`, `name` UNIQUE, `slug` UNIQUE, `timestamps` | Chủ đề: "Hóa vô cơ", "Lớp 10", … |
+| `quiz_tag` | `quiz_id` FK, `tag_id` FK | PK composite — 1 quiz nhiều tag |
+
+Admin nhập tag dạng chuỗi phân cách dấu phẩy; lọc quiz theo tag trên `/admin/quizzes`.
+
 ---
 
 ## 7. Bảng `questions`
@@ -110,15 +126,18 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 | `id` | BIGINT PK | |
 | `quiz_id` | BIGINT FK → `quizzes.id` ON DELETE CASCADE | |
 | `content` | LONGTEXT NOT NULL | HTML: đề text + `<img>` + `<video>` (sanitize trước lưu) |
-| `answer_type` | ENUM('mc','formula','structured') NOT NULL | |
+| `explanation` | LONGTEXT NULL | HTML giải thích đáp án (tuỳ chọn, sanitize trước lưu) |
+| `answer_type` | ENUM('mc','essay') NOT NULL | |
 | `options` | JSON NULL | `mc`: `["đáp án A", "B", "C", "D"]` — tối thiểu 2, tối đa 6 |
 | `correct_index` | TINYINT UNSIGNED NULL | `mc`: index 0-based |
-| `correct_answer_normalized` | VARCHAR(255) NULL | `formula`: chuẩn hóa H₂O → H2O |
-| `input_mode` | VARCHAR(32) NULL | `structured`: `product` \| `balance` \| `blank` \| `blank_balance` |
-| `template` | JSON NULL | `structured`: cấu trúc ô blank/coef (theo prototype) |
-| `correct_answer` | JSON NULL | `structured`: `{blank:{b0:'O2'}, coef:{c0:'4'}}` |
+| `correct_answer_normalized` | TEXT NULL | `essay`: đáp án mẫu (so khớp văn bản) |
+| `input_mode` | VARCHAR(32) NULL | *(dự phòng — chưa dùng)* |
+| `template` | JSON NULL | *(dự phòng — chưa dùng)* |
+| `correct_answer` | JSON NULL | *(dự phòng — chưa dùng)* |
 | `time_limit_seconds` | INT NOT NULL DEFAULT 30 | |
+| `points` | SMALLINT UNSIGNED NOT NULL DEFAULT 1 | Điểm cơ bản khi trả lời đúng (1–100) |
 | `sort_order` | SMALLINT NOT NULL DEFAULT 0 | Thứ tự trong quiz |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true | Ẩn câu hỏi khi tắt (không đưa vào phòng chơi) |
 | `created_at`, `updated_at` | TIMESTAMP | |
 
 ### Validation theo `answer_type`
@@ -126,8 +145,7 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 | `answer_type` | Field bắt buộc |
 |---|---|
 | `mc` | `options` (≥2), `correct_index` |
-| `formula` | `correct_answer_normalized` |
-| `structured` | `input_mode`, `template`, `correct_answer` |
+| `essay` | `correct_answer_normalized` (đáp án mẫu) |
 
 ### Ví dụ `content` (HTML)
 

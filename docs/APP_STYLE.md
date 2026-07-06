@@ -1,9 +1,9 @@
 # App Style — Hóa Thầy Đạt
 
 > Design tokens, layout, component patterns cho **UI học sinh (mobile only)**.
-> **Admin + Teacher:** web desktop — không dùng file này làm chuẩn chính; tham chiếu mockup `prototype/reference/teacher-website*.png` và layout Laravel admin.
+> **Admin + Teacher:** web desktop — Laravel `/admin` nhúng prototype qua iframe (`embedded=admin`); CSS embed ghi ở §12.
 
-**Cập nhật lần cuối:** 2026-07-06 (Phase 3B — UI polish)
+**Cập nhật lần cuối:** 2026-07-06 (Admin native — Blade + `public/admin/`)
 
 ---
 
@@ -306,8 +306,23 @@ Full viewport height, flex column, **không scroll**:
 
 ---
 
-## 11. Tài liệu liên quan
+## 12. Admin tools (Laravel Blade + `public/htd-admin/`)
+
+GV dùng **Blade trong `/admin`**, JS/CSS tại `php-admin/public/htd-admin/` — không trùng URL `/admin` (nginx 403 nếu có thư mục `public/admin/`).
+
+| Tool | Blade | Assets |
+|---|---|---|
+| Keyboard editor | `admin/keyboards/editor` + `_editor-body` | `htd-admin/css/keyboard-editor.css`, `htd-admin/js/keyboard-editor.js` |
+| Host phòng | `admin/sessions/show` + `_host-panel` | `htd-admin/css/session-host.css`, `htd-admin/js/teacher.js` |
+
+Init qua `window.ADMIN_BOOT` + `admin-boot.js` (cùng origin API, `config('services.ws.url')` cho Socket.io).
+
+---
+
+## 13. Tài liệu liên quan
 
 - [`docs/SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) — Kiến trúc hệ thống
 - [`docs/APP_LOGIC.md`](APP_LOGIC.md) — Logic ứng dụng
-- [`prototype/index.html`](../prototype/index.html) — UI prototype
+- [`prototype/index.html`](../prototype/index.html) — UI prototype học sinh
+- [`prototype/teacher.html`](../prototype/teacher.html) — Host (embed admin)
+- [`prototype/keyboard-editor.html`](../prototype/keyboard-editor.html) — Editor bàn phím (embed admin)

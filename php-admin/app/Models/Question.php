@@ -11,6 +11,7 @@ class Question extends Model
     protected $fillable = [
         'quiz_id',
         'content',
+        'explanation',
         'answer_type',
         'options',
         'correct_index',
@@ -19,7 +20,9 @@ class Question extends Model
         'template',
         'correct_answer',
         'time_limit_seconds',
+        'points',
         'sort_order',
+        'is_active',
     ];
 
     protected function casts(): array
@@ -28,6 +31,7 @@ class Question extends Model
             'options' => 'array',
             'template' => 'array',
             'correct_answer' => 'array',
+            'is_active' => 'boolean',
         ];
     }
 

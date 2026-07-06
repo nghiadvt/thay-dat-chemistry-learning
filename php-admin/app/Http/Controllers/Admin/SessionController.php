@@ -67,15 +67,8 @@ class SessionController extends Controller
     {
         $session->load(['game', 'host']);
 
-        $hostUrl = url('/app/teacher.html').'?'.http_build_query([
-            'pin' => $session->pin,
-            'game_id' => $session->game_id,
-            'session_id' => $session->id,
-            'from' => 'admin',
-        ]);
+        $joinUrl = url('/join/'.$session->pin);
 
-        $studentUrl = url('/app/index.html').'?pin='.$session->pin;
-
-        return view('admin.sessions.show', compact('session', 'hostUrl', 'studentUrl'));
+        return view('admin.sessions.show', compact('session', 'joinUrl'));
     }
 }
