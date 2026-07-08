@@ -220,8 +220,9 @@ const HTD = {
   LEADERBOARD_MS: 5000,
 
   formatTimer(sec) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
+    const total = Math.max(0, Math.ceil(Number(sec) || 0));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   },
 

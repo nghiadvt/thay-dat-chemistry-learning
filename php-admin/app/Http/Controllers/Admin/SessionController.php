@@ -84,20 +84,81 @@ class SessionController extends Controller
             ->with('success', "Đã tạo phòng «{$session->name}» — PIN {$pin}.");
     }
 
+    public function edit(GameSession $session): View
+    {
+        $session->load(['game', 'quiz', 'host']);
+
+        $games = Game::query()->orderBy('name')->get();
+
+        $quizzes = Quiz::query()
+            ->with('game:id,name')
+            ->withCount(['questions as active_questions_count' => fn ($q) => $q->where('is_active', true)])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        // Keep current quiz in the dropdown even if it was deactivated after create.
+        if ($session->quiz_id && ! $quizzes->contains('id', $session->quiz_id)) {
+            $current = Quiz::query()
+                ->with('game:id,name')
+                ->withCount(['questions as active_questions_count' => fn ($q) => $q->where('is_active', true)])
+                ->find($session->quiz_id);
+            if ($current) {
+                $quizzes->prepend($current);
+            }
+        }
+
+        $canChangeQuiz = $session->status === 'waiting';
+
+        return view('admin.sessions.edit', compact('session', 'games', 'quizzes', 'canChangeQuiz'));
+    }
+
+    public function update(Request $request, GameSession $session): RedirectResponse
+    {
+        $canChangeQuiz = $session->status === 'waiting';
+
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+        ];
+
+        if ($canChangeQuiz) {
+            $rules['quiz_id'] = ['required', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)];
+        }
+
+        $validated = $request->validate($rules);
+
+        $session->name = $validated['name'];
+
+        if ($canChangeQuiz) {
+            $quiz = Quiz::with('game')->findOrFail($validated['quiz_id']);
+
+            if ($quiz->questions()->where('is_active', true)->count() === 0) {
+                return back()->with('error', 'Quiz chưa có câu hỏi active. Chọn quiz khác.')->withInput();
+            }
+
+            $quizChanged = (int) $session->quiz_id !== (int) $quiz->id;
+
+            $session->quiz_id = $quiz->id;
+            $session->game_id = $quiz->game_id;
+
+            if ($quizChanged && $session->is_active) {
+                $this->redisRoomService->createWaitingRoom($session->pin, $quiz->game_id, $quiz->id);
+            }
+        }
+
+        $session->save();
+
+        return redirect()->route('admin.sessions.index')
+            ->with('success', "Đã cập nhật phòng «{$session->name}» (PIN {$session->pin}).");
+    }
+
     public function show(GameSession $session): View
     {
         $session->load(['game', 'quiz', 'host']);
 
         $joinUrl = $this->sessionQrService->joinUrl($session);
-
-        try {
-            $this->sessionQrService->ensureQr($session, $joinUrl);
-            $session->refresh();
-        } catch (\Throwable) {
-            // Hiển thị placeholder nếu không tạo được QR
-        }
-
-        $qrUrl = $session->qr_url;
+        // Always a scannable QR for /join/{pin} — never the mock qr-login.png asset.
+        $qrUrl = $this->sessionQrService->displayQrUrl($session, $joinUrl);
 
         return view('admin.sessions.show', compact('session', 'joinUrl', 'qrUrl'));
     }

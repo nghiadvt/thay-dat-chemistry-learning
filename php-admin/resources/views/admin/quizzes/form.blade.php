@@ -24,16 +24,10 @@
                 </select>
                 @error('game_id')<div class="field-error">{{ $message }}</div>@enderror
             </div>
-            <div class="form-group">
-                <label for="keyboard_id">Bàn phím *</label>
-                <select id="keyboard_id" name="keyboard_id" required>
-                    <option value="">— Chọn bàn phím —</option>
-                    @foreach ($keyboards as $keyboard)
-                        <option value="{{ $keyboard->id }}" @selected(old('keyboard_id') == $keyboard->id)>{{ $keyboard->name }}</option>
-                    @endforeach
-                </select>
-                @error('keyboard_id')<div class="field-error">{{ $message }}</div>@enderror
-            </div>
+            @include('admin.partials.keyboard-select-with-preview', [
+                'keyboards' => $keyboards,
+                'selectedKeyboardId' => old('keyboard_id'),
+            ])
         </div>
 
         <div class="form-group">
@@ -108,4 +102,10 @@
         <button type="submit" class="btn btn-primary">Tạo quiz</button>
     </form>
 </div>
+
+@include('admin.partials.keyboard-preview-lightbox')
 @endsection
+
+@push('scripts')
+<script src="{{ asset('htd-admin/js/admin-keyboard-preview.js') }}?v={{ file_exists(public_path('htd-admin/js/admin-keyboard-preview.js')) ? filemtime(public_path('htd-admin/js/admin-keyboard-preview.js')) : time() }}"></script>
+@endpush

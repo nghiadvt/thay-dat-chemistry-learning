@@ -46,7 +46,10 @@ class GameSession extends Model
                 return null;
             }
 
-            return asset('storage/'.$this->qr_path);
+            $url = asset('storage/'.$this->qr_path);
+            $mtime = Storage::disk('public')->lastModified($this->qr_path);
+
+            return $mtime ? $url.'?v='.$mtime : $url;
         });
     }
 

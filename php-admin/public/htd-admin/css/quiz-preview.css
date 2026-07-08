@@ -275,3 +275,49 @@
   max-width: 100%;
   height: auto;
 }
+
+.htd-preview-eq-wrap {
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.htd-preview-eq-wrap .eq-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 1.05rem;
+}
+
+.htd-preview-eq-wrap .eq-coef-box {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 2px solid #93c5fd;
+  border-radius: 8px;
+  background: #eff6ff;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.htd-preview-eq-wrap .eq-blank-box {
+  min-width: 72px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  pointer-events: none;
+}
+
+.htd-preview-eq-wrap .eq-chem sub {
+  font-size: 0.75em;
+}
+
+.htd-preview-eq-hint {
+  margin: 10px 0 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}

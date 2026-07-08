@@ -237,6 +237,85 @@ function scheduleKeyboardPreviewCapture(delayMs = 600) {
   }, delayMs);
 }
 
+/** html2canvas không parse được oklch/oklab — chuyển sang dạng canvas chấp nhận (rgb/hex). */
+function cssColorToCanvasSafe(color) {
+  if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') return color;
+  if (!/oklch|oklab|color\(|lab\(|lch\(/i.test(color)) return color;
+  try {
+    const probe = document.createElement('div');
+    probe.style.color = color;
+    document.body.appendChild(probe);
+    const safe = getComputedStyle(probe).color;
+    probe.remove();
+    return safe || '#000000';
+  } catch {
+    return '#000000';
+  }
+}
+
+const PREVIEW_CAPTURE_STYLE_PROPS = [
+  'box-sizing', 'display', 'flex-direction', 'flex-wrap', 'align-items', 'justify-content',
+  'align-self', 'flex', 'flex-grow', 'flex-shrink', 'flex-basis', 'gap', 'row-gap', 'column-gap',
+  'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+  'margin', 'padding', 'border', 'border-radius', 'background', 'background-color',
+  'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height',
+  'letter-spacing', 'text-align', 'vertical-align', 'white-space', 'overflow',
+  'position', 'top', 'right', 'bottom', 'left', 'z-index', 'opacity',
+  'box-shadow', 'outline', 'transform', 'transform-origin',
+];
+
+function bakeComputedStyles(sourceRoot, cloneRoot) {
+  const sources = [sourceRoot, ...sourceRoot.querySelectorAll('*')];
+  const clones = [cloneRoot, ...cloneRoot.querySelectorAll('*')];
+  sources.forEach((src, i) => {
+    const dst = clones[i];
+    if (!(src instanceof Element) || !(dst instanceof Element)) return;
+    if (dst.classList?.contains('kbe-row-hover-actions')) {
+      dst.remove();
+      return;
+    }
+    const cs = getComputedStyle(src);
+    PREVIEW_CAPTURE_STYLE_PROPS.forEach((prop) => {
+      let value = cs.getPropertyValue(prop);
+      if (!value) return;
+      if (/color|background|border|outline|shadow/i.test(prop)) {
+        value = value.replace(
+          /oklch\([^)]+\)|oklab\([^)]+\)|color\([^)]+\)|lab\([^)]+\)|lch\([^)]+\)/gi,
+          (m) => cssColorToCanvasSafe(m)
+        );
+        if (/oklch|oklab|color\(/i.test(value)) {
+          value = cssColorToCanvasSafe(value);
+        }
+      }
+      dst.style.setProperty(prop, value);
+    });
+  });
+}
+
+/**
+ * Clone bàn phím off-DOM + style inline RGB, bỏ stylesheet khi html2canvas clone
+ * (tránh lỗi "unsupported color function oklch" từ CSS trang / browser).
+ */
+function buildKeyboardPreviewCaptureNode(sourceEl) {
+  const host = document.createElement('div');
+  host.id = 'kbePreviewCaptureHost';
+  host.setAttribute('aria-hidden', 'true');
+  Object.assign(host.style, {
+    position: 'fixed',
+    left: '-10000px',
+    top: '0',
+    width: `${Math.max(sourceEl.offsetWidth, 1)}px`,
+    zIndex: '-1',
+    pointerEvents: 'none',
+    background: '#f5f5f5',
+  });
+  const clone = sourceEl.cloneNode(true);
+  bakeComputedStyles(sourceEl, clone);
+  host.appendChild(clone);
+  document.body.appendChild(host);
+  return { host, clone };
+}
+
 async function captureKeyboardPreview(kbId) {
   if (previewCaptureInFlight) return previewCaptureInFlight;
 
@@ -252,16 +331,49 @@ async function captureKeyboardPreview(kbId) {
     await waitForPreviewReady();
 
     const deviceWrap = document.getElementById('kbePhoneWrap');
-    const prevTransform = deviceWrap ? deviceWrap.style.transform : '';
-    if (deviceWrap) deviceWrap.style.transform = 'none';
+    const stage = document.getElementById('kbePreviewStage');
+    const area = document.getElementById('kbePreviewArea');
+    const frame = document.getElementById('kbePhoneFrame');
+    const restores = [];
+    let captureHost = null;
+    const stashStyle = (el, prop, value) => {
+      if (!el) return;
+      restores.push([el, prop, el.style.getPropertyValue(prop), el.style.getPropertyPriority(prop)]);
+      el.style.setProperty(prop, value, 'important');
+    };
+
+    // html2canvas lệch khi parent có transform scale + overflow:hidden + filter
+    stashStyle(deviceWrap, 'transform', 'none');
+    stashStyle(stage, 'overflow', 'visible');
+    stashStyle(area, 'overflow', 'visible');
+    stashStyle(frame, 'filter', 'none');
 
     try {
-      const canvas = await window.html2canvas(target, {
+      target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      await waitForPreviewReady();
+
+      const rect = target.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) {
+        throw new Error('Khung bàn phím quá nhỏ để chụp preview.');
+      }
+
+      const capture = buildKeyboardPreviewCaptureNode(target);
+      captureHost = capture.host;
+
+      const canvas = await window.html2canvas(capture.clone, {
         backgroundColor: '#f5f5f5',
-        scale: 1.5,
+        scale: Math.min(2, window.devicePixelRatio || 1.5),
         logging: false,
         useCORS: true,
+        foreignObjectRendering: false,
+        onclone: (clonedDoc) => {
+          // Bỏ mọi stylesheet — clone đã có style inline RGB an toàn cho html2canvas
+          clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => node.remove());
+        },
       });
+      if (!canvas.width || !canvas.height) {
+        throw new Error('html2canvas trả ảnh trống.');
+      }
       const image = canvas.toDataURL('image/png');
       const data = await HTDApi.uploadKeyboardPreview(kbId, image);
       const previewUrl = data.preview_url || (data.keyboard && data.keyboard.preview_url);
@@ -269,9 +381,16 @@ async function captureKeyboardPreview(kbId) {
         window.ADMIN_BOOT.keyboard.preview_url = previewUrl;
         window.ADMIN_BOOT.keyboard.preview_path = data.keyboard?.preview_path || null;
       }
+      if (!previewUrl) {
+        throw new Error('API không trả preview_url.');
+      }
       return previewUrl;
     } finally {
-      if (deviceWrap) deviceWrap.style.transform = prevTransform;
+      if (captureHost) captureHost.remove();
+      restores.forEach(([el, prop, value, priority]) => {
+        if (value) el.style.setProperty(prop, value, priority || '');
+        else el.style.removeProperty(prop);
+      });
     }
   })();
 
@@ -314,7 +433,11 @@ async function saveKeyboardToApi() {
     notify('Đã lưu vào database', 'success');
     try {
       await captureKeyboardPreview(kbId);
-    } catch {
+    } catch (capErr) {
+      notify(
+        'Đã lưu config nhưng chưa tạo được ảnh preview: ' + (capErr.message || 'lỗi không rõ'),
+        'warning'
+      );
       scheduleKeyboardPreviewCapture(800);
     }
   } catch (err) {
@@ -495,22 +618,23 @@ function renderRowList() {
   });
 }
 
-function renderPhoneKb(container) {
+function renderPhoneKb(container, options = {}) {
   const el = container || document.getElementById('kbePhoneKb');
   if (!el) return;
+  const editable = options.editable !== false;
 
   el.innerHTML = editor.data.rows.map(row => {
     if (row.hidden) return `<div class="kbe-kb-row hidden-row" data-row-id="${row.id}"></div>`;
     const units = rowUnits(row);
     const exceeded = units > MAX_UNITS;
-    const sel = row.id === editor.selectedRowId && !editor.selectedKeyId ? ' selected' : '';
+    const sel = editable && row.id === editor.selectedRowId && !editor.selectedKeyId ? ' selected' : '';
     const h = row.height || 'M';
 
     const keysHtml = row.keys.map(k => {
       if (k.type === 'empty') {
         return `<div class="kbe-kb-key type-empty" style="flex:${k.width} 1 0" data-key-id="${k.id}"></div>`;
       }
-      const keySel = k.id === editor.selectedKeyId ? ' selected' : '';
+      const keySel = editable && k.id === editor.selectedKeyId ? ' selected' : '';
       const typeCls = k.type !== 'normal' ? ` type-${k.type}` : '';
       const sizeCls = ` size-${k.fontSize || 'M'}`;
       const dis = k.disabled ? ' disabled' : '';
@@ -521,15 +645,21 @@ function renderPhoneKb(container) {
         title="${k.tooltip || ''}">${label}</button>`;
     }).join('');
 
+    const hoverActions = editable
+      ? `<div class="kbe-row-hover-actions">
+        <button type="button" class="kbe-row-hover-btn" data-menu-row="${row.id}" title="Tùy chọn hàng">⋮</button>
+      </div>`
+      : '';
+
     return `<div class="kbe-kb-row height-${h}${sel}${exceeded ? ' exceeded' : ''}"
       data-row-id="${row.id}"
       style="--row-gap:${row.spacing}px;--row-pad:${row.padding}px;--row-bg:${row.background};--row-border:${row.border}">
-      <div class="kbe-row-hover-actions">
-        <button type="button" class="kbe-row-hover-btn" data-menu-row="${row.id}" title="Tùy chọn hàng">⋮</button>
-      </div>
+      ${hoverActions}
       ${keysHtml}
     </div>`;
   }).join('');
+
+  if (!editable) return;
 
   el.querySelectorAll('.kbe-kb-row').forEach(rowEl => {
     rowEl.addEventListener('click', e => {
@@ -1275,15 +1405,37 @@ function buildOverlayPhone(containerId) {
       </div>
     </div>
   </div>`;
-  renderPhoneKb(document.getElementById(`${containerId}Kb`));
+  renderPhoneKb(document.getElementById(`${containerId}Kb`), { editable: false });
   return container.querySelector('.kbe-device-wrap');
+}
+
+const FRAME_SIZE = { phone: { w: 268, h: 548 }, tablet: { w: 420, h: 560 } };
+
+function fitOverlayDevice(wrap, hostEl) {
+  if (!wrap) return 1;
+  const size = FRAME_SIZE[editor.device] || FRAME_SIZE.phone;
+  const host = hostEl || wrap.closest('.kbe-test-wrap') || wrap.parentElement;
+  const pad = 48;
+  const availH = Math.max((host?.clientHeight || window.innerHeight) - pad, 180);
+  const availW = Math.max((host?.clientWidth || window.innerWidth) * 0.48 - 16, 140);
+  const scale = Math.min(availW / size.w, availH / size.h, editor.zoom || 1, 1);
+  wrap.style.transformOrigin = 'top center';
+  wrap.style.transform = `scale(${scale})`;
+  // transform không đổi layout box — thu chỗ chiếm chỗ theo scale để khỏi overflow
+  const phoneHost = wrap.parentElement;
+  if (phoneHost && phoneHost.classList.contains('kbe-overlay-phone')) {
+    phoneHost.style.width = `${Math.round(size.w * scale)}px`;
+    phoneHost.style.height = `${Math.round(size.h * scale)}px`;
+    phoneHost.style.overflow = 'hidden';
+  }
+  return scale;
 }
 
 function openPreview() {
   const overlay = document.getElementById('kbePreviewOverlay');
   overlay.hidden = false;
   const wrap = buildOverlayPhone('kbeOverlayPhone');
-  wrap.style.transform = `scale(${editor.zoom})`;
+  fitOverlayDevice(wrap, overlay);
 }
 
 function closePreview() {
@@ -1298,7 +1450,7 @@ function openTest() {
   overlay.hidden = false;
   formulaUpdateOutput(testTokens);
   const wrap = buildOverlayPhone('kbeTestPhone');
-  wrap.style.transform = `scale(${editor.zoom})`;
+  fitOverlayDevice(wrap, document.querySelector('#kbeTestOverlay .kbe-test-wrap'));
 
   const smartContext = editor.data.smart_context || {
     after_element: 'subscript',
@@ -1307,7 +1459,9 @@ function openTest() {
 
   const kb = document.getElementById('kbeTestPhoneKb');
   kb.querySelectorAll('.kbe-kb-key').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
       const row = findRow(btn.dataset.rowId);
       const key = findKey(row, btn.dataset.keyId);
       if (!key || key.disabled || key.type === 'empty') return;
@@ -1375,8 +1529,6 @@ function validateAndSave() {
 }
 
 /* ─── Init ─── */
-
-const FRAME_SIZE = { phone: { w: 268, h: 548 }, tablet: { w: 420, h: 560 } };
 
 function previewAutoFitScale() {
   const stage = document.getElementById('kbePreviewStage');
@@ -1495,14 +1647,14 @@ function initEditor() {
     });
   });
 
-  document.querySelectorAll('.kbe-zoom-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.kbe-zoom-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      editor.zoom = parseFloat(btn.dataset.zoom);
+  const zoomSelect = document.getElementById('kbeZoomSelect');
+  if (zoomSelect) {
+    zoomSelect.value = String(editor.zoom || 1);
+    zoomSelect.addEventListener('change', () => {
+      editor.zoom = parseFloat(zoomSelect.value) || 1;
       applyZoom();
     });
-  });
+  }
 
   document.getElementById('kbeKeySearch').addEventListener('input', e => {
     renderKeyLibrary(e.target.value);

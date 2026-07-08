@@ -16,7 +16,11 @@ const teacherState = {
   prevRanks: {},
   lastScoreTick: -1,
   qZoom: 1,
-  scorePanelOpen: true,
+  /** Khi true: sau mỗi câu hết giờ → hiện modal bảng điểm (~5s) rồi mới sang câu sau */
+  scorePanelOpen: false,
+  revealAnswers: false,
+  advancingQuestion: false,
+  questionEndHandled: false,
   fitTimer: null,
   fitObserver: null,
   presentationOpen: false,
@@ -27,10 +31,28 @@ const teacherState = {
   playerScores: {},
   finalLeaderboard: [],
   presentationTick: null,
+  /** Đồng hồ câu hiện tại (memory) — tránh race ghi đè localStorage */
+  liveTimerEndsAt: null,
+  livePhaseEndsAt: null,
 };
 const LS_SIDEBAR_COLLAPSED = 'htd_teacher_sidebar_collapsed';
 const LS_MAIN_SPLIT = 'htd_teacher_main_split';
 const FAKE_QUESTIONS = HTD.FAKE_QUESTIONS;
+
+function teacherServerNow() {
+  const offset = typeof HTDSocket !== 'undefined' && HTDSocket.getNtpOffset
+    ? HTDSocket.getNtpOffset()
+    : 0;
+  return Date.now() + offset;
+}
+
+function getTeacherQuestionSecondsRemaining(game) {
+  if (!game || game.phase !== 'question') return 0;
+  if (game.paused) return Math.ceil((game.pauseRemainingMs || 0) / 1000);
+  const endsAt = teacherState.liveTimerEndsAt || game.timerEndsAt;
+  if (!endsAt) return 0;
+  return Math.max(0, Math.ceil((endsAt - teacherServerNow()) / 1000));
+}
 
 function isBackendMode() {
   return Boolean(window.HTD_CONFIG?.useBackend);
@@ -301,21 +323,24 @@ function renderDashboard() {
   if (gameToolbar) gameToolbar.hidden = isEnded;
   mainGrid?.classList.toggle('game-active', inGame);
   mainGrid?.classList.toggle('game-ended', isEnded);
-  mainGrid?.classList.toggle('scores-collapsed', inGame && !isEnded && !teacherState.scorePanelOpen);
+  // Trong game: luôn ẩn panel phải — bảng điểm dùng modal sau mỗi câu (nếu bật)
+  mainGrid?.classList.toggle('scores-collapsed', inGame && !isEnded);
   playersPanel?.classList.toggle('game-active', inGame);
-  document.getElementById('teacherMainResizer')?.classList.toggle('hidden', inGame && !isEnded && !teacherState.scorePanelOpen);
+  document.getElementById('teacherMainResizer')?.classList.toggle('hidden', inGame && !isEnded);
   updateTeacherScorePanelBtn();
   applyTeacherQZoom();
   if (btnEndRoom) btnEndRoom.hidden = inGame && !isEnded;
   if (panelTitle) {
-    panelTitle.textContent = isEnded ? 'Kết quả cuối' : inGame ? 'Bảng điểm' : 'Danh sách học sinh';
+    panelTitle.textContent = isEnded ? 'Kết quả cuối' : 'Danh sách học sinh';
   }
   if (playerGrid) playerGrid.hidden = inGame;
-  if (scoreList) scoreList.hidden = !inGame || (!isEnded && !teacherState.scorePanelOpen);
-  if (playersPanel) playersPanel.hidden = inGame && !isEnded && !teacherState.scorePanelOpen;
+  if (scoreList) scoreList.hidden = !isEnded;
+  if (playersPanel) playersPanel.hidden = inGame && !isEnded;
 
   if (inGame && room.game) {
     renderTeacherGame(room);
+  } else {
+    closeTeacherLbModal();
   }
 
   renderTeacherList();
@@ -413,7 +438,7 @@ function renderTeacherQuestionContent(q) {
   }
 }
 
-function renderTeacherMcOptions(q, containerId) {
+function renderTeacherMcOptions(q, containerId, revealCorrect = false) {
   const answersEl = document.getElementById(containerId);
   if (!answersEl) return;
 
@@ -426,7 +451,7 @@ function renderTeacherMcOptions(q, containerId) {
   const correctIdx = q.correctIndex ?? q.correct ?? null;
   answersEl.innerHTML = `<div class="teacher-mc-options">${options
     .map((optText, i) => {
-      const isCorrect = correctIdx === i;
+      const isCorrect = revealCorrect && correctIdx === i;
       return `<div class="teacher-mc-option${isCorrect ? ' correct' : ''}">
           <span class="teacher-mc-label">${teacherOptionLetter(i)}.</span>
           <span class="teacher-mc-text">${EquationUI.chemToHtml(optText)}</span>
@@ -436,7 +461,7 @@ function renderTeacherMcOptions(q, containerId) {
     .join('')}</div>`;
 }
 
-function renderTeacherStructuredPreview(q, eqElId) {
+function renderTeacherStructuredPreview(q, eqElId, revealCorrect = false) {
   const eqEl = document.getElementById(eqElId);
   if (!eqEl) return false;
 
@@ -454,7 +479,7 @@ function renderTeacherStructuredPreview(q, eqElId) {
     eqEl.innerHTML =
       '<div class="teacher-formula-preview">' +
       '<p class="teacher-formula-preview-hint">Học sinh nhập công thức bằng bàn phím hóa học</p>' +
-      (q.correctAnswerNormalized
+      (revealCorrect && q.correctAnswerNormalized
         ? `<p class="teacher-formula-preview-answer">Đáp án: <strong>${EquationUI.chemToHtml(q.correctAnswerNormalized)}</strong></p>`
         : '') +
       '</div>';
@@ -473,9 +498,15 @@ function renderTeacherStructuredPreview(q, eqElId) {
   return false;
 }
 
-function renderTeacherBarem(q) {
+function renderTeacherBarem(q, revealCorrect = false) {
   const baremEl = document.getElementById('teacherQBarem');
   if (!baremEl) return;
+
+  if (!revealCorrect) {
+    baremEl.innerHTML = '';
+    baremEl.hidden = true;
+    return;
+  }
 
   const parts = [];
 
@@ -554,12 +585,12 @@ function renderTeacherQuestion(room) {
   }
 
   if (q.type === 'mc') {
-    renderTeacherMcOptions(q, 'teacherQAnswers');
+    renderTeacherMcOptions(q, 'teacherQAnswers', teacherState.revealAnswers);
   } else {
-    renderTeacherStructuredPreview(q, 'teacherQEq');
+    renderTeacherStructuredPreview(q, 'teacherQEq', teacherState.revealAnswers);
   }
 
-  renderTeacherBarem(q);
+  renderTeacherBarem(q, teacherState.revealAnswers);
   updateTeacherTimer(room);
   applyTeacherQZoom();
   scheduleFitTeacherQuestionCard();
@@ -573,9 +604,12 @@ function updateTeacherTimer(room) {
 
   let sec = 0;
   if (game.phase === 'question') {
-    sec = HTD.getQuestionTimeRemaining(game);
+    sec = getTeacherQuestionSecondsRemaining(game);
   } else if (game.phase === 'leaderboard') {
-    sec = HTD.getPhaseTimeRemaining(game);
+    const endsAt = teacherState.livePhaseEndsAt || game.phaseEndsAt;
+    sec = endsAt
+      ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+      : HTD.getPhaseTimeRemaining(game);
   }
 
   text.textContent = HTD.formatTimer(sec);
@@ -596,8 +630,19 @@ function updateTeacherTimer(room) {
 function renderTeacherIntermission(room) {
   document.getElementById('teacherQuestionPhase').hidden = false;
   document.getElementById('teacherFinalPhase').hidden = true;
+  teacherState.revealAnswers = true;
+  const q = getTeacherCurrentQuestion();
+  if (q) {
+    if (q.type === 'mc') renderTeacherMcOptions(q, 'teacherQAnswers', true);
+    else renderTeacherStructuredPreview(q, 'teacherQEq', true);
+    renderTeacherBarem(q, true);
+  }
   updateTeacherTimer(room);
-  renderTeacherScoreList();
+  if (teacherState.scorePanelOpen) {
+    openTeacherLbModal(room);
+  } else {
+    closeTeacherLbModal();
+  }
 }
 
 function renderTeacherPresentationQuestion(room) {
@@ -661,9 +706,10 @@ function renderTeacherPresentationQuestion(room) {
   if (q.type === 'mc') {
     const options = Array.isArray(q.options) ? q.options : [];
     const correctIdx = q.correctIndex ?? q.correct ?? null;
+    const reveal = teacherState.revealAnswers;
     answersEl.innerHTML = `<div class="teacher-presentation-mc">${options
       .map((optText, i) => {
-        const isCorrect = correctIdx === i;
+        const isCorrect = reveal && correctIdx === i;
         return `<div class="teacher-presentation-mc-item${isCorrect ? ' correct' : ''}">
           <span class="teacher-presentation-mc-label">${teacherOptionLetter(i)}.</span>
           <span>${EquationUI.chemToHtml(optText)}</span>
@@ -672,7 +718,7 @@ function renderTeacherPresentationQuestion(room) {
       })
       .join('')}</div>`;
   } else {
-    renderTeacherStructuredPreview(q, 'teacherPresentationEq');
+    renderTeacherStructuredPreview(q, 'teacherPresentationEq', teacherState.revealAnswers);
   }
 }
 
@@ -733,7 +779,7 @@ function updateTeacherPresentationCountdown(room) {
   }
 
   if (game.phase === 'question') {
-    const sec = HTD.getQuestionTimeRemaining(game);
+    const sec = getTeacherQuestionSecondsRemaining(game);
     const q = getTeacherCurrentQuestion();
     const total = Math.max(1, q?.timeLimit || 1);
     const ratio = Math.max(0, Math.min(1, sec / total));
@@ -929,15 +975,18 @@ function renderTeacherGame(room) {
     (game.phase === 'question' && game.questionIndex !== teacherState.lastRenderedIndex);
 
   if (game.phase === 'question') {
+    closeTeacherLbModal();
     if (needsFullRender) renderTeacherQuestion(room);
     else updateTeacherTimer(room);
   } else if (game.phase === 'leaderboard') {
     if (needsFullRender) renderTeacherIntermission(room);
     else {
       updateTeacherTimer(room);
-      renderTeacherScoreList();
+      updateTeacherLbModalCountdown(room);
+      if (teacherState.scorePanelOpen) renderTeacherLbModalList(room);
     }
   } else if (game.phase === 'final') {
+    closeTeacherLbModal();
     if (needsFullRender) renderTeacherFinal();
   }
 
@@ -948,16 +997,28 @@ function renderTeacherGame(room) {
 
 function teacherGameTick() {
   const room = HTD.getRoom();
-  if (isBackendMode() && room?.backendMode) return;
   if (!room?.game || room.status !== 'started') return;
 
   const game = room.game;
+
+  // Backend: host đếm giờ local (NTP) + tự chuyển phase / câu tiếp
+  if (isBackendMode() && room.backendMode) {
+    teacherBackendGameTick(room);
+    return;
+  }
+
   let changed = false;
 
   if (game.phase === 'question' && !game.paused) {
     const remaining = HTD.getQuestionTimeRemaining(game);
     if (remaining <= 0) {
-      HTD.startLeaderboardPhase(room);
+      if (teacherState.scorePanelOpen) {
+        HTD.startLeaderboardPhase(room);
+      } else {
+        const next = game.questionIndex + 1;
+        if (next >= FAKE_QUESTIONS.length) HTD.startFinalPhase(room);
+        else HTD.startQuestionPhase(room, next);
+      }
       changed = true;
     }
   } else if (game.phase === 'leaderboard') {
@@ -984,14 +1045,102 @@ function teacherGameTick() {
   if (room2?.game?.phase === 'question') {
     updateTeacherTimer(room2);
     renderTeacherTimeline(room2.game);
+    closeTeacherLbModal();
   } else if (room2?.game?.phase === 'leaderboard') {
     updateTeacherTimer(room2);
     renderTeacherTimeline(room2.game);
-    renderTeacherScoreList();
+    updateTeacherLbModalCountdown(room2);
+    if (teacherState.scorePanelOpen) openTeacherLbModal(room2);
   } else if (changed) {
     renderTeacherGame(room2);
   }
   renderTeacherPresentation(room2);
+}
+
+function teacherBackendGameTick(room) {
+  const game = room.game;
+  if (!game || game.phase === 'final' || room.status === 'ended') return;
+
+  // Khôi phục timer từ memory nếu localStorage bị ghi đè stale
+  if (teacherState.liveTimerEndsAt && game.phase === 'question' && !game.timerEndsAt) {
+    game.timerEndsAt = teacherState.liveTimerEndsAt;
+  }
+  if (teacherState.livePhaseEndsAt && game.phase === 'leaderboard' && !game.phaseEndsAt) {
+    game.phaseEndsAt = teacherState.livePhaseEndsAt;
+  }
+
+  if (game.phase === 'question') {
+    if (!teacherState.liveTimerEndsAt && !game.timerEndsAt) return;
+
+    updateTeacherTimer(room);
+    renderTeacherTimeline(game);
+    if (teacherState.presentationOpen) updateTeacherPresentationCountdown(room);
+
+    if (!game.paused) {
+      const remaining = getTeacherQuestionSecondsRemaining(game);
+      if (remaining <= 0 && !teacherState.advancingQuestion) {
+        teacherEndQuestionPhase(room);
+      }
+    }
+    return;
+  }
+
+  if (game.phase === 'leaderboard') {
+    updateTeacherTimer(room);
+    updateTeacherLbModalCountdown(room);
+    if (teacherState.presentationOpen) updateTeacherPresentationCountdown(room);
+
+    const endsAt = teacherState.livePhaseEndsAt || game.phaseEndsAt;
+    const remaining = endsAt
+      ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+      : HTD.getPhaseTimeRemaining(game);
+    if (remaining <= 0 && !teacherState.advancingQuestion) {
+      teacherState.questionEndHandled = false;
+      teacherAdvanceAfterQuestion();
+    }
+  }
+}
+
+const STUDENT_REVEAL_MS = 9000;
+
+function teacherEndQuestionPhase(room) {
+  if (teacherState.questionEndHandled || teacherState.advancingQuestion) return;
+  teacherState.questionEndHandled = true;
+  teacherState.revealAnswers = true;
+
+  const onFinalized = () => {
+    if (teacherState.scorePanelOpen) {
+      HTD.startLeaderboardPhase(room);
+      teacherState.liveTimerEndsAt = null;
+      teacherState.livePhaseEndsAt = room.game.phaseEndsAt;
+      HTD.setRoom(room);
+      teacherState.lastRenderedPhase = null;
+      renderTeacherGame(room);
+      return;
+    }
+    setTimeout(() => {
+      teacherState.questionEndHandled = false;
+      teacherAdvanceAfterQuestion();
+    }, STUDENT_REVEAL_MS);
+  };
+
+  HTDBridge.hostFinalizeQuestion()
+    .catch(err => console.error('host_finalize_question', err))
+    .finally(onFinalized);
+}
+
+function teacherAdvanceAfterQuestion() {
+  if (teacherState.advancingQuestion) return;
+  teacherState.advancingQuestion = true;
+  closeTeacherLbModal();
+  HTDBridge.hostNextQuestion()
+    .catch(err => {
+      console.error('host_next_question', err);
+      alert(err.message || 'Không chuyển câu được.');
+    })
+    .finally(() => {
+      teacherState.advancingQuestion = false;
+    });
 }
 
 function syncModalPinDigits() {
@@ -1002,17 +1151,30 @@ function syncModalPinDigits() {
 }
 
 function updateTeacherJoinQr(room) {
+  const joinUrl =
+    room?.joinUrl ||
+    window.ADMIN_BOOT?.session?.joinUrl ||
+    null;
   const qrUrl =
     room?.qrUrl ||
     window.ADMIN_BOOT?.session?.qrUrl ||
-    (room?.joinUrl
+    (joinUrl
       ? 'https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=' +
-        encodeURIComponent(room.joinUrl)
+        encodeURIComponent(joinUrl)
       : null);
   if (!qrUrl) return;
-  document.querySelectorAll('.teacher-qr-presentation .qr-mock-img, .teacher-qr-modal-frame .qr-mock-img').forEach(img => {
-    img.src = qrUrl;
-    img.alt = 'QR tham gia phòng ' + (room?.pin || '');
+  document
+    .querySelectorAll('.teacher-qr-presentation .qr-mock-img, .teacher-qr-modal-frame .qr-mock-img')
+    .forEach(img => {
+      // Never keep mock qr-login.png — always point at join URL QR.
+      if (/qr-login\.png/i.test(img.getAttribute('src') || '') || img.src !== qrUrl) {
+        img.src = qrUrl;
+      }
+      if (joinUrl) img.dataset.joinUrl = joinUrl;
+      img.alt = joinUrl ? 'QR tham gia ' + joinUrl : 'QR tham gia phòng ' + (room?.pin || '');
+    });
+  document.querySelectorAll('.teacher-qr-join-url').forEach(el => {
+    if (joinUrl) el.textContent = joinUrl;
   });
 }
 
@@ -1169,18 +1331,18 @@ function renderTeacherList() {
   document.getElementById('teacherCount').textContent = `${players.length} học sinh`;
 
   const btnStart = document.getElementById('btnStartGame');
-  btnStart.disabled = inGame;
-  btnStart.textContent = isEnded ? 'Đã kết thúc' : inGame ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
-
-  const btnNext = document.getElementById('btnNextQuestion');
-  if (btnNext) {
-    btnNext.hidden = !(isBackendMode() && inGame && !isEnded);
+  if (btnStart) {
+    btnStart.disabled = inGame;
+    btnStart.textContent = isEnded ? 'Đã kết thúc' : inGame ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
   }
+
   const submitEl = document.getElementById('teacherSubmitCount');
-  if (submitEl) submitEl.hidden = !(isBackendMode() && inGame && !isEnded);
+  if (submitEl) {
+    submitEl.hidden = !(isBackendMode() && inGame && !isEnded);
+  }
 
   if (inGame) {
-    renderTeacherScoreList();
+    if (isEnded) renderTeacherScoreList();
     return;
   }
 
@@ -1220,10 +1382,13 @@ function teacherStartGame() {
   if (isBackendMode()) {
     HTDBridge.hostStartGame()
       .then(() => {
-        room.status = 'started';
-        room.startedAt = Date.now();
-        room.backendMode = true;
-        HTD.setRoom(room);
+        // Không setRoom(room cũ) — game_started/new_question đã cập nhật localStorage;
+        // ghi đè room stale sẽ xóa timerEndsAt → đồng hồ đứng im.
+        const latest = HTD.getRoom() || room;
+        latest.status = 'started';
+        latest.backendMode = true;
+        if (!latest.startedAt) latest.startedAt = Date.now();
+        HTD.setRoom(latest);
         teacherState.lastRenderedPhase = null;
         teacherState.lastRenderedIndex = -1;
         closeTeacherActionMenu();
@@ -1292,7 +1457,12 @@ function resetTeacherSessionLocalState() {
   teacherState.lastRenderedIndex = -1;
   teacherState.presentationOpen = false;
   teacherState.leaderboardAnimSecond = null;
-  teacherState.scorePanelOpen = true;
+  teacherState.scorePanelOpen = localStorage.getItem(LS_SCORE_PANEL_OPEN) === '1';
+  teacherState.revealAnswers = false;
+  teacherState.advancingQuestion = false;
+  teacherState.liveTimerEndsAt = null;
+  teacherState.livePhaseEndsAt = null;
+  closeTeacherLbModal();
 }
 
 function teacherPlayAgain() {
@@ -1388,7 +1558,8 @@ function initTeacherQZoom() {
   teacherState.qZoom = Number.isFinite(saved)
     ? Math.min(TEACHER_ZOOM_MAX, Math.max(TEACHER_ZOOM_MIN, saved))
     : 1;
-  teacherState.scorePanelOpen = localStorage.getItem(LS_SCORE_PANEL_OPEN) !== '0';
+  // Mặc định tắt; chỉ bật khi GV chọn «Hiện bảng điểm»
+  teacherState.scorePanelOpen = localStorage.getItem(LS_SCORE_PANEL_OPEN) === '1';
 }
 
 function applyTeacherQZoom() {
@@ -1449,8 +1620,15 @@ function teacherZoomOut() {
 function toggleTeacherScorePanel() {
   teacherState.scorePanelOpen = !teacherState.scorePanelOpen;
   localStorage.setItem(LS_SCORE_PANEL_OPEN, teacherState.scorePanelOpen ? '1' : '0');
-  renderDashboard();
-  scheduleFitTeacherQuestionCard();
+  closeTeacherActionMenu();
+  updateTeacherScorePanelBtn();
+  // Nếu đang ở phase leaderboard và vừa bật → hiện modal ngay
+  const room = HTD.getRoom();
+  if (teacherState.scorePanelOpen && room?.game?.phase === 'leaderboard') {
+    openTeacherLbModal(room);
+  } else if (!teacherState.scorePanelOpen) {
+    closeTeacherLbModal();
+  }
 }
 
 function updateTeacherScorePanelBtn() {
@@ -1464,8 +1642,71 @@ function updateTeacherScorePanelBtn() {
   const scoreMenuBtn = document.getElementById('teacherToggleScoresMenuBtn');
   if (scoreMenuBtn) {
     scoreMenuBtn.hidden = !started;
-    scoreMenuBtn.textContent = teacherState.scorePanelOpen ? 'Ẩn bảng điểm' : 'Hiện bảng điểm';
+    scoreMenuBtn.textContent = teacherState.scorePanelOpen
+      ? 'Tắt hiện bảng điểm'
+      : 'Hiện bảng điểm';
   }
+}
+
+function openTeacherLbModal(room) {
+  const modal = document.getElementById('teacherLbModal');
+  if (!modal || !teacherState.scorePanelOpen) return;
+  modal.hidden = false;
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  renderTeacherLbModalList(room);
+  updateTeacherLbModalCountdown(room);
+}
+
+function closeTeacherLbModal() {
+  const modal = document.getElementById('teacherLbModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function renderTeacherLbModalList(room) {
+  const listEl = document.getElementById('teacherLbModalList');
+  if (!listEl) return;
+
+  const players = getTeacherDisplayPlayers();
+  initTeacherFakeScores(players);
+
+  const sorted = players
+    .map(p => ({ ...p, score: getTeacherPlayerScore(p) }))
+    .sort((a, b) => b.score - a.score);
+
+  if (sorted.length === 0) {
+    listEl.innerHTML = '<p class="teacher-lb-modal-empty">Chưa có học sinh</p>';
+    return;
+  }
+
+  listEl.innerHTML = sorted
+    .map((p, i) => {
+      const rank = i + 1;
+      const av = p.avatarDataUrl
+        ? `<img src="${p.avatarDataUrl}" alt="">`
+        : p.avatarEmoji || '😀';
+      const rankCls = rank <= 3 ? ` r${rank}` : '';
+      return `<div class="teacher-lb-modal-item">
+        <span class="teacher-lb-modal-rank${rankCls}">${rank}</span>
+        <div class="teacher-lb-modal-av">${av}</div>
+        <div class="teacher-lb-modal-name">${escapeTeacherHtml(p.name)}</div>
+        <div class="teacher-lb-modal-pts">${p.score}</div>
+      </div>`;
+    })
+    .join('');
+}
+
+function updateTeacherLbModalCountdown(room) {
+  const el = document.getElementById('teacherLbModalCountdown');
+  if (!el || !room?.game || room.game.phase !== 'leaderboard') return;
+  const endsAt = teacherState.livePhaseEndsAt || room.game.phaseEndsAt;
+  const sec = endsAt
+    ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+    : HTD.getPhaseTimeRemaining(room.game);
+  el.textContent = sec > 0 ? `Câu tiếp sau ${sec}s...` : '...';
 }
 
 function initTeacherDashboardUi() {
@@ -1530,7 +1771,7 @@ function applyMainSplit(grid, leftRatio) {
   const room = HTD.getRoom();
   const inGame = isTeacherRoomInGame(room);
   const isEnded = isTeacherRoomEnded(room);
-  if (inGame && !isEnded && !teacherState.scorePanelOpen) {
+  if (inGame && !isEnded) {
     grid.style.gridTemplateColumns = '1fr';
     return;
   }
@@ -1565,7 +1806,6 @@ window.closeTeacherQrModal = closeTeacherQrModal;
 window.toggleTeacherSidebar = toggleTeacherSidebar;
 window.resetTeacherRoom = resetTeacherRoom;
 window.teacherStartGame = teacherStartGame;
-window.teacherNextQuestion = teacherNextQuestion;
 window.teacherTogglePause = teacherTogglePause;
 window.teacherEndGame = teacherEndGame;
 window.teacherPlayAgain = teacherPlayAgain;
@@ -1587,11 +1827,6 @@ function demoTeacherGo(s) {
   showTeacherScreen(s);
 }
 
-function teacherNextQuestion() {
-  if (!isBackendMode()) return;
-  HTDBridge.hostNextQuestion().catch(err => alert(err.message || 'Không chuyển câu được.'));
-}
-
 function teacherExportCsv() {
   const sessionId = HTD.getRoom()?.sessionId;
   if (!sessionId) {
@@ -1611,9 +1846,16 @@ function setupTeacherBackendBridge() {
     room.backendMode = true;
     teacherState.serverQuestionIndex = 0;
     teacherState.currentQuestion = null;
+    teacherState.revealAnswers = false;
+    teacherState.advancingQuestion = false;
+    // Chờ new_question để có timerEndsAt — đừng set phase=question sớm (timer=0 → nhảy câu)
     const game = ensureTeacherGameState(room);
-    game.phase = 'question';
+    game.phase = 'waiting';
     game.questionIndex = 0;
+    game.timerEndsAt = null;
+    game.phaseEndsAt = null;
+    teacherState.liveTimerEndsAt = null;
+    teacherState.livePhaseEndsAt = null;
     room.startedAt = Date.now();
     HTD.setRoom(room);
     teacherState.lastRenderedPhase = null;
@@ -1635,18 +1877,24 @@ function setupTeacherBackendBridge() {
     const game = ensureTeacherGameState(room);
     game.phase = 'question';
     game.questionIndex = teacherState.serverQuestionIndex - 1;
-    const startedAt = Number(payload.server_time || Date.now());
+    const startedAt = Number(payload.server_time || teacherServerNow());
     const limit = Number(payload.time_limit || 30);
     game.questionStartedAt = startedAt;
     game.questionDuration = limit;
     game.timerEndsAt = startedAt + limit * 1000;
     game.phaseEndsAt = null;
     game.paused = false;
+    teacherState.liveTimerEndsAt = game.timerEndsAt;
+    teacherState.livePhaseEndsAt = null;
     room.backendMode = true;
     room.status = 'started';
     HTD.setRoom(room);
+    teacherState.revealAnswers = false;
+    teacherState.advancingQuestion = false;
+    teacherState.questionEndHandled = false;
     teacherState.lastRenderedPhase = null;
     teacherState.lastRenderedIndex = -1;
+    closeTeacherLbModal();
     if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
       renderDashboard();
     }
@@ -1662,14 +1910,18 @@ function setupTeacherBackendBridge() {
       players.map(p => ({
         id: p.id,
         name: p.name,
-        avatarEmoji: p.avatarEmoji,
+        avatarDataUrl: p.avatarDataUrl || null,
+        avatarEmoji: p.avatarEmoji || (p.avatarDataUrl ? null : '😀'),
         connected: p.connected !== false,
         joinedAt: Date.now(),
       }))
     );
     if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
       renderTeacherList();
-      if (HTD.getRoom()?.status === 'started') renderTeacherScoreList();
+      const room = HTD.getRoom();
+      if (room?.game?.phase === 'leaderboard' && teacherState.scorePanelOpen) {
+        renderTeacherLbModalList(room);
+      }
     }
   });
 
@@ -1678,14 +1930,21 @@ function setupTeacherBackendBridge() {
       teacherState.playerScores[row.name] = Number(row.score || 0);
     });
     if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
-      renderTeacherScoreList();
+      const room = HTD.getRoom();
+      if (room?.game?.phase === 'leaderboard' && teacherState.scorePanelOpen) {
+        renderTeacherLbModalList(room);
+      }
+      if (isTeacherRoomEnded(room)) renderTeacherScoreList();
     }
     syncTeacherPresentationFromRoom();
   });
 
   HTDBridge.on('submitCountUpdate', data => {
     const el = document.getElementById('teacherSubmitCount');
-    if (el) el.textContent = `${data.submitted}/${data.total} đã nộp`;
+    if (el) {
+      el.hidden = false;
+      el.textContent = `${data.submitted}/${data.total} đã nộp`;
+    }
   });
 
   HTDBridge.on('gameEnded', data => {
@@ -1701,7 +1960,11 @@ function setupTeacherBackendBridge() {
     HTD.setRoom(room);
     teacherState.lastRenderedPhase = null;
     teacherState.lastRenderedIndex = -1;
-    teacherState.scorePanelOpen = true;
+    teacherState.revealAnswers = false;
+    teacherState.advancingQuestion = false;
+    teacherState.liveTimerEndsAt = null;
+    teacherState.livePhaseEndsAt = null;
+    closeTeacherLbModal();
     stopPresentationTick();
     if (teacherState.presentationOpen) {
       teacherState.presentationOpen = false;

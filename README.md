@@ -23,6 +23,10 @@ Website đố vui hóa học real-time dạng Kahoot. **Học sinh: mobile only.
 
 **Luồng HS:** Mở link `/join/123456` hoặc `/join` → nhập PIN → chơi. (Cùng port `38480` với admin; WS ở `38581`.)
 
+**Trải nghiệm app (không thanh URL):** học sinh **Thêm vào Màn hình chính** trên điện thoại (PWA). Mở link thường trong trình duyệt vẫn hiện thanh địa chỉ — đó là giới hạn bảo mật của trình duyệt, không tắt được bằng code.
+
+**Link/QR công khai** lấy từ `APP_URL` trong root `.env` (không phụ thuộc host trình duyệt admin). Test phone cùng Wi‑Fi: đặt `APP_URL` / `WS_PUBLIC_URL` = IP LAN rồi recreate `php-admin`. Production: `https://your-domain`.
+
 Login seed: `teacher@hoadat.local` / `password123`
 
 ## Hạ tầng local (Docker)

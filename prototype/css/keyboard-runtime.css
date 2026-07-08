@@ -1,66 +1,68 @@
-/* Dynamic keyboard from keyboards.config — student runtime */
+/* Dynamic keyboard from keyboards.config — student runtime (full-width, giống numpad PIN) */
 .dyn-kb {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
-  padding: 4px 2px 6px;
+  padding: 0;
 }
 
 .dyn-kb-row {
   display: flex;
   align-items: stretch;
-  gap: var(--row-gap, 4px);
-  padding: var(--row-pad, 2px);
-  border-radius: 8px;
+  gap: var(--row-gap, 6px);
+  padding: var(--row-pad, 0);
+  border-radius: 0;
   width: 100%;
+  background: transparent;
 }
 
-.dyn-kb-row.height-S { min-height: 36px; }
-.dyn-kb-row.height-M { min-height: 44px; }
-.dyn-kb-row.height-L { min-height: 52px; }
+.dyn-kb-row.height-S { min-height: 44px; }
+.dyn-kb-row.height-M { min-height: 52px; }
+.dyn-kb-row.height-L { min-height: 56px; }
 
 .dyn-kb-key {
   min-width: 0;
   min-height: 44px;
-  border: 1px solid #3d3d42;
-  border-radius: 8px;
-  background: #3a3a40;
-  color: #f5f5f5;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: #111;
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 700;
   cursor: pointer;
   padding: 0 4px;
-  box-shadow: 0 2px 0 #1e1e22;
-  transition: transform 0.06s, box-shadow 0.06s;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  transition: background 0.08s;
   -webkit-tap-highlight-color: transparent;
 }
 
 .dyn-kb-key:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 0 0 #1e1e22;
+  background: #e5e7eb;
 }
 
 .dyn-kb-key.type-delete {
-  background: #4a4a52;
-  font-size: 18px;
+  background: #fff;
+  font-size: 20px;
+  color: #374151;
 }
 
 .dyn-kb-key.type-space {
-  background: #35353b;
+  background: #fff;
   font-weight: 600;
+  color: #6b7280;
 }
 
 .dyn-kb-key.type-send {
-  background: linear-gradient(135deg, #2D46D6, #3B5BDB);
+  background: linear-gradient(135deg, #1A5C38, #2ECC71);
   color: #fff;
-  border-color: #2438b0;
-  box-shadow: 0 3px 0 #1e3080;
+  box-shadow: 0 3px 0 #0D3A22;
   font-weight: 800;
 }
 
 .dyn-kb-key.type-send:active:not(:disabled) {
-  box-shadow: 0 1px 0 #1e3080;
+  transform: translateY(1px);
+  box-shadow: 0 2px 0 #0D3A22;
 }
 
 .dyn-kb-key:disabled {
@@ -69,7 +71,7 @@
 }
 
 .question-keyboard.has-dyn-kb {
-  background: #1c1c1f;
-  padding: 8px 6px 4px;
-  border-radius: 12px 12px 0 0;
+  background: #d1d5db;
+  padding: 8px 6px max(8px, env(safe-area-inset-bottom));
+  border-radius: 0;
 }

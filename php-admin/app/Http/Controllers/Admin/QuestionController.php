@@ -100,7 +100,7 @@ class QuestionController extends Controller
         $validated = $request->validate([
             'content' => ['required', 'string'],
             'explanation' => ['nullable', 'string'],
-            'answer_type' => ['required', 'in:mc,essay'],
+            'answer_type' => ['required', 'in:mc,essay,structured'],
             'time_limit_seconds' => ['nullable', 'integer', 'min:5', 'max:300'],
             'points' => ['nullable', 'integer', 'min:1', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
@@ -108,6 +108,9 @@ class QuestionController extends Controller
             'correct_answer_normalized' => ['nullable', 'string', 'max:10000'],
             'options' => ['nullable', 'array'],
             'options.*' => ['nullable', 'string', 'max:500'],
+            'input_mode' => ['nullable', 'string', 'max:32'],
+            'template_json' => ['nullable', 'string'],
+            'correct_answer_json' => ['nullable', 'string'],
         ]);
 
         $data = [
@@ -141,7 +144,38 @@ class QuestionController extends Controller
             $data['correct_answer'] = null;
         }
 
+        if ($validated['answer_type'] === 'structured') {
+            $template = $this->decodeJsonField($request->input('template_json'), 'template');
+            $correctAnswer = $this->decodeJsonField($request->input('correct_answer_json'), 'correct_answer');
+
+            $data['input_mode'] = $validated['input_mode'] ?? 'balance';
+            $data['template'] = $template;
+            $data['correct_answer'] = $correctAnswer;
+            $data['options'] = null;
+            $data['correct_index'] = null;
+            $data['correct_answer_normalized'] = null;
+        }
+
         return $data;
+    }
+
+    /**
+     * @return array<string, mixed>|list<mixed>
+     */
+    private function decodeJsonField(?string $raw, string $field): array
+    {
+        if ($raw === null || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            throw ValidationException::withMessages([
+                $field => 'Dữ liệu JSON không hợp lệ.',
+            ]);
+        }
+
+        return $decoded;
     }
 
     private function ensureBelongsToQuiz(Quiz $quiz, Question $question): void

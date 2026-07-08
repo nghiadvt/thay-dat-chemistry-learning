@@ -255,9 +255,9 @@ Step 4: Full local testing (chỉ khi Phase 3 xong)
 - [x] 3C.3 Game CRUD UI — *phụ thuộc: 1.6*
 > Done: CRUD Blade `admin/games`.
 - [x] 3C.4 Quiz CRUD UI (chọn `game_id`, `keyboard_id`) — *phụ thuộc: 1.7*
-> Done: Form dropdown game/keyboard; list lọc theo game.
-- [x] 3C.5 Question CRUD UI (`mc`, `formula`, `structured`) — *phụ thuộc: 1.7*
-> Done: Form nested dưới quiz; toggle theo `answer_type`.
+> Done: Form dropdown game/keyboard; list lọc theo game; chọn bàn phím hiện ảnh preview (click phóng to lightbox) trên form tạo/sửa quiz.
+- [x] 3C.5 Question CRUD UI (`mc`, `essay`, `structured`) — *phụ thuộc: 1.7*
+> Done: Form nested dưới quiz; `mc` + `essay` + **`structured`** (builder phương trình, `input_mode`, `template`, `correct_answer`); xem `docs/QUESTION_TEMPLATE_SCHEMA.md`.
 - [x] 3C.6 Tạo phòng từ admin (chọn Game → PIN + Redis) + link sang host — *phụ thuộc: 1.8*
 > Done: `admin/sessions` + link host `?pin=&game_id=&session_id=`; `teacher.js` join phòng có sẵn.
 - [x] 3C.7 Báo cáo: lịch sử session, chi tiết điểm, export CSV — *phụ thuộc: 1.9*
@@ -548,16 +548,16 @@ Write via `ZINCRBY leaderboard:<PIN>`. Return `question_result` to just the clie
 ---
 
 ### 3C.4 — Quiz CRUD UI
-**What to do:** Quiz form must select existing `game_id` and `keyboard_id` (dropdowns from DB).
+**What to do:** Quiz form must select existing `game_id` and `keyboard_id` (dropdowns from DB). When a keyboard is selected, show its preview image below the dropdown; clicking the image opens a lightbox zoom view (reuse keyboard preview lightbox pattern).
 
-**Acceptance criteria:** Quiz saved with correct FKs; list shows parent game and keyboard name.
+**Acceptance criteria:** Quiz saved with correct FKs; list shows parent game and keyboard name; keyboard preview visible on create/edit quiz form when a keyboard with `preview_path` is selected.
 
 ---
 
 ### 3C.5 — Question CRUD UI
-**What to do:** Nested under quiz: support `answer_type` = `mc` | `formula` | `structured` with correct fields (`options`, `correct_index`, `correct_answer_normalized`, `template`, `input_mode`, `time_limit_seconds`, HTML `content`).
+**What to do:** Nested under quiz: support `answer_type` = `mc` | `essay` | `structured`. Structured: visual equation builder (`template` JSON), `input_mode` preset (`balance`, `blank`, `blank_balance`, `product`), `correct_answer` per slot. MC: `options` + `correct_index`. Essay: `correct_answer_normalized`. All: HTML `content`, `time_limit_seconds`.
 
-**Acceptance criteria:** Create at least one question of each type via UI; validation errors shown clearly.
+**Acceptance criteria:** Create at least one question of each type via UI; structured shows equation preview + per-slot answers; validation errors shown clearly. Schema: `docs/QUESTION_TEMPLATE_SCHEMA.md`.
 
 ---
 

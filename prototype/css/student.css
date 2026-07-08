@@ -616,7 +616,7 @@ body.student-app {
 }
 .q-star-btn.active { color: var(--warning); }
 
-/* Input zone — bàn phím neo dưới cùng màn hình */
+/* Input zone — bàn phím neo dưới cùng màn hình (full-width như numpad PIN) */
 .q-input-zone {
   margin-top: auto;
   flex-shrink: 0;
@@ -624,6 +624,13 @@ body.student-app {
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  margin-left: -14px;
+  margin-right: -14px;
+  width: calc(100% + 28px);
+}
+.q-input-zone[hidden],
+.question-screen.mode-mc .q-input-zone {
+  display: none !important;
 }
 .q-kb-dock {
   display: flex;
@@ -631,27 +638,38 @@ body.student-app {
   flex-shrink: 0;
   gap: 0;
 }
-.q-kb-dock .question-keyboard {
-  order: 1;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
-.q-kb-dock .kb-toggle-btn {
-  order: 2;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-}
-.q-kb-dock .kb-open-fab {
-  order: 2;
-  position: static;
-  width: 100%;
-  border-radius: var(--radius-md);
-  box-shadow: none;
-}
 .q-eq-display {
   padding: 8px 4px 4px;
   flex-shrink: 0;
   overflow-x: auto;
 }
 .q-eq-display[hidden] { display: none !important; }
+
+.formula-display {
+  font-family: 'STIX Two Text', 'Times New Roman', serif;
+  font-size: clamp(22px, 5vw, 28px);
+  min-height: 48px;
+  border-bottom: 2px solid var(--formula-border);
+  text-align: center;
+  line-height: 1.5;
+  color: var(--text-dark);
+}
+.formula-display sub {
+  font-size: 0.65em;
+  vertical-align: sub;
+}
+.formula-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  background: var(--primary);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
 
 .eq-line {
   display: flex;
@@ -716,11 +734,49 @@ body.student-app {
 }
 .eq-placeholder { opacity: 0.35; font-style: italic; }
 
+.q-locked-banner {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: #eff6ff;
+  border: 2px solid #bfdbfe;
+  flex-shrink: 0;
+}
+.q-locked-banner[hidden] { display: none !important; }
+.q-locked-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+.q-locked-answer {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+.q-locked-time {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-top: 4px;
+}
+.q-locked-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 .answer-actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+  padding: 0 14px;
 }
+.answer-actions[hidden] { display: none !important; }
 .btn-answer-clear,
 .btn-answer-submit {
   flex: 1;
@@ -743,58 +799,25 @@ body.student-app {
 }
 .btn-answer-submit:active { transform: translateY(1px); box-shadow: 0 2px 0 #0D3A22; }
 
-.kb-toggle-btn {
-  width: 100%;
-  padding: 10px 8px;
-  background: #c5cad1;
-  border: none;
-  border-top: 1px solid #b0b6bf;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.kb-toggle-icon { font-size: 11px; }
-
 .question-keyboard {
   background: #d1d5db;
-  padding: 6px 4px 0;
+  padding: 8px 6px max(8px, env(safe-area-inset-bottom));
   flex-shrink: 0;
   overflow: hidden;
-  max-height: min(42vh, 280px);
-  transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s;
+  width: 100%;
+  border-radius: 0;
 }
 .question-keyboard.collapsed {
-  max-height: 0;
-  padding: 0;
-  opacity: 0;
-  pointer-events: none;
-  border: none;
+  display: none;
 }
-.question-screen.mode-input .q-input-zone .question-keyboard:not(.collapsed) {
+.question-screen.mode-input .q-body {
+  padding-bottom: 0;
+}
+.question-screen.mode-input .q-input-zone .question-keyboard {
   overflow-y: auto;
+  max-height: min(48vh, 360px);
 }
 .question-keyboard.open { opacity: 1; }
-
-.kb-open-fab {
-  display: none;
-  background: #c5cad1;
-  color: #374151;
-  border: none;
-  padding: 12px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.kb-open-fab[hidden] { display: none !important; }
 
 .chem-kb {
   display: flex;

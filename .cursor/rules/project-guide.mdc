@@ -31,6 +31,7 @@ Stack: **PHP (Laravel) + MySQL** (admin) · **Node.js (Socket.io) + Redis** (rea
 | Schema DB, quan hệ bảng, ERD | `docs/DATA_MODEL.md` |
 | Event WebSocket, endpoint PHP, Redis key + payload mẫu | `docs/API_CONTRACTS.md` *(tạo ở task 2.1)* |
 | Cấu trúc JSON config bàn phím hóa học | `docs/KEYBOARD_SCHEMA.md` |
+| Cấu trúc JSON template câu hỏi structured | `docs/QUESTION_TEMPLATE_SCHEMA.md` |
 | Tiến độ task, checklist triển khai backend | `ke-hoach-trien-khai-local.md` / `local-deployment-plan.md` |
 | Đặc tả gốc (tham khảo, không sửa) | `dac-ta-ky-thuat-v4.docx.md` |
 

@@ -3,7 +3,7 @@
 > Design tokens, layout, component patterns cho **UI học sinh (mobile only)**.
 > **Admin + Teacher:** web desktop — Laravel `/admin` nhúng prototype qua iframe (`embedded=admin`); CSS embed ghi ở §12.
 
-**Cập nhật lần cuối:** 2026-07-06 (Admin native — Blade + `public/admin/`)
+**Cập nhật lần cuối:** 2026-07-08 (PWA standalone — học sinh cài màn hình chính)
 
 ---
 
@@ -15,6 +15,28 @@
 - **Không scroll** trên màn Question (layout cố định theo %)
 - **1 ngón cái** thao tác được bàn phím hóa học
 - **Placeholder assets** cho đến khi user cung cấp icon/ảnh thật
+- **PWA (app-like):** học sinh **thêm vào Màn hình chính** để ẩn thanh URL trình duyệt (`display: standalone`). Mở link thường trong Chrome/Safari/Google vẫn có chrome trình duyệt — không thể tắt bằng code.
+
+---
+
+## 1b. PWA — hiển thị như app (không thanh URL)
+
+| Cách mở | Thanh URL / header trình duyệt |
+|---|---|
+| Link thường (Google, Zalo, Chrome tab) | **Có** — trình duyệt bắt buộc hiển thị |
+| **Thêm vào Màn hình chính** (PWA) | **Không** — full màn hình app (`standalone`) |
+
+**Cài đặt cho học sinh:**
+
+| Nền tảng | Thao tác |
+|---|---|
+| **Android (Chrome)** | Menu ⋮ → *Cài đặt ứng dụng* / *Thêm vào Màn hình chính* |
+| **iPhone (Safari)** | Chia sẻ ↗ → *Thêm vào Màn hình chính* |
+| Mở từ app Google / Facebook | Thường có thanh URL riêng → chọn *Mở bằng Chrome/Safari* hoặc cài PWA từ trình duyệt hệ thống |
+
+**File kỹ thuật:** `prototype/manifest.webmanifest` (`start_url: /join`, `display: standalone`), `prototype/sw.js`, meta `apple-mobile-web-app-*` + `theme-color` trong `index.html`. Route Laravel: `/manifest.webmanifest`, `/sw.js`.
+
+**Production:** cần **HTTPS** để Chrome cho phép cài PWA (localhost được miễn).
 
 ---
 
@@ -91,7 +113,7 @@ Full viewport height, flex column, **không scroll**:
 | Timer | 12% | SVG countdown tròn |
 | Câu hỏi | 25% | Text căn giữa, scroll nội bộ nếu dài |
 | Input display | 15% | Formula preview, cursor nhấp nháy |
-| Bàn phím | 40% | 3 tab, touch target ≥44px |
+| Bàn phím | 40% | `keyboards.config` full-width neo đáy màn (giống numpad PIN); không thu gọn |
 
 ### Timer colors
 
@@ -232,7 +254,8 @@ Full viewport height, flex column, **không scroll**:
 
 - Circle 80–100px, border 3px white
 - Placeholder: emoji hoặc gradient + initials
-- Camera preview: `<video>` trong circle, object-fit cover
+- Camera preview: `<video>` trong circle, object-fit cover (chỉ HTTPS/`localhost`)
+- **HTTP LAN (mặc định khi test phone):** `<input type="file" accept="image/*" capture>` — mở camera native / chọn ảnh; không phụ thuộc `getUserMedia`
 
 ---
 

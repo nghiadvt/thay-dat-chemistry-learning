@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2D3192">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hóa Thầy Đạt">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/logo.png">
   <title>Hóa Thầy Đạt — Học sinh</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=STIX+Two+Text&display=swap" rel="stylesheet">
@@ -95,14 +102,16 @@
       <div class="avatar-wrap" onclick="onAvatarClick()">
         <div class="avatar-circle" id="profileAvatar">
           <span id="profileEmoji">😀</span>
-          <video id="profileVideo" autoplay playsinline style="display:none"></video>
+          <video id="profileVideo" autoplay playsinline muted style="display:none"></video>
           <img id="profileImg" style="display:none" alt="">
         </div>
         <div class="avatar-badge">📷</div>
       </div>
+      <input type="file" id="avatarFileInput" accept="image/*" capture="environment" hidden onchange="onAvatarFileSelected(event)">
+      <p class="profile-avatar-hint" style="font-size:13px;opacity:.7;margin:0">Chạm 📷 để chụp / chọn ảnh</p>
       <div class="capture-bar" id="captureBar">
-        <button style="background:var(--success);color:#fff" onclick="captureProfilePhoto()">Chụp</button>
-        <button style="background:rgba(255,255,255,0.2);color:#fff" onclick="cancelCapture()">Huỷ</button>
+        <button type="button" style="background:var(--success);color:#fff" onclick="captureProfilePhoto()">Chụp</button>
+        <button type="button" style="background:rgba(255,255,255,0.2);color:#fff" onclick="cancelCapture()">Huỷ</button>
       </div>
       <input class="text-input" id="profileName" maxlength="20" placeholder="Tên của bạn" oninput="onProfileNameInput()">
       <div class="char-count"><span id="profileCharCount">0</span>/20</div>
@@ -166,6 +175,12 @@
         </div>
         <div class="q-answer" id="qAnswer"></div>
         <div class="q-eq-display" id="qEqDisplay" hidden></div>
+        <div class="q-locked-banner" id="qLockedBanner" hidden>
+          <p class="q-locked-label">Đáp án của bạn</p>
+          <p class="q-locked-answer" id="qLockedAnswer">—</p>
+          <p class="q-locked-time" id="qLockedTime">Thời gian nộp: —</p>
+          <p class="q-locked-hint">Có thể đổi đáp án — thời gian tính từ lần nộp đầu tiên</p>
+        </div>
         <div class="q-card-footer">
           <span class="q-id" id="qId">ID: —</span>
           <button type="button" class="q-star-btn" id="qStarBtn" aria-label="Yêu thích">☆</button>
@@ -175,20 +190,13 @@
       <div class="q-input-zone" id="qInputZone" hidden>
         <div class="answer-actions" id="qInputActions">
           <button type="button" class="btn-answer-clear" onclick="clearInputAnswer()">Xóa</button>
-          <button type="button" class="btn-answer-submit" onclick="submitAnswer()">Gửi đáp án</button>
+          <button type="button" class="btn-answer-submit" id="qAnswerSubmitBtn" onclick="submitAnswer()" hidden>Gửi đáp án</button>
         </div>
         <div class="q-kb-dock" id="qKbDock">
           <div class="question-keyboard open" id="qKeyboard">
             <div class="chem-kb" id="chemKb"></div>
             <div class="coef-numpad" id="coefNumpad" hidden></div>
           </div>
-          <button type="button" class="kb-toggle-btn" id="kbToggleBtn" onclick="toggleKeyboard()">
-            <span class="kb-toggle-icon" id="kbToggleIcon">▼</span>
-            <span id="kbToggleLabel">Thu nhỏ bàn phím</span>
-          </button>
-          <button type="button" class="kb-open-fab" id="kbOpenFab" hidden onclick="toggleKeyboard(true)">
-            ⌨ Mở bàn phím
-          </button>
         </div>
       </div>
     </div>
@@ -230,8 +238,10 @@
   <div class="result-card">
     <div class="result-circle" id="resultCircle">✓</div>
     <div class="result-title" id="resultTitle"></div>
+    <div class="result-meta" id="resultMeta"></div>
     <div class="result-points" id="resultPoints"></div>
     <div class="result-answer" id="resultAnswer"></div>
+    <div class="result-rank" id="resultRank"></div>
   </div>
 </div>
 
@@ -248,5 +258,10 @@
 <script src="js/equation-ui.js"></script>
 <script src="js/keyboard-runtime.js"></script>
 <script src="js/student.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+  }
+</script>
 </body>
 </html>

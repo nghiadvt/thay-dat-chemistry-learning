@@ -8,8 +8,18 @@ window.HTDQuizPreview = (function () {
   let mode = 'teacher';
   let lastPayload = null;
 
-  function typeLabel(answerType) {
-    return answerType === 'mc' ? 'Trắc nghiệm' : 'Tự luận';
+  function typeLabel(answerType, inputMode) {
+    if (answerType === 'mc') return 'Trắc nghiệm';
+    if (answerType === 'structured') {
+      const labels = {
+        balance: 'Cân bằng hệ số',
+        blank: 'Điền chỗ thiếu',
+        blank_balance: 'Cân bằng + điền',
+        product: 'Điền sản phẩm',
+      };
+      return labels[inputMode] || 'Phương trình';
+    }
+    return 'Tự luận';
   }
 
   function optionLetter(index) {
@@ -159,6 +169,22 @@ window.HTDQuizPreview = (function () {
         '</div>';
     }
 
+    if (question.answer_type === 'structured' && question.correct_answer) {
+      const ca = question.correct_answer;
+      if (ca.coef && Object.keys(ca.coef).length) {
+        html +=
+          '<div class="htd-preview-barem-block"><strong>Hệ số:</strong> ' +
+          escapeHtml(Object.entries(ca.coef).map(([id, v]) => id + '=' + v).join(', ')) +
+          '</div>';
+      }
+      if (ca.blank && Object.keys(ca.blank).length) {
+        html +=
+          '<div class="htd-preview-barem-block"><strong>Ô điền:</strong> ' +
+          escapeHtml(Object.entries(ca.blank).map(([id, v]) => id + '=' + v).join(', ')) +
+          '</div>';
+      }
+    }
+
     if (question.explanation) {
       html +=
         '<h4>Giải thích</h4>' +
@@ -169,6 +195,37 @@ window.HTDQuizPreview = (function () {
     return html;
   }
 
+  function renderStructuredEquation(question, isTeacher) {
+    if (typeof EquationUI === 'undefined' || !Array.isArray(question.template) || !question.template.length) {
+      return '<p class="htd-preview-empty">Chưa có phương trình. Thêm phần tử hoặc dùng «Nhập nhanh».</p>';
+    }
+
+    const values = EquationUI.createInputState(question.template);
+    if (isTeacher && question.correct_answer) {
+      Object.entries(question.correct_answer.coef || {}).forEach(([id, val]) => {
+        values.coef[id] = val;
+      });
+      Object.entries(question.correct_answer.blank || {}).forEach(([id, val]) => {
+        values.blank[id] = val;
+        if (val) values.blankTokens[id] = [];
+      });
+    }
+
+    const modeHint = question.input_mode === 'balance'
+      ? 'Điền hệ số vào các ô nhỏ'
+      : question.input_mode === 'blank'
+        ? 'Điền công thức thiếu vào ô lớn'
+        : 'Điền hệ số và công thức theo ô';
+
+    return (
+      '<div class="htd-preview-eq-wrap">' +
+      EquationUI.renderEquation(question.template, values, null) +
+      '<p class="htd-preview-eq-hint">' +
+      (isTeacher ? 'Barem: ô đã điền đáp án đúng' : modeHint + ' · bàn phím hóa học của quiz') +
+      '</p></div>'
+    );
+  }
+
   function renderQuestion(question, index, isTeacher, quizSettings) {
     const num = question.sort_order != null ? question.sort_order : index + 1;
     const points = question.points != null ? question.points : 1;
@@ -177,6 +234,8 @@ window.HTDQuizPreview = (function () {
     let body = '';
     if (question.answer_type === 'mc') {
       body = renderMcOptions(question, isTeacher, quizSettings);
+    } else if (question.answer_type === 'structured') {
+      body = renderStructuredEquation(question, isTeacher);
     } else {
       body =
         '<textarea class="htd-preview-essay-input" readonly placeholder="Học sinh nhập câu trả lời tại đây…"></textarea>';
@@ -188,7 +247,7 @@ window.HTDQuizPreview = (function () {
       '<article class="htd-preview-question">' +
       '<div class="htd-preview-q-head">' +
       '<span class="htd-preview-q-num">Câu ' + num + '</span>' +
-      '<span class="htd-preview-q-badge">' + typeLabel(question.answer_type) + '</span>' +
+      '<span class="htd-preview-q-badge">' + typeLabel(question.answer_type, question.input_mode) + '</span>' +
       '<span class="htd-preview-q-meta">' + points + ' điểm · ' + time + 's</span>' +
       '</div>' +
       '<div class="htd-preview-q-content">' + (question.content || '<em>Chưa có nội dung</em>') + '</div>' +

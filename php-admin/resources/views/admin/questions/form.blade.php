@@ -17,6 +17,21 @@
     $initialContent = old('content', $question?->content ?? '');
     $initialExplanation = old('explanation', $question?->explanation ?? '');
     $showExplanation = filled($initialExplanation);
+    $initialTemplate = old('template_json');
+    if (is_string($initialTemplate)) {
+        $initialTemplate = json_decode($initialTemplate, true);
+    }
+    if (! is_array($initialTemplate)) {
+        $initialTemplate = $question?->template ?? [];
+    }
+    $initialCorrectAnswer = old('correct_answer_json');
+    if (is_string($initialCorrectAnswer)) {
+        $initialCorrectAnswer = json_decode($initialCorrectAnswer, true);
+    }
+    if (! is_array($initialCorrectAnswer)) {
+        $initialCorrectAnswer = $question?->correct_answer ?? ['coef' => [], 'blank' => []];
+    }
+    $initialInputMode = old('input_mode', $question?->input_mode ?? 'balance');
     $qeCss = public_path('htd-admin/css/question-editor.css');
     $qeCssV = file_exists($qeCss) ? filemtime($qeCss) : time();
 @endphp
@@ -66,13 +81,55 @@
                     </div>
                     <textarea id="explanation" name="explanation" hidden>{{ $initialExplanation }}</textarea>
                 </div>
+
+                <div id="section-structured" class="qe-panel qe-structured-panel type-section-main">
+                    <span class="qe-panel-label">Phương trình / ô điền</span>
+
+                    <div class="qe-quick-equation">
+                        <label for="quickEquationInput" class="qe-quick-label">Nhập nhanh</label>
+                        <div class="qe-quick-row">
+                            <input type="text" id="quickEquationInput" class="qe-quick-eq-input"
+                                placeholder="VD: H2 + O2 → H2O  ·  Fe + ___ → Fe2O3">
+                            <input type="text" id="quickAnswerInput" class="qe-quick-ans-input"
+                                placeholder="Đáp án: 2,1,2  hoặc  O2">
+                            <button type="button" id="btnQuickApply" class="btn btn-primary btn-sm">Áp dụng</button>
+                        </div>
+                        <p class="qe-template-hint">
+                            Cân bằng hệ số: gõ chất + đáp án số (2,1,2).
+                            Điền thiếu: dùng <code>___</code> cho ô trống + đáp án công thức.
+                            Gõ <code>-&gt;</code> hoặc <code>=&gt;</code> tự đổi thành <code>→</code>.
+                        </p>
+                    </div>
+
+                    <div id="eqTemplatePreview" class="qe-eq-preview qe-eq-preview--interactive" aria-live="polite"></div>
+
+                    <div class="qe-template-toolbar">
+                        <button type="button" id="btnAddCoef" class="btn btn-secondary btn-sm">+ Hệ số</button>
+                        <button type="button" id="btnAddBlank" class="btn btn-secondary btn-sm">+ Ô điền</button>
+                        <button type="button" id="btnAddChem" class="btn btn-secondary btn-sm">+ Chất</button>
+                        @foreach ([' + ', ' → ', ' = ', ' ↑ ', ' ↓ '] as $sym)
+                            <button type="button" class="btn btn-secondary btn-sm" data-txt-symbol="{{ $sym }}">{{ trim($sym) ?: $sym }}</button>
+                        @endforeach
+                        <button type="button" id="btnApplyPreset" class="btn btn-secondary btn-sm qe-template-preset-btn">Mẫu theo chế độ</button>
+                    </div>
+
+                    <p class="qe-parts-list-label">Chi tiết từng phần <span class="qe-parts-list-hint">— kéo ⋮⋮ để sắp xếp · đổi loại bằng dropdown</span></p>
+                    <div id="templatePartsList" class="qe-template-parts"></div>
+
+                    @error('template')<div class="field-error">{{ $message }}</div>@enderror
+                    @error('correct_answer')<div class="field-error">{{ $message }}</div>@enderror
+                    @error('input_mode')<div class="field-error">{{ $message }}</div>@enderror
+
+                    <input type="hidden" name="template_json" id="template_json" value="">
+                    <input type="hidden" name="correct_answer_json" id="correct_answer_json" value="">
+                </div>
             </div>
 
             <aside class="qe-sidebar">
                 <div class="form-group">
                     <label for="answer_type">Loại câu hỏi</label>
                     <select id="answer_type" name="answer_type" required>
-                        @foreach (['mc' => 'Trắc nghiệm', 'essay' => 'Tự luận'] as $val => $label)
+                        @foreach (['mc' => 'Trắc nghiệm', 'essay' => 'Tự luận', 'structured' => 'Phương trình / ô điền'] as $val => $label)
                             <option value="{{ $val }}" @selected(old('answer_type', $question?->answer_type ?? 'mc') === $val)>{{ $label }}</option>
                         @endforeach
                     </select>
@@ -102,7 +159,18 @@
                     </div>
                 </div>
 
-                <div class="qe-sidebar-divider"></div>
+                <div id="section-structured-meta" class="type-section">
+                    <div class="form-group">
+                        <label for="input_mode">Chế độ phương trình</label>
+                        <select id="input_mode" name="input_mode">
+                            @foreach (['balance' => 'Cân bằng hệ số', 'blank' => 'Điền chỗ thiếu', 'blank_balance' => 'Cân bằng + điền thiếu', 'product' => 'Điền sản phẩm'] as $val => $label)
+                                <option value="{{ $val }}" @selected($initialInputMode === $val)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="qe-sidebar-divider type-section-divider"></div>
 
                 <div class="form-group">
                     <label for="points">Điểm</label>
@@ -132,13 +200,20 @@ window.QUESTION_EDITOR_BOOT = {
     options: @json(array_values($initialOptions)),
     correctIndex: {{ $correctIndex }},
     uploadUrl: @json(url('/api/question-content-images')),
+    inputMode: @json($initialInputMode),
+    template: @json($initialTemplate),
+    correctAnswer: @json($initialCorrectAnswer),
 };
 </script>
 <script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
 @php
     $qeJs = public_path('htd-admin/js/question-editor.js');
     $qpJs = public_path('htd-admin/js/quiz-preview.js');
+    $eqJs = public_path('htd-admin/js/equation-ui.js');
+    $qtbJs = public_path('htd-admin/js/question-template-builder.js');
 @endphp
+<script src="{{ asset('htd-admin/js/equation-ui.js') }}?v={{ file_exists($eqJs) ? filemtime($eqJs) : $qeCssV }}"></script>
+<script src="{{ asset('htd-admin/js/question-template-builder.js') }}?v={{ file_exists($qtbJs) ? filemtime($qtbJs) : $qeCssV }}"></script>
 <script src="{{ asset('htd-admin/js/quiz-preview.js') }}?v={{ file_exists($qpJs) ? filemtime($qpJs) : $qeCssV }}"></script>
 <script src="{{ asset('htd-admin/js/question-editor.js') }}?v={{ file_exists($qeJs) ? filemtime($qeJs) : $qeCssV }}"></script>
 @endpush

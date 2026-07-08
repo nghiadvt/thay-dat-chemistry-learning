@@ -100,16 +100,14 @@ body.admin-embedded .kbe-header {
 .kbe-icon-btn:hover:not(:disabled) { background: #eef2ff; color: var(--primary); }
 .kbe-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.kbe-device-toggle,
-.kbe-zoom-toggle {
+.kbe-device-toggle {
   display: inline-flex;
   border: 1px solid #e0e4ee;
   border-radius: 10px;
   overflow: hidden;
   background: #f8f9fc;
 }
-.kbe-device-btn,
-.kbe-zoom-btn {
+.kbe-device-btn {
   border: none;
   background: transparent;
   padding: 7px 14px;
@@ -120,13 +118,45 @@ body.admin-embedded .kbe-header {
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.kbe-device-btn + .kbe-device-btn,
-.kbe-zoom-btn + .kbe-zoom-btn { border-left: 1px solid #e0e4ee; }
-.kbe-device-btn.active,
-.kbe-zoom-btn.active {
+.kbe-device-btn + .kbe-device-btn { border-left: 1px solid #e0e4ee; }
+.kbe-device-btn.active {
   background: #fff;
   color: var(--primary);
   box-shadow: inset 0 0 0 1px var(--primary);
+}
+.kbe-zoom-select-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+.kbe-zoom-select {
+  appearance: none;
+  border: 1px solid #e0e4ee;
+  border-radius: 10px;
+  background: #f8f9fc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+  padding: 7px 32px 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--primary);
+  cursor: pointer;
+  min-width: 88px;
+}
+.kbe-zoom-select:hover,
+.kbe-zoom-select:focus {
+  background-color: #fff;
+  border-color: var(--primary);
+  outline: none;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .kbe-btn {
@@ -758,11 +788,28 @@ body.admin-embedded .kbe-header {
 .kbe-overlay-phone {
   transform-origin: center center;
 }
+.kbe-overlay .kbe-row-hover-actions { display: none; }
 .kbe-test-overlay .kbe-test-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 20px;
+  max-width: min(960px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  padding: 48px 16px 16px;
+  box-sizing: border-box;
+}
+.kbe-test-overlay .kbe-overlay-phone {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.kbe-test-overlay .kbe-device-wrap,
+.kbe-test-overlay .kbe-phone-wrap {
+  transform-origin: top center;
 }
 .kbe-test-output-wrap {
   background: rgba(255,255,255,0.1);
@@ -772,6 +819,23 @@ body.admin-embedded .kbe-header {
   min-width: 320px;
   max-width: 500px;
   width: 90vw;
+  box-sizing: border-box;
+}
+@media (max-height: 820px) {
+  .kbe-test-overlay .kbe-test-wrap {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 16px 24px;
+  }
+  .kbe-test-overlay .kbe-test-output-wrap {
+    min-width: 220px;
+    max-width: 300px;
+    width: min(300px, 36vw);
+    flex: 0 1 300px;
+    align-self: flex-start;
+  }
 }
 .kbe-test-output-wrap label {
   display: block;

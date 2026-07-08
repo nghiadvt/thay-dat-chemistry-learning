@@ -843,10 +843,6 @@ function renderTeacherList() {
   btnStart.disabled = started;
   btnStart.textContent = started ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
 
-  const btnNext = document.getElementById('btnNextQuestion');
-  if (btnNext) {
-    btnNext.hidden = !(isBackendMode() && started);
-  }
   const submitEl = document.getElementById('teacherSubmitCount');
   if (submitEl) submitEl.hidden = !(isBackendMode() && started);
 
@@ -1196,7 +1192,6 @@ window.closeTeacherQrModal = closeTeacherQrModal;
 window.toggleTeacherSidebar = toggleTeacherSidebar;
 window.resetTeacherRoom = resetTeacherRoom;
 window.teacherStartGame = teacherStartGame;
-window.teacherNextQuestion = teacherNextQuestion;
 window.teacherTogglePause = teacherTogglePause;
 window.teacherEndGame = teacherEndGame;
 window.teacherPlayAgain = teacherPlayAgain;
@@ -1213,11 +1208,6 @@ document.getElementById('demoNav').innerHTML = TEACHER_SCREENS.map(
 function demoTeacherGo(s) {
   if (s === 'dashboard' && !HTD.getRoom()) createTeacherRoom();
   showTeacherScreen(s);
-}
-
-function teacherNextQuestion() {
-  if (!isBackendMode()) return;
-  HTDBridge.hostNextQuestion().catch(err => alert(err.message || 'Không chuyển câu được.'));
 }
 
 function teacherExportCsv() {
@@ -1290,7 +1280,8 @@ function setupTeacherBackendBridge() {
       players.map(p => ({
         id: p.id,
         name: p.name,
-        avatarEmoji: p.avatarEmoji,
+        avatarDataUrl: p.avatarDataUrl || null,
+        avatarEmoji: p.avatarEmoji || (p.avatarDataUrl ? null : '😀'),
         joinedAt: Date.now(),
       }))
     );

@@ -226,7 +226,21 @@ html, body {
 .result-circle.correct { background: var(--success); }
 .result-circle.wrong { background: var(--error); }
 .result-title { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+.result-meta {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  opacity: 0.95;
+}
+.result-meta p { margin: 4px 0; }
 .result-points { font-size: 18px; font-weight: 600; color: var(--warning); }
+.result-rank {
+  font-size: 14px;
+  margin-top: 10px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+.result-rank[hidden] { display: none; }
 
 .demo-nav {
   position: fixed;

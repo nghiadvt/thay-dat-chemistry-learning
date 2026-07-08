@@ -42,6 +42,10 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # Dev: live-reload room/gameplay handlers without rebuild (node process still needs restart)
+      - ./ws-server/ws:/app/ws:ro
+      - ./ws-server/index.js:/app/index.js:ro
     ports:
       - "${WS_HOST_PORT}:${WS_PORT}"
     depends_on:
@@ -58,7 +62,9 @@ services:
       APP_NAME: "Hoa Thay Dat Admin"
       APP_ENV: local
       APP_DEBUG: "true"
-      APP_URL: http://localhost:${PHP_HOST_PORT}
+      # Public base URL for join links + QR (override in root .env for LAN phone / production)
+      APP_URL: ${APP_URL:-http://localhost:${PHP_HOST_PORT}}
+      WS_PUBLIC_URL: ${WS_PUBLIC_URL:-http://localhost:${WS_HOST_PORT}}
       DB_CONNECTION: mysql
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}

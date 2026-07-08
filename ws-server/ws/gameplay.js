@@ -3,6 +3,7 @@ const {
   playersKey,
   leaderboardKey,
   submittedKey,
+  answerKey,
 } = require('./redis-keys');
 const {
   getSessionByPin,
@@ -39,6 +40,19 @@ function registerGameplayHandlers(io, redis) {
       }
     });
 
+    socket.on('host_finalize_question', async (_payload, ack) => {
+      try {
+        await requireHost(socket);
+        const pin = socket.data.pin;
+        await finalizeCurrentQuestion(io, redis, pin);
+        if (typeof ack === 'function') ack({ success: true });
+      } catch (err) {
+        const message = err.message || 'Không thể chốt câu hỏi.';
+        socket.emit('room_error', { message });
+        if (typeof ack === 'function') ack({ success: false, error: message });
+      }
+    });
+
     socket.on('host_next_question', async (_payload, ack) => {
       try {
         await requireHost(socket);
@@ -54,7 +68,12 @@ function registerGameplayHandlers(io, redis) {
     socket.on('host_end_game', async (_payload, ack) => {
       try {
         await requireHost(socket);
-        await endGame(io, redis, socket.data.pin);
+        const pin = socket.data.pin;
+        const room = await redis.hgetall(roomKey(pin));
+        if (room.status === 'playing' && room.current_question_id) {
+          await finalizeCurrentQuestion(io, redis, pin);
+        }
+        await endGame(io, redis, pin);
         if (typeof ack === 'function') ack({ success: true });
       } catch (err) {
         const message = err.message || 'Không thể kết thúc game.';
@@ -66,7 +85,6 @@ function registerGameplayHandlers(io, redis) {
     socket.on('submit_answer', async (payload = {}, ack) => {
       try {
         const result = await handleSubmitAnswer(io, redis, socket, payload);
-        socket.emit('question_result', result);
         if (typeof ack === 'function') ack({ success: true, data: result });
       } catch (err) {
         const message = err.message || 'Không thể nộp đáp án.';
@@ -149,10 +167,22 @@ async function startGame(io, redis, socket) {
   return emitCurrentQuestion(io, redis, pin);
 }
 
+function finalizedKey(pin, questionId) {
+  return `room:${pin}:finalized:${questionId}`;
+}
+
 async function advanceQuestion(io, redis, pin) {
   const room = await redis.hgetall(roomKey(pin));
   if (room.status !== 'playing') {
     throw new Error('Game chưa bắt đầu.');
+  }
+
+  const currentQuestionId = room.current_question_id;
+  if (currentQuestionId) {
+    const done = await redis.get(finalizedKey(pin, currentQuestionId));
+    if (!done) {
+      await finalizeCurrentQuestion(io, redis, pin);
+    }
   }
 
   const plan = await getPlan(redis, pin);
@@ -192,6 +222,7 @@ async function emitCurrentQuestion(io, redis, pin) {
     question_started_at: String(startedAt),
   });
   await redis.del(submittedKey(pin, question.id));
+  await redis.del(finalizedKey(pin, question.id));
   await refreshRoomTtl(redis, pin);
   await redis.expire(submittedKey(pin, question.id), 7200);
 
@@ -280,72 +311,205 @@ async function handleSubmitAnswer(io, redis, socket, payload) {
     throw new Error(tsCheck.message);
   }
 
-  const added = await redis.sadd(submittedKey(pin, questionId), name);
-  if (added === 0) {
-    throw new Error('Bạn đã nộp câu này rồi.');
-  }
-  await redis.expire(submittedKey(pin, questionId), 7200);
-
   const question = await getQuestionById(questionId);
   if (!question) {
     throw new Error('Câu hỏi không tồn tại.');
   }
 
+  const startedAt = Number(room.question_started_at);
+  const key = answerKey(pin, questionId, name);
+  const existingRaw = await redis.get(key);
+  let firstSubmitAt = Number(hybridTimestamp);
+
+  if (existingRaw) {
+    try {
+      const existing = JSON.parse(existingRaw);
+      if (existing.first_submit_at) firstSubmitAt = Number(existing.first_submit_at);
+    } catch {
+      /* keep new timestamp */
+    }
+  } else {
+    await redis.sadd(submittedKey(pin, questionId), name);
+    await redis.expire(submittedKey(pin, questionId), 7200);
+  }
+
+  await redis.set(
+    key,
+    JSON.stringify({
+      answer,
+      first_submit_at: firstSubmitAt,
+      last_submit_at: Number(hybridTimestamp),
+    }),
+    'EX',
+    7200,
+  );
+  await refreshRoomTtl(redis, pin);
+
+  await emitSubmitCount(io, redis, pin, questionId);
+
+  const elapsedSeconds = Math.max(0, Math.ceil((firstSubmitAt - startedAt) / 1000));
+  const answerDisplay = formatAnswerDisplay(question, answer);
+
+  return {
+    locked: true,
+    elapsed_seconds: elapsedSeconds,
+    answer_display: answerDisplay,
+    can_change: true,
+  };
+}
+
+async function finalizeCurrentQuestion(io, redis, pin) {
+  const room = await redis.hgetall(roomKey(pin));
+  const questionId = room.current_question_id;
+  if (!questionId) return;
+
+  const question = await getQuestionById(questionId);
+  if (!question) return;
+
   const plan = await getPlan(redis, pin);
   const quizIndex = Number(room.quiz_index || 0);
   const quiz = plan[quizIndex];
-  const answerForScoring = await mapShuffledAnswer(redis, pin, questionId, name, question, answer);
-  const { correct, correctAnswer } = checkAnswer(question, answerForScoring);
-  const player = await getPlayer(redis, pin, name);
-  const streakBefore = player?.streak_correct || 0;
+  const startedAt = Number(room.question_started_at);
+  const timeLimitSeconds = question.time_limit_seconds;
+  const studentSockets = await getStudentSockets(io, pin);
+  const scored = [];
 
-  const { scoreEarned, streakAfter } = calculateScore({
-    timeLimitSeconds: question.time_limit_seconds,
-    questionStartedAt: room.question_started_at,
-    hybridTimestamp,
-    correct,
-    streakBefore,
-  });
+  for (const studentSocket of studentSockets) {
+    const name = studentSocket.data.name;
+    const raw = await redis.get(answerKey(pin, questionId, name));
+    let answer = null;
+    let firstSubmitAt = startedAt + timeLimitSeconds * 1000;
 
-  if (player) {
-    player.streak_correct = streakAfter;
-    await savePlayer(redis, pin, player);
-  }
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        answer = parsed.answer;
+        firstSubmitAt = Number(parsed.first_submit_at || parsed.last_submit_at || firstSubmitAt);
+      } catch {
+        answer = null;
+      }
+    }
 
-  if (scoreEarned > 0) {
-    await redis.zincrby(leaderboardKey(pin), scoreEarned, name);
-  }
-  await refreshRoomTtl(redis, pin);
+    const answerForScoring = await mapShuffledAnswer(redis, pin, questionId, name, question, answer);
+    const { correct, correctAnswer } = checkAnswer(question, answerForScoring);
+    const player = await getPlayer(redis, pin, name);
+    const streakBefore = player?.streak_correct || 0;
 
-  const sessionId = Number(room.session_id);
-  if (sessionId) {
-    await saveSessionAnswer({
-      sessionId,
-      questionId: question.id,
-      studentName: name,
-      answerSubmitted: answer,
-      isCorrect: correct,
+    const { scoreEarned, streakAfter } = calculateScore({
+      timeLimitSeconds,
+      questionStartedAt: startedAt,
+      hybridTimestamp: firstSubmitAt,
+      correct,
+      streakBefore,
+    });
+
+    if (player) {
+      player.streak_correct = streakAfter;
+      await savePlayer(redis, pin, player);
+    }
+
+    if (scoreEarned > 0) {
+      await redis.zincrby(leaderboardKey(pin), scoreEarned, name);
+    }
+
+    const sessionId = Number(room.session_id);
+    if (sessionId && raw) {
+      await saveSessionAnswer({
+        sessionId,
+        questionId: question.id,
+        studentName: name,
+        answerSubmitted: answer,
+        isCorrect: correct,
+        scoreEarned,
+        answeredAt: new Date(firstSubmitAt),
+      });
+    }
+
+    const elapsedSeconds = Math.max(0, Math.ceil((firstSubmitAt - startedAt) / 1000));
+    const totalScore = Number(await redis.zscore(leaderboardKey(pin), name)) || 0;
+
+    scored.push({
+      name,
+      socket: studentSocket,
+      correct,
+      correctAnswer,
       scoreEarned,
-      answeredAt: new Date(Number(hybridTimestamp)),
+      totalScore,
+      elapsedSeconds,
+      answerDisplay: formatAnswerDisplay(question, answer),
+      myAnswer: answer,
     });
   }
 
-  const totalScore = Number(await redis.zscore(leaderboardKey(pin), name)) || 0;
-  const rank = await getPlayerRank(redis, pin, name);
+  await refreshRoomTtl(redis, pin);
+
+  const ranking = buildQuestionRanking(scored);
+  const fastestCorrect = ranking.find((entry) => entry.correct) || null;
+
+  for (const entry of ranking) {
+    const rank = await getPlayerRank(redis, pin, entry.name);
+    const correctRank = entry.correct
+      ? ranking.filter((r) => r.correct).findIndex((r) => r.name === entry.name) + 1
+      : null;
+
+    entry.socket.emit('question_result', {
+      correct: entry.correct,
+      correct_answer: entry.correctAnswer,
+      score_earned: entry.scoreEarned,
+      rank,
+      total_score: entry.totalScore,
+      elapsed_seconds: entry.elapsedSeconds,
+      my_answer: entry.answerDisplay,
+      question_rank_correct: correctRank,
+      question_total: ranking.length,
+      fastest_correct: fastestCorrect
+        ? {
+            name: fastestCorrect.name,
+            elapsed_seconds: fastestCorrect.elapsedSeconds,
+          }
+        : null,
+      ...(quiz.show_explanation && question.explanation
+        ? { explanation: question.explanation }
+        : {}),
+    });
+  }
 
   await emitLeaderboard(io, redis, pin);
-  await emitSubmitCount(io, redis, pin, questionId);
+  await redis.set(finalizedKey(pin, questionId), '1', 'EX', 7200);
+  await redis.del(submittedKey(pin, questionId));
+}
 
-  return {
-    correct,
-    correct_answer: correctAnswer,
-    score_earned: scoreEarned,
-    rank,
-    total_score: totalScore,
-    ...(quiz.show_explanation && question.explanation
-      ? { explanation: question.explanation }
-      : {}),
-  };
+function formatAnswerDisplay(question, answer) {
+  if (answer == null) return '—';
+
+  if (question.answer_type === 'mc') {
+    const submitted = typeof answer === 'object' && answer !== null && 'index' in answer
+      ? answer.index
+      : answer;
+    const idx = Number(submitted);
+    if (!Number.isFinite(idx) || idx < 0) return '—';
+    const labels = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const label = labels[idx] || String(idx + 1);
+    const text = question.options?.[idx] || '';
+    return text ? `${label}. ${text}` : label;
+  }
+
+  if (typeof answer === 'object' && answer !== null && 'text' in answer) {
+    return String(answer.text || '—');
+  }
+
+  if (typeof answer === 'string') return answer || '—';
+  return '—';
+}
+
+function buildQuestionRanking(scored) {
+  const correct = scored
+    .filter((entry) => entry.correct)
+    .sort((a, b) => a.elapsedSeconds - b.elapsedSeconds || a.name.localeCompare(b.name));
+  const wrong = scored
+    .filter((entry) => !entry.correct)
+    .sort((a, b) => a.elapsedSeconds - b.elapsedSeconds || a.name.localeCompare(b.name));
+  return [...correct, ...wrong];
 }
 
 async function getPlayerRank(redis, pin, name) {
@@ -358,16 +522,25 @@ async function emitLeaderboard(io, redis, pin) {
   const prevKey = `room:${pin}:prev_scores`;
   const prevRaw = await redis.hgetall(prevKey);
   const entries = await redis.zrevrange(leaderboardKey(pin), 0, 4, 'WITHSCORES');
+  const allPlayers = await redis.hgetall(playersKey(pin));
 
   const top5 = [];
   for (let i = 0; i < entries.length; i += 2) {
     const playerName = entries[i];
     const score = Number(entries[i + 1]);
     const prev = Number(prevRaw[playerName] || 0);
+    let avatar = null;
+    try {
+      const playerRaw = allPlayers[playerName];
+      if (playerRaw) avatar = JSON.parse(playerRaw).avatar || null;
+    } catch {
+      avatar = null;
+    }
     top5.push({
       name: playerName,
       score,
       delta: score - prev,
+      avatar,
     });
     await redis.hset(prevKey, playerName, String(score));
   }
@@ -406,6 +579,7 @@ async function endGame(io, redis, pin) {
       score,
       rank: finalLeaderboard.length + 1,
       player_token: player.player_token || null,
+      avatar: player.avatar || null,
     });
   }
 
@@ -449,6 +623,9 @@ async function getStudentSockets(io, pin) {
 async function mapShuffledAnswer(redis, pin, questionId, studentName, question, answer) {
   if (question.answer_type !== 'mc') {
     return answer;
+  }
+  if (answer == null) {
+    return { index: -1 };
   }
 
   const orderRaw = await redis.get(optionOrderKey(pin, questionId, studentName));

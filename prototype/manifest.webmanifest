@@ -1,0 +1,25 @@
+{
+  "name": "Hóa Thầy Đạt",
+  "short_name": "Hóa Đạt",
+  "description": "Đố vui hóa học real-time",
+  "start_url": "/join",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1a1a4e",
+  "theme_color": "#2D3192",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/app/assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app/assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

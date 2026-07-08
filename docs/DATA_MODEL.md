@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-08 (QR phòng lưu PNG `qr_path`; chơi lại phòng ended)
+**Cập nhật lần cuối:** 2026-07-09 (thêm `answer_type: structured`)
 
 ---
 
@@ -62,7 +62,7 @@ Giữ nguyên: `id`, `name`, `email` UNIQUE, `password`, `remember_token`, `emai
 | `preview_path` | VARCHAR(255) NULL | Đường dẫn tương đối file PNG preview (disk `public`) — VD: `keyboards/06-07-2026-ban-phim-hoa-vo-co.png` |
 | `created_at`, `updated_at` | TIMESTAMP | |
 
-**Preview ảnh:** Admin editor chụp DOM bàn phím (`html2canvas`) khi **Save** hoặc lần đầu mở editor (nếu chưa có ảnh) → `POST /api/keyboards/{id}/preview` → lưu `storage/app/public/keyboards/{dd-mm-YYYY}-{slug-ten-ban-phim}.png` (trùng tên trong ngày → thêm `-{id}`). Truy cập qua `/storage/...` (cần `php artisan storage:link`). Model expose `preview_url` (accessor, không lưu DB). Xóa bàn phím → xóa file preview tương ứng.
+**Preview ảnh:** Admin editor chụp DOM `#kbePhoneKb` (`html2canvas`) khi **Save** hoặc lần đầu mở editor (nếu chưa có ảnh) → `POST /api/keyboards/{id}/preview` → lưu `storage/app/public/keyboards/{dd-mm-YYYY}-{slug-ten-ban-phim}.png` (trùng tên trong ngày → thêm `-{id}`). Client: bake computed styles (RGB) vào clone off-DOM, `onclone` **remove stylesheet** (html2canvas không parse `oklch`/`oklab` từ CSS trang/browser), tạm tắt `transform`/`overflow:hidden`/`filter` trên device frame. Truy cập qua `/storage/...` (cần `php artisan storage:link`). Model expose `preview_url` (accessor, không lưu DB). Xóa bàn phím → xóa file preview tương ứng.
 
 ### Lưu từ Keyboard Editor
 
@@ -131,13 +131,13 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 | `quiz_id` | BIGINT FK → `quizzes.id` ON DELETE CASCADE | |
 | `content` | LONGTEXT NOT NULL | HTML: đề text + `<img>` + `<video>` (sanitize trước lưu) |
 | `explanation` | LONGTEXT NULL | HTML giải thích đáp án (tuỳ chọn, sanitize trước lưu) |
-| `answer_type` | ENUM('mc','essay') NOT NULL | |
+| `answer_type` | ENUM('mc','essay','structured') NOT NULL | |
 | `options` | JSON NULL | `mc`: `["đáp án A", "B", "C", "D"]` — tối thiểu 2, tối đa 6 |
 | `correct_index` | TINYINT UNSIGNED NULL | `mc`: index 0-based |
 | `correct_answer_normalized` | TEXT NULL | `essay`: đáp án mẫu (so khớp văn bản) |
-| `input_mode` | VARCHAR(32) NULL | *(dự phòng — chưa dùng)* |
-| `template` | JSON NULL | *(dự phòng — chưa dùng)* |
-| `correct_answer` | JSON NULL | *(dự phòng — chưa dùng)* |
+| `input_mode` | VARCHAR(32) NULL | `structured`: `balance` \| `blank` \| `blank_balance` \| `product` |
+| `template` | JSON NULL | `structured`: mảng parts — xem [`QUESTION_TEMPLATE_SCHEMA.md`](QUESTION_TEMPLATE_SCHEMA.md) |
+| `correct_answer` | JSON NULL | `structured`: `{ coef: {c0:"2"}, blank: {b0:"O2"} }` |
 | `time_limit_seconds` | INT NOT NULL DEFAULT 30 | |
 | `points` | SMALLINT UNSIGNED NOT NULL DEFAULT 1 | Điểm cơ bản khi trả lời đúng (1–100) |
 | `sort_order` | SMALLINT NOT NULL DEFAULT 0 | Thứ tự trong quiz |
@@ -150,6 +150,7 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 |---|---|
 | `mc` | `options` (≥2), `correct_index` |
 | `essay` | `correct_answer_normalized` (đáp án mẫu) |
+| `structured` | `input_mode`, `template` (≥1 ô coef/blank), `correct_answer` khớp mọi id |
 
 ### Ví dụ `content` (HTML)
 
@@ -171,7 +172,7 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 |---|---|---|
 | `id` | BIGINT PK | |
 | `pin` | CHAR(6) NOT NULL UNIQUE | 6 chữ số |
-| `qr_path` | VARCHAR(255) NULL | Ảnh QR join (`/join/{pin}`) — PNG trên disk `public`, VD: `sessions/123456.png`. Tạo khi **Tạo phòng**; backfill khi mở trang host nếu thiếu. Model expose `qr_url` (accessor) |
+| `qr_path` | VARCHAR(255) NULL | Ảnh QR join — PNG `sessions/{pin}.png`. Join URL trong QR = `{APP_URL}/join/{pin}` (sidecar `sessions/{pin}.joinurl` để regenerate khi `APP_URL` đổi). Tạo khi **Tạo phòng**; backfill / refresh khi mở trang host. Model expose `qr_url` (accessor, `?v=` mtime) |
 | `name` | VARCHAR(255) NULL | Tên phòng do GV đặt (hiển thị danh sách) |
 | `host_id` | BIGINT FK → `users.id` | GV host |
 | `game_id` | BIGINT FK → `games.id` | Game chứa quiz (denormalized) |
@@ -180,9 +181,11 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 | `is_active` | BOOLEAN NOT NULL DEFAULT true | Tắt → xóa Redis room, HS không join được |
 | `started_at` | TIMESTAMP NULL | Khi GV bấm Start |
 | `ended_at` | TIMESTAMP NULL | Khi game kết thúc |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+**Sửa phòng (admin):** đổi `name` mọi lúc; đổi `quiz_id`/`game_id` chỉ khi `status=waiting` (+ đồng bộ Redis nếu `is_active`). PIN + `qr_path` không đổi.
 
 **Chơi lại:** Admin `POST .../reset` hoặc API `POST /api/game-sessions/{id}/reset` — đặt lại `status=waiting`, xóa state Redis (players, leaderboard, plan…), **giữ** bản ghi `game_results` / `session_answers` của lần chơi trước.
-| `created_at`, `updated_at` | TIMESTAMP | |
 
 ---
 

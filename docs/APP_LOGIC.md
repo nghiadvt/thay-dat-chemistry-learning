@@ -3,7 +3,7 @@
 > Logic ứng dụng: luồng màn hình, state, scoring, bàn phím, WebSocket events.
 > Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
 
-**Cập nhật lần cuối:** 2026-07-08 (chơi lại phòng ended từ danh sách / host)
+**Cập nhật lần cuối:** 2026-07-09 (Admin: builder câu `structured`)
 
 ---
 
@@ -19,16 +19,16 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 | Màn hình | ID | Bắt buộc | Mô tả |
 |---|---|---|---|
 | Welcome | `welcome` | — | Landing, nút "Tham gia phòng" + "Hướng dẫn" |
-| Join PIN | `join` | PIN 6 số | Validate PIN, tab QR placeholder |
+| Join PIN | `join` | PIN 6 số | Nhập PIN thủ công; tab QR placeholder. **Bỏ qua** khi mở `/join/{pin}` hoặc quét QR |
 | Hướng dẫn | `guide` | — | Text tĩnh, nút quay lại |
-| Nhập tên | `name` | Tên ≤20 ký tự | Không cho rỗng, trim whitespace |
-| Avatar | `avatar` | Tùy chọn | Camera chụp ảnh hoặc "Bỏ qua" → avatar ngẫu nhiên |
+| Nhập tên | `name` / `profile` | Tên ≤20 ký tự | Không cho rỗng, trim whitespace (cùng màn với avatar) |
+| Avatar | `avatar` / `profile` | Tùy chọn | HTTP LAN: `<input capture>` mở camera native; HTTPS: `getUserMedia`. Bỏ qua → emoji mặc định |
 | Phòng chờ | `waiting` | — | Hiển thị tên phòng, GV, danh sách người join. Chờ event `START` |
 | Question MC | `question-mc` | — | Trắc nghiệm 4 đáp án A–D |
 | Question Formula | `question-formula` | — | Nhập công thức qua bàn phím ảo 3 tab |
-| Submit | `submit` | — | Spinner "Đã nộp! Chờ kết quả...", bàn phím ẩn |
-| Result | `result` | — | Đúng/sai, điểm, confetti nếu đúng |
-| Leaderboard | `leaderboard` | — | Top 5, hiển thị 5 giây, animation reorder |
+| Lock-in (trên màn Question) | — | — | Sau nộp: hiện **đáp án của mình** + **thời gian nộp** (từ lần đầu); **không** hiện điểm; có thể đổi đáp án (thời gian chấm giữ lần nộp đầu) |
+| Result | `result` | — | **Sau hết giờ câu:** đúng/sai, điểm, thời gian nộp, hạng nhanh trong nhóm đúng; confetti nếu đúng |
+| Leaderboard | `leaderboard` | — | Top 5, ~5 giây sau Result, animation reorder |
 | Final | `final` | — | Podium top 3, nút "Chơi lại" / "Về trang chủ" |
 
 ### Quy tắc join phòng
@@ -36,8 +36,10 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 - **Không yêu cầu login** — ai có link/PIN đều vào được
 - PIN: 6 chữ số
 - Tên hiển thị: bắt buộc, tối đa 20 ký tự
-- Avatar: tùy chọn — chụp camera hoặc bỏ qua (server gán avatar ngẫu nhiên)
-- Production: WebSocket handshake + NTP sync ngay tại bước join
+- Avatar: tùy chọn — trên HTTP LAN (điện thoại Wi‑Fi) mở camera/thư viện native qua `<input type="file" capture>`; live preview `getUserMedia` chỉ khi HTTPS/`localhost`. Bỏ qua → emoji mặc định. Ảnh gửi kèm `join_room.avatar` → Redis + `players_update` / BXH (host + HS)
+- **QR / deep-link** `GET /join/{pin}`: server inject `window.HTD_JOIN_PIN` + validate PIN → màn **profile** (tên + avatar) → phòng chờ. **Không** dừng ở màn nhập PIN. QR trên host admin luôn mã hóa `{APP_URL}/join/{pin}` (không dùng ảnh mock `qr-login.png`)
+- Production: WebSocket handshake + NTP sync ngay tại bước join (sau khi bấm "Vào phòng")
+- Danh sách HS (host + grid phòng chờ HS): dùng `players_update` có `avatar`; không pad fake
 
 ---
 
@@ -47,7 +49,8 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 |---|---|---|
 | Soạn nội dung | `/admin/keyboards`, `/admin/games`, … | CRUD trong Blade |
 | Tạo phòng | `/admin/sessions/create` | Nhập **tên phòng** + lọc game → chọn quiz → PIN + QR |
-| Danh sách phòng | `/admin/sessions` | Tên, PIN, QR, quiz, GV, bật/tắt, **Chơi thử** (modal xem quiz như HS) |
+| Sửa phòng | `/admin/sessions/{id}/edit` | Đổi **tên** mọi lúc; đổi **quiz** chỉ khi `waiting` (đồng bộ Redis). PIN/QR giữ nguyên |
+| Danh sách phòng | `/admin/sessions` | Tên, PIN, QR, quiz, GV, bật/tắt, **Sửa**, **Chơi thử** (modal xem quiz như HS) |
 | Vào phòng | `/admin/sessions/{id}` | Host native (Blade + `public/htd-admin/js/teacher.js`) |
 | Link HS | `/join/{pin}` | Màn học sinh mobile (Laravel serve `prototype/index.html` + `<base href="/app/">`) |
 
@@ -65,7 +68,11 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 - Init: `admin-session-init.js` → `joinExistingRoomFromAdmin()`
 - Scripts: **`equation-ui.js` bắt buộc** trước `teacher.js` (render MC/structured)
 - Config: `window.ADMIN_BOOT` (pin, roomName, quizName, gameName, quizId, sessionId, joinUrl, wsUrl)
-- Layout: full viewport (`admin-body--session-host`) — đề bài HTML + đáp án MC (highlight đúng) + barem/giải thích sidebar
+- Layout: full viewport (`admin-body--session-host`) — **sidebar admin trái tự động thu gọn** khi vào trang này (`admin-sidebar.js`)
+- Trong game: panel HS bên phải **ẩn**; đề bài full-width; đáp án đúng / barem **chỉ hiện sau khi hết giờ câu** (không lộ sớm)
+- **Timer (backend):** đếm theo `server_time` + NTP offset; giữ `liveTimerEndsAt` trên memory (tránh race `setRoom` stale từ promise `hostStartGame`); `formatTimer` luôn `Math.ceil` → giây nguyên (`00:31`, không thập phân)
+- **Hết giờ câu:** host tự gọi `host_next_question` (auto-advance). **Không** có nút «Câu tiếp theo» — chỉ chuyển câu khi hết giờ (hoặc sau leaderboard nếu bật)
+- **Hành động → Hiện bảng điểm** (mặc định tắt, lưu `localStorage`): khi bật, sau hết giờ → phase leaderboard ~5s với **modal bảng điểm** (giống màn HS), rồi mới `host_next_question`. Không dùng panel phải nữa
 - Kết thúc quiz: WS `game_ended` → màn **Kết thúc trò chơi** (podium top 3 + bảng điểm + Tải CSV); `room.status = ended` vẫn giữ `teacherGameView` hiển thị
 - **Chơi lại:** `POST /admin/sessions/{id}/reset` hoặc nút **Chơi lại** — reset MySQL `waiting` + xóa Redis; cùng PIN; báo cáo lần trước vẫn trong `/admin/reports`
 - WS `new_question` host nhận thêm `correct_index`, `correct_answer_normalized`, `correct_answer`, `explanation`
@@ -174,7 +181,7 @@ serialize(tokens) → '2H2O'  // plain text, server normalize
 - Emit event `formula-change` với `{ tokens, serialized }`
 
 > **Keyboard editor Test:** đã có token logic (`formulaAppendToken` trong `keyboard-editor.js`).
-> Runtime học sinh: implement sau → `keyboard.js` + `keyboard-config.js`.
+> **Runtime học sinh:** `equation-ui.js` (`FormulaController` + `blankTokens`) dùng cùng quy tắc `smart_context` như Test editor.
 
 ---
 
@@ -182,15 +189,41 @@ serialize(tokens) → '2H2O'  // plain text, server normalize
 
 | Event | Direction | Payload | Mô tả |
 |---|---|---|---|
-| `join_room` | C→S | `{ pin, name }` | HS vào phòng |
+| `join_room` | C→S | `{ pin, name, avatar? }` | HS vào phòng; `avatar` data URL tùy chọn |
 | `ntp_ping` / `ntp_pong` | both | `{ t0 }` / `{ t0, t1, t2 }` | Đồng bộ thời gian |
 | `game_started` | S→C | `{}` | GV bắt đầu |
 | `new_question` | S→C | xem payload bên dưới | Câu hỏi mới |
-| `submit_answer` | C→S | `{ question_id, answer, hybrid_timestamp }` | Nộp đáp án |
-| `question_result` | S→C | `{ correct, correct_answer, score_earned, rank, total_score, explanation? }` | Kết quả câu; `explanation` (HTML) chỉ khi quiz bật `show_explanation` |
-| `leaderboard_update` | S→C | `{ top5: [{ name, score, delta }] }` | Top 5 |
-| `game_ended` | S→C | `{ final_leaderboard }` | Kết thúc |
+| `submit_answer` | C→S | `{ question_id, answer, hybrid_timestamp }` | Nộp / cập nhật đáp án (có thể đổi cho đến hết giờ) |
+| `submit_answer` ack | S→C | `{ locked, elapsed_seconds, answer_display, can_change }` | Lock-in — **không** chấm điểm |
+| `question_result` | S→C | xem §5.1 | **Khi hết câu** (finalize); kèm điểm + thời gian nộp |
+| `leaderboard_update` | S→C | `{ top5: [...] }` | Sau finalize câu (~4s trước khi HS xem BXH) |
+| `game_ended` | S→C | `{ final_leaderboard }` | Kết thúc (kèm `avatar` từng người) |
 | `submit_count_update` | S→C (host) | `{ submitted, total }` | Số người đã nộp |
+| `players_update` | S→C | `{ players: [{ name, connected, score, avatar }] }` | Danh sách HS trong phòng |
+
+### 5.1 Payload `question_result` (sau hết giờ câu)
+
+Gửi **riêng từng HS** khi host `host_next_question` finalize câu hiện tại. Thời gian chấm = `first_submit_at` (lần nộp đầu). Xếp hạng câu: đúng trước (nhanh → chậm), sai sau.
+
+```json
+{
+  "correct": true,
+  "correct_answer": "C. CaO",
+  "score_earned": 900,
+  "rank": 2,
+  "total_score": 2400,
+  "elapsed_seconds": 5,
+  "my_answer": "C. CaO",
+  "question_rank_correct": 1,
+  "question_total": 12,
+  "fastest_correct": { "name": "Lan", "elapsed_seconds": 3 },
+  "explanation": "<p>...</p>"
+}
+```
+
+- `my_answer` / `elapsed_seconds`: chỉ của HS nhận event — **không** broadcast đáp án HS khác trong lúc câu đang mở
+- `question_rank_correct`: hạng trong nhóm trả lời **đúng** (null nếu sai)
+- `fastest_correct`: HS đúng nhanh nhất câu này (tên + giây)
 
 ### Payload `new_question`
 
@@ -304,6 +337,9 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 
 **Serve UI học sinh:** `http://localhost:38480/join` hoặc `/join/{PIN}` — cùng port với admin/API; static assets (`css/`, `js/`) vẫn tại `/app/` (Docker mount `prototype/`).
 
+**Test trên điện thoại (cùng Wi‑Fi):** set trong root `.env`:
+`APP_URL=http://<IP-LAN>:38480` và `WS_PUBLIC_URL=http://<IP-LAN>:38581` (vd. `192.168.1.9`), rồi recreate `php-admin`. Join/QR/link copy từ admin đều dùng `APP_URL` (không phụ thuộc việc GV mở admin bằng localhost). Phone mở `/join/{PIN}` hoặc quét QR. Firewall Windows: inbound TCP `38480` + `38581`. Production: chỉ đổi `APP_URL` / `WS_PUBLIC_URL` sang domain HTTPS — cùng code path, không nhánh riêng.
+
 **Demo mode (localStorage cũ):** thêm `?demo=1` vào URL.
 
 ### File tích hợp (`prototype/js/`)
@@ -328,7 +364,8 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 | `prompt` (text) | `content` (HTML → strip text) |
 | Timer sync localStorage | `server_time` + NTP offset |
 | `teacherStartGame()` local | `host_start_game` |
-| Chuyển câu tự động (demo) | Host bấm **Câu tiếp theo** → `host_next_question` |
+| Chuyển câu tự động (demo) | Host đếm hết giờ → tự `host_next_question` |
+| Hiện bảng điểm panel phải | Tùy chọn **Hiện bảng điểm** → modal ~5s sau hết giờ câu |
 
 ### MVP Phase 3A
 

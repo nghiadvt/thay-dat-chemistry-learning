@@ -57,16 +57,10 @@
                 </select>
                 @error('game_id')<div class="field-error">{{ $message }}</div>@enderror
             </div>
-            <div class="form-group">
-                <label for="keyboard_id">Bàn phím *</label>
-                <select id="keyboard_id" name="keyboard_id" required>
-                    <option value="">— Chọn bàn phím —</option>
-                    @foreach ($keyboards as $keyboard)
-                        <option value="{{ $keyboard->id }}" @selected(old('keyboard_id', $quiz->keyboard_id) == $keyboard->id)>{{ $keyboard->name }}</option>
-                    @endforeach
-                </select>
-                @error('keyboard_id')<div class="field-error">{{ $message }}</div>@enderror
-            </div>
+            @include('admin.partials.keyboard-select-with-preview', [
+                'keyboards' => $keyboards,
+                'selectedKeyboardId' => old('keyboard_id', $quiz->keyboard_id),
+            ])
         </div>
 
         <div class="form-group">
@@ -168,7 +162,19 @@
                 @php $questionActive = $question->is_active ?? true; @endphp
                 <tr class="{{ $questionActive ? '' : 'row-inactive' }}">
                     <td>{{ $question->sort_order }}</td>
-                    <td>{{ $question->answer_type === 'mc' ? 'Trắc nghiệm' : 'Tự luận' }}</td>
+                    <td>@php
+                        echo match ($question->answer_type) {
+                            'mc' => 'Trắc nghiệm',
+                            'structured' => match ($question->input_mode) {
+                                'balance' => 'Cân bằng hệ số',
+                                'blank' => 'Điền chỗ thiếu',
+                                'blank_balance' => 'Cân bằng + điền',
+                                'product' => 'Điền sản phẩm',
+                                default => 'Phương trình',
+                            },
+                            default => 'Tự luận',
+                        };
+                    @endphp</td>
                     <td>{!! Str::limit(strip_tags($question->content), 80) !!}</td>
                     <td>{{ $question->points ?? 1 }}</td>
                     <td>{{ $question->time_limit_seconds }}s</td>
@@ -194,6 +200,8 @@
     </div>
     @endif
 </div>
+
+@include('admin.partials.keyboard-preview-lightbox')
 @endsection
 
 @push('head')
@@ -203,4 +211,6 @@
 @push('scripts')
 @php $qpJs = public_path('htd-admin/js/quiz-preview.js'); @endphp
 <script src="{{ asset('htd-admin/js/quiz-preview.js') }}?v={{ file_exists($qpJs) ? filemtime($qpJs) : $qpV }}"></script>
+@php $kbPreviewJs = public_path('htd-admin/js/admin-keyboard-preview.js'); @endphp
+<script src="{{ asset('htd-admin/js/admin-keyboard-preview.js') }}?v={{ file_exists($kbPreviewJs) ? filemtime($kbPreviewJs) : $qpV }}"></script>
 @endpush

@@ -111,7 +111,25 @@ const HTDGameAdapter = (function () {
     }
 
     if (question.type === 'input') {
+      if (question.inputMode === 'formula') {
+        const serialized = uiState.inputValues?.formulaTokens
+          ? EquationUI.formulaSerialize(uiState.inputValues.formulaTokens)
+          : '';
+        return { text: serialized };
+      }
+
+      if (question.inputMode === 'essay') {
+        const blank = uiState.inputValues?.blank || {};
+        const first = Object.values(blank)[0] || '';
+        return { text: first };
+      }
+
+      const coef = uiState.inputValues?.coef || {};
       const blank = uiState.inputValues?.blank || {};
+      if (Object.keys(coef).length || Object.keys(blank).length) {
+        return { coef, blank };
+      }
+
       const first = Object.values(blank)[0] || '';
       return { text: first };
     }
@@ -124,7 +142,8 @@ const HTDGameAdapter = (function () {
       id: `p-${p.name}-${idx}`,
       name: p.name,
       score: Number(p.score || 0),
-      avatarEmoji: '😀',
+      avatarDataUrl: p.avatar || null,
+      avatarEmoji: p.avatar ? null : '😀',
       connected: p.connected !== false,
       isFake: false,
     }));
@@ -136,7 +155,8 @@ const HTDGameAdapter = (function () {
       name: row.name,
       score: Number(row.score || 0),
       delta: Number(row.delta || 0),
-      avatarEmoji: '😀',
+      avatarDataUrl: row.avatar || null,
+      avatarEmoji: row.avatar ? null : '😀',
       isFake: false,
     }));
   }

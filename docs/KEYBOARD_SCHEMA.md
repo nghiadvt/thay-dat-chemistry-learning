@@ -4,7 +4,7 @@
 > Editor tham chiếu: [`prototype/keyboard-editor.html`](../prototype/keyboard-editor.html) + [`prototype/js/keyboard-editor.js`](../prototype/js/keyboard-editor.js).
 > Runtime gửi qua WebSocket: field `keyboard_config` trong event `new_question`.
 
-**Cập nhật lần cuối:** 2026-07-08
+**Cập nhật lần cuối:** 2026-07-08 (runtime HS: full-width + token smart_context)
 
 ---
 
@@ -177,7 +177,7 @@ Khi emit `new_question`, server load `quizzes.keyboard_id` → copy `keyboards.c
 }
 ```
 
-Client học sinh render `rows[]` giống `renderPhoneKb()` trong editor — **không** dùng model `tabs[]` cũ.
+Client học sinh render `rows[]` giống markup keys của `renderPhoneKb()` trong editor — **không** dùng model `tabs[]` cũ. Overlay Preview/Test admin gọi `renderPhoneKb(el, { editable: false })` (không selectKey / không row menu). Runtime HS (`keyboard-runtime.js` + `student.css`): bàn phím **full-width** neo đáy viewport, nền `#d1d5db`, phím trắng như numpad PIN; phím `send` = nộp đáp án (ẩn nút «Gửi đáp án» trùng ở trên). Nhập công thức dùng `smart_context` qua `EquationUI.FormulaController` / `blankTokens`.
 
 ---
 

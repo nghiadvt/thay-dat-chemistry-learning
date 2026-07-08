@@ -9,6 +9,21 @@ const {
 const { getSessionByPin } = require('./db');
 
 const MAX_NAME_LENGTH = 20;
+/** JPEG data URL from student camera (~240×240) — reject oversized payloads */
+const MAX_AVATAR_LENGTH = 120000;
+
+function sanitizeAvatar(raw) {
+  if (raw == null || raw === '') return null;
+  const avatar = String(raw).trim();
+  if (!avatar) return null;
+  if (avatar.length > MAX_AVATAR_LENGTH) {
+    throw new Error('Ảnh đại diện quá lớn. Chụp lại hoặc bỏ qua.');
+  }
+  if (!/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(avatar)) {
+    throw new Error('Ảnh đại diện không hợp lệ.');
+  }
+  return avatar;
+}
 
 function registerRoomHandlers(io, redis) {
   io.on('connection', (socket) => {
@@ -34,6 +49,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
   const pin = String(payload.pin || '').trim();
   const name = String(payload.name || '').trim();
   const isHost = Boolean(payload.is_host);
+  const avatar = isHost ? null : sanitizeAvatar(payload.avatar);
 
   if (!/^\d{6}$/.test(pin)) {
     throw new Error('PIN phải là 6 chữ số.');
@@ -80,6 +96,10 @@ async function handleJoinRoom(io, redis, socket, payload) {
     player.disconnected_at = null;
     player.socket_id = socket.id;
     player.is_host = isHost || player.is_host;
+    // Rejoin with a new photo updates avatar; omit avatar → keep previous.
+    if (!isHost && avatar) {
+      player.avatar = avatar;
+    }
   } else {
     if (isHost) {
       // Host is not counted as a student player in leaderboard
@@ -90,6 +110,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
         is_host: true,
         streak_correct: 0,
         socket_id: socket.id,
+        avatar: null,
       };
     } else {
       player = {
@@ -99,6 +120,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
         is_host: false,
         streak_correct: 0,
         socket_id: socket.id,
+        avatar: avatar || null,
       };
       await redis.zadd(leaderboardKey(pin), 0, name);
     }
@@ -171,6 +193,7 @@ async function broadcastPlayerList(io, redis, pin) {
       name: p.name,
       connected: p.connected,
       score: 0,
+      avatar: p.avatar || null,
     }));
 
   for (const p of players) {
@@ -178,6 +201,12 @@ async function broadcastPlayerList(io, redis, pin) {
   }
 
   io.to(pin).emit('players_update', { players });
+}
+
+/** Read avatar from Redis player hash (for leaderboard / game_ended). */
+async function getPlayerAvatar(redis, pin, name) {
+  const player = await getPlayer(redis, pin, name);
+  return player?.avatar || null;
 }
 
 async function refreshRoomTtl(redis, pin) {
@@ -208,5 +237,6 @@ module.exports = {
   broadcastPlayerList,
   refreshRoomTtl,
   getPlayer,
+  getPlayerAvatar,
   savePlayer,
 };

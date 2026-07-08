@@ -64,16 +64,10 @@
     @endif
 </div>
 
-<div class="kb-preview-lightbox" id="kbPreviewLightbox" hidden>
-    <button type="button" class="kb-preview-lightbox-backdrop" aria-label="Đóng"></button>
-    <div class="kb-preview-lightbox-dialog" role="dialog" aria-modal="true" aria-labelledby="kbPreviewLightboxTitle">
-        <button type="button" class="kb-preview-lightbox-close" aria-label="Đóng">×</button>
-        <h3 id="kbPreviewLightboxTitle"></h3>
-        <img id="kbPreviewLightboxImg" src="" alt="">
-    </div>
-</div>
+@include('admin.partials.keyboard-preview-lightbox')
 @endsection
 
 @push('scripts')
-<script src="{{ asset('htd-admin/js/admin-keyboards-index.js') }}"></script>
+@php $kbPreviewJs = public_path('htd-admin/js/admin-keyboard-preview.js'); @endphp
+<script src="{{ asset('htd-admin/js/admin-keyboard-preview.js') }}?v={{ file_exists($kbPreviewJs) ? filemtime($kbPreviewJs) : time() }}"></script>
 @endpush

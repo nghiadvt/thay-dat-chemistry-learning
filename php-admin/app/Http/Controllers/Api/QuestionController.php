@@ -28,7 +28,7 @@ class QuestionController extends Controller
         $validated = $request->validate([
             'content' => ['required', 'string'],
             'explanation' => ['nullable', 'string'],
-            'answer_type' => ['required', 'in:mc,essay'],
+            'answer_type' => ['required', 'in:mc,essay,structured'],
             'options' => ['nullable', 'array'],
             'correct_index' => ['nullable', 'integer', 'min:0'],
             'correct_answer_normalized' => ['nullable', 'string', 'max:255'],
@@ -70,7 +70,7 @@ class QuestionController extends Controller
         $validated = $request->validate([
             'content' => ['sometimes', 'required', 'string'],
             'explanation' => ['nullable', 'string'],
-            'answer_type' => ['sometimes', 'required', 'in:mc,essay'],
+            'answer_type' => ['sometimes', 'required', 'in:mc,essay,structured'],
             'options' => ['nullable', 'array'],
             'correct_index' => ['nullable', 'integer', 'min:0'],
             'correct_answer_normalized' => ['nullable', 'string', 'max:255'],

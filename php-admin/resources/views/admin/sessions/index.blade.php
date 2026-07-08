@@ -31,24 +31,24 @@
             </thead>
             <tbody>
                 @foreach ($sessions as $session)
-                @php $joinUrl = url('/join/'.$session->pin); @endphp
+                @php
+                    $joinUrl = rtrim(config('app.url'), '/').'/join/'.$session->pin;
+                    $qrSrc = $session->qr_url
+                        ?: 'https://api.qrserver.com/v1/create-qr-code/?size=128x128&data='.rawurlencode($joinUrl);
+                @endphp
                 <tr class="{{ $session->is_active ? '' : 'row-inactive' }}">
                     <td><strong>{{ $session->name ?? 'Phòng '.$session->pin }}</strong></td>
                     <td><strong class="session-pin-cell">{{ $session->pin }}</strong></td>
                     <td class="session-qr-cell">
-                        @if ($session->qr_url)
-                        <a href="{{ url('/join/'.$session->pin) }}" target="_blank" rel="noopener" class="session-qr-link" title="{{ url('/join/'.$session->pin) }}">
+                        <a href="{{ $joinUrl }}" target="_blank" rel="noopener" class="session-qr-link" title="{{ $joinUrl }}">
                             <img
-                                src="{{ $session->qr_url }}"
-                                alt="QR PIN {{ $session->pin }}"
+                                src="{{ $qrSrc }}"
+                                alt="QR {{ $joinUrl }}"
                                 width="48"
                                 height="48"
                                 loading="lazy"
                             >
                         </a>
-                        @else
-                        <span class="text-muted" title="Mở trang host để tạo QR">—</span>
-                        @endif
                     </td>
                     <td>{{ $session->quiz?->name ?? '—' }}</td>
                     <td>{{ $session->game?->name ?? '—' }}</td>
@@ -64,6 +64,7 @@
                     </td>
                     <td>{{ $session->created_at?->format('d/m/Y H:i') }}</td>
                     <td class="actions-cell">
+                        <a href="{{ route('admin.sessions.edit', $session) }}" class="btn btn-secondary btn-sm">Sửa</a>
                         @if ($session->quiz_id)
                             <button
                                 type="button"

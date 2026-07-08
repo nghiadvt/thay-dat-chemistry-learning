@@ -49,13 +49,14 @@
                     </svg>
                   </button>
                   <div class="qr-frame teacher-qr-presentation">
-                    <img src="{{ $qrUrl ?? asset('htd-admin/assets/qr-login.png') }}" alt="QR Code PIN {{ $session->pin }}" class="qr-mock-img">
+                    <img src="{{ $qrUrl }}" alt="QR tham gia {{ $joinUrl }}" class="qr-mock-img" data-join-url="{{ $joinUrl }}">
                     <span class="qr-bracket tl"></span>
                     <span class="qr-bracket tr"></span>
                     <span class="qr-bracket bl"></span>
                     <span class="qr-bracket br"></span>
                   </div>
                   <p class="teacher-qr-hint">Quét mã QR để tham gia</p>
+                  <p class="teacher-qr-join-url" style="font-size:12px;word-break:break-all;opacity:.75;margin:8px 0 0">{{ $joinUrl }}</p>
                 </div>
               </div>
             </div>
@@ -70,6 +71,7 @@
                       <span id="teacherTimerText">00:00</span>
                     </div>
                     <span class="teacher-q-type" id="teacherQType">Trắc nghiệm</span>
+                    <p class="teacher-submit-count" id="teacherSubmitCount" hidden></p>
                   </div>
                   <div class="teacher-game-controls-right">
                     <div class="teacher-zoom-controls" aria-label="Phóng to thu nhỏ đề bài">
@@ -83,7 +85,7 @@
                       </button>
                       <div class="teacher-action-menu" id="teacherActionMenu" hidden>
                         <button type="button" id="teacherPresentationMenuBtn" onclick="toggleTeacherPresentation()">Bật trình chiếu</button>
-                        <button type="button" id="teacherToggleScoresMenuBtn" onclick="toggleTeacherScorePanel()">Ẩn bảng điểm</button>
+                        <button type="button" id="teacherToggleScoresMenuBtn" onclick="toggleTeacherScorePanel()">Hiện bảng điểm</button>
                         <button type="button" id="teacherPauseBtn" onclick="teacherTogglePause()">Tạm dừng</button>
                         <button type="button" onclick="teacherEndGame()">Kết thúc trò chơi</button>
                         <button type="button" onclick="teacherPlayAgain()">Chơi lại</button>
@@ -163,10 +165,6 @@
             <button class="btn-primary teacher-btn-start" id="btnStartGame" onclick="teacherStartGame()" disabled>
               Bắt đầu trò chơi
             </button>
-            <button class="btn-secondary teacher-btn-next" id="btnNextQuestion" onclick="teacherNextQuestion()" hidden>
-              Câu tiếp theo
-            </button>
-            <p class="teacher-submit-count" id="teacherSubmitCount" hidden></p>
           </div>
           <div class="teacher-player-grid" id="teacherList"></div>
           <div class="teacher-score-list" id="teacherScoreList" hidden></div>
@@ -185,17 +183,28 @@
     <div class="teacher-qr-modal-body">
       <h2 class="teacher-qr-modal-title" id="teacherQrModalTitle">Quét QR để tham gia</h2>
       <div class="qr-frame teacher-qr-modal-frame">
-        <img src="{{ $qrUrl ?? asset('htd-admin/assets/qr-login.png') }}" alt="QR Code PIN {{ $session->pin }}" class="qr-mock-img">
+        <img src="{{ $qrUrl }}" alt="QR tham gia {{ $joinUrl }}" class="qr-mock-img" data-join-url="{{ $joinUrl }}">
         <span class="qr-bracket tl"></span>
         <span class="qr-bracket tr"></span>
         <span class="qr-bracket bl"></span>
         <span class="qr-bracket br"></span>
       </div>
-      <p class="teacher-qr-modal-hint">Mở camera hoặc ứng dụng quét mã để tham gia phòng.</p>
+      <p class="teacher-qr-modal-hint">Quét để mở: {{ $joinUrl }}</p>
       <div class="teacher-qr-modal-pin">
         <div class="teacher-pin-digits teacher-pin-digits-large" id="teacherPinDigitsModal"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="teacher-lb-modal" id="teacherLbModal" aria-hidden="true" hidden>
+  <div class="teacher-lb-modal-backdrop" id="teacherLbModalBackdrop"></div>
+  <div class="teacher-lb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="teacherLbModalTitle">
+    <div class="teacher-lb-modal-head">
+      <h2 class="teacher-lb-modal-title" id="teacherLbModalTitle">🏆 Bảng xếp hạng</h2>
+      <p class="teacher-lb-modal-countdown" id="teacherLbModalCountdown">Câu tiếp sau 5s...</p>
+    </div>
+    <div class="teacher-lb-modal-list" id="teacherLbModalList"></div>
   </div>
 </div>
 

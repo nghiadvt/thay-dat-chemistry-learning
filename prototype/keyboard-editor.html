@@ -32,12 +32,15 @@
       <button type="button" class="kbe-device-btn active" data-device="phone">Phone</button>
       <button type="button" class="kbe-device-btn" data-device="tablet">Tablet</button>
     </div>
-    <div class="kbe-zoom-toggle" role="group" aria-label="Thu phóng">
-      <button type="button" class="kbe-zoom-btn" data-zoom="0.5">50%</button>
-      <button type="button" class="kbe-zoom-btn" data-zoom="0.75">75%</button>
-      <button type="button" class="kbe-zoom-btn active" data-zoom="1">100%</button>
-      <button type="button" class="kbe-zoom-btn" data-zoom="1.5">150%</button>
-    </div>
+    <label class="kbe-zoom-select-wrap">
+      <span class="visually-hidden">Thu phóng</span>
+      <select class="kbe-zoom-select" id="kbeZoomSelect" aria-label="Thu phóng">
+        <option value="0.5">50%</option>
+        <option value="0.75">75%</option>
+        <option value="1" selected>100%</option>
+        <option value="1.5">150%</option>
+      </select>
+    </label>
   </div>
   <div class="kbe-header-right">
     <button type="button" class="kbe-btn kbe-btn-ghost" id="kbePreviewBtn">

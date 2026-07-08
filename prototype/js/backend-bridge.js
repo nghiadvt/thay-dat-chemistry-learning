@@ -51,16 +51,22 @@ const HTDBridge = (function () {
     return true;
   }
 
-  async function joinRoom({ pin, name, isHost = false }) {
+  async function joinRoom({ pin, name, isHost = false, avatar = null }) {
     isHost = Boolean(isHost);
     await HTDSocket.syncNtp();
-    const data = await HTDSocket.emit('join_room', { pin, name, is_host: isHost });
-    roomMeta = { pin, name, ...data };
+    const payload = { pin, name, is_host: isHost };
+    if (!isHost && avatar) payload.avatar = avatar;
+    const data = await HTDSocket.emit('join_room', payload);
+    roomMeta = { pin, name, avatar: avatar || null, ...data };
     return data;
   }
 
   async function hostStartGame() {
     return HTDSocket.emit('host_start_game', {});
+  }
+
+  async function hostFinalizeQuestion() {
+    return HTDSocket.emit('host_finalize_question', {});
   }
 
   async function hostNextQuestion() {
@@ -92,6 +98,7 @@ const HTDBridge = (function () {
     on,
     joinRoom,
     hostStartGame,
+    hostFinalizeQuestion,
     hostNextQuestion,
     hostEndGame,
     submitAnswer,

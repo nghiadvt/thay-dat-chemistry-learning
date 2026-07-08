@@ -31,7 +31,12 @@
     toggles.forEach((btn) => btn.addEventListener('click', toggle));
 
     try {
-      if (localStorage.getItem(STORAGE_KEY) === '1') {
+      // Trang host: thu gọn sidebar để rộng màn hình — không ghi localStorage
+      if (document.body.classList.contains('admin-body--session-host')) {
+        shell.classList.add('sidebar-collapsed');
+        document.body.classList.add('admin-sidebar-collapsed');
+        toggles.forEach((btn) => btn.setAttribute('aria-expanded', 'false'));
+      } else if (localStorage.getItem(STORAGE_KEY) === '1') {
         setCollapsed(true);
       }
     } catch (_) {}

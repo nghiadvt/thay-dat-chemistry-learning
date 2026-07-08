@@ -21,7 +21,9 @@
   const sections = {
     mc: document.getElementById('section-mc'),
     essay: document.getElementById('section-essay'),
+    structured: document.getElementById('section-structured-meta'),
   };
+  const structuredMain = document.getElementById('section-structured');
 
   let contentEditor = null;
   let explanationEditor = null;
@@ -134,6 +136,9 @@
     Object.entries(sections).forEach(([key, el]) => {
       if (el) el.classList.toggle('active', key === type);
     });
+    if (structuredMain) {
+      structuredMain.classList.toggle('active', type === 'structured');
+    }
   }
 
   function optionLabel(index) {
@@ -273,7 +278,7 @@
       explanation = explanationField.value;
     }
 
-    return {
+    const base = {
       content: contentEditor ? contentEditor.getData() : contentField.value,
       answer_type: typeSelect.value,
       options,
@@ -284,6 +289,12 @@
       time_limit_seconds: parseInt(document.getElementById('time_limit_seconds')?.value, 10) || 30,
       sort_order: parseInt(document.getElementById('sort_order')?.value, 10) || 0,
     };
+
+    if (typeSelect.value === 'structured' && window.QuestionTemplateBuilder) {
+      return window.QuestionTemplateBuilder.collectDraftQuestion(base);
+    }
+
+    return base;
   }
 
   function openPreview() {
@@ -341,8 +352,25 @@
     } else if (!explanationSection || explanationSection.hidden) {
       explanationField.value = '';
     }
+    if (typeSelect.value === 'structured' && window.QuestionTemplateBuilder) {
+      window.QuestionTemplateBuilder.getState();
+      const templateField = document.getElementById('template_json');
+      const correctField = document.getElementById('correct_answer_json');
+      const state = window.QuestionTemplateBuilder.getState();
+      if (templateField) templateField.value = JSON.stringify(state.template);
+      if (correctField) correctField.value = JSON.stringify(state.correct_answer);
+    }
   });
 
   initOptions();
   initEditors();
+  syncTypeSections();
+
+  if (window.QuestionTemplateBuilder) {
+    window.QuestionTemplateBuilder.init({
+      inputMode: boot.inputMode || 'balance',
+      template: boot.template || [],
+      correctAnswer: boot.correctAnswer || { coef: {}, blank: {} },
+    });
+  }
 })();

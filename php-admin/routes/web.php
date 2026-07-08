@@ -23,6 +23,27 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+Route::get('manifest.webmanifest', function () {
+    $path = public_path('app/manifest.webmanifest');
+    abort_unless(is_readable($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'application/manifest+json; charset=UTF-8',
+        'Cache-Control' => 'no-cache',
+    ]);
+});
+
+Route::get('sw.js', function () {
+    $path = public_path('app/sw.js');
+    abort_unless(is_readable($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'application/javascript; charset=UTF-8',
+        'Service-Worker-Allowed' => '/',
+        'Cache-Control' => 'no-cache',
+    ]);
+});
+
 Route::get('join', [StudentJoinController::class, 'show'])->name('student.join');
 Route::get('join/{pin}', [StudentJoinController::class, 'show'])
     ->where('pin', '[0-9]{6}')
@@ -60,6 +81,8 @@ Route::middleware('auth')->group(function () {
         Route::get('sessions', [AdminSessionController::class, 'index'])->name('sessions.index');
         Route::get('sessions/create', [AdminSessionController::class, 'create'])->name('sessions.create');
         Route::post('sessions', [AdminSessionController::class, 'store'])->name('sessions.store');
+        Route::get('sessions/{session}/edit', [AdminSessionController::class, 'edit'])->name('sessions.edit');
+        Route::put('sessions/{session}', [AdminSessionController::class, 'update'])->name('sessions.update');
         Route::get('sessions/{session}', [AdminSessionController::class, 'show'])->name('sessions.show');
         Route::post('sessions/{session}/reset', [AdminSessionController::class, 'reset'])->name('sessions.reset');
         Route::patch('sessions/{session}/active', [AdminSessionController::class, 'toggleActive'])->name('sessions.toggle-active');

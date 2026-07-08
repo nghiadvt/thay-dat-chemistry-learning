@@ -573,6 +573,44 @@ body.kb-preview-lightbox-open { overflow: hidden; }
 
 .kb-preview-lightbox-close:hover { color: #111827; }
 
+.keyboard-select-with-preview .kb-select-preview {
+  margin-top: 10px;
+}
+
+.kb-select-preview[hidden] {
+  display: none;
+}
+
+.kb-select-preview-hint {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.kb-select-preview-empty {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.kb-select-preview-empty a {
+  color: #2D46D6;
+}
+
+.kb-preview-thumb--large {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  min-height: 120px;
+}
+
+.kb-preview-thumb--large img {
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+}
+
 .quiz-detail-section .section-header {
   display: flex;
   justify-content: space-between;

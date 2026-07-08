@@ -44,6 +44,34 @@ function checkAnswer(question, answer) {
         correctAnswer: question.correct_answer_normalized,
       };
     }
+    case 'structured': {
+      const submitted = typeof answer === 'object' && answer !== null ? answer : {};
+      const expected = question.correct_answer || {};
+      let correct = true;
+
+      if (expected.coef) {
+        for (const [id, ans] of Object.entries(expected.coef)) {
+          if (String(submitted.coef?.[id] ?? '') !== String(ans)) {
+            correct = false;
+            break;
+          }
+        }
+      }
+
+      if (correct && expected.blank) {
+        for (const [id, ans] of Object.entries(expected.blank)) {
+          if (normalizeFormula(submitted.blank?.[id]) !== normalizeFormula(ans)) {
+            correct = false;
+            break;
+          }
+        }
+      }
+
+      return {
+        correct,
+        correctAnswer: expected,
+      };
+    }
     default:
       return { correct: false, correctAnswer: null };
   }

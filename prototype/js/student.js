@@ -17,6 +17,12 @@ const state = {
   focusedSlotId: null,
   keyboardOpen: true,
   submitted: false,
+  lockedIn: false,
+  lockedElapsedSeconds: 0,
+  lockedAnswerDisplay: '',
+  awaitingResult: false,
+  pendingLeaderboard: null,
+  pendingNewQuestion: null,
   students: [],
   displayPlayers: [],
   fakeScores: {},
@@ -120,7 +126,19 @@ function buildNumpad() {
   });
 }
 
-function validatePinAndContinue() {
+function validatePinAndContinue(opts = {}) {
+  const fromDeepLink = Boolean(opts.fromDeepLink);
+
+  function onPinInvalid(message) {
+    alert(message);
+    state.pinDigits = '';
+    if (fromDeepLink || state.screen !== 'join') {
+      showScreen('join');
+    } else {
+      renderPinDisplay();
+    }
+  }
+
   if (isBackendMode()) {
     HTDApi.checkPin(state.pinDigits)
       .then(data => {
@@ -128,24 +146,20 @@ function validatePinAndContinue() {
           pin: state.pinDigits,
           name: data.game_name || 'PHÒNG QUIZ',
           teacher: 'Giáo viên',
-          status: 'waiting',
+          status: data.status || 'waiting',
           backendMode: true,
         };
         HTD.setRoom(state.backendRoom);
         showScreen('profile');
       })
       .catch(err => {
-        alert(err.message || 'PIN không hợp lệ.');
-        state.pinDigits = '';
-        renderPinDisplay();
+        onPinInvalid(err.message || 'PIN không hợp lệ.');
       });
     return;
   }
   const room = HTD.getRoom();
   if (!room || state.pinDigits !== room.pin) {
-    alert(room ? 'PIN không đúng!' : 'Chưa có phòng. Giáo viên cần tạo phòng trước.');
-    state.pinDigits = '';
-    renderPinDisplay();
+    onPinInvalid(room ? 'PIN không đúng!' : 'Chưa có phòng. Giáo viên cần tạo phòng trước.');
     return;
   }
   showScreen('profile');
@@ -163,18 +177,17 @@ function simulateQrScan() {
 
 (function checkUrlPin() {
   const params = new URLSearchParams(location.search);
-  let p = params.get('pin');
+  let p = params.get('pin') || window.HTD_JOIN_PIN || null;
   if (!p) {
     const m = location.pathname.match(/\/join\/(\d{6})\/?$/);
     if (m) p = m[1];
   }
-  if (p) {
-    state.pinDigits = p.replace(/\D/g, '').slice(0, 6);
-    setTimeout(() => {
-      showScreen('join');
-      if (state.pinDigits.length === 6) validatePinAndContinue();
-    }, 100);
-  }
+  if (!p) return;
+  const pin = String(p).replace(/\D/g, '').slice(0, 6);
+  if (pin.length !== 6) return;
+  // QR / deep-link: skip Join PIN → validate → name/avatar (profile).
+  state.pinDigits = pin;
+  setTimeout(() => validatePinAndContinue({ fromDeepLink: true }), 100);
 })();
 
 // ─── Profile ───
@@ -206,58 +219,128 @@ function updateProfileAvatarUI() {
   }
 }
 
-async function onAvatarClick(fromWaiting) {
+function pickAvatarFile() {
+  const input = document.getElementById('avatarFileInput');
+  if (!input) {
+    alert('Không chọn được ảnh.');
+    return;
+  }
+  input.value = '';
+  // Must run synchronously in user-gesture handlers (async getUserMedia catch blocks get blocked).
+  input.click();
+}
+
+function onAvatarFileSelected(ev) {
+  const file = ev.target?.files?.[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 240;
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      const ctx = c.getContext('2d');
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      state.avatarDataUrl = c.toDataURL('image/jpeg', 0.8);
+      updateProfileAvatarUI();
+      if (state.screen === 'waiting') {
+        saveMyPlayer();
+        renderWaitingGrid();
+      }
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function canUseLiveCamera() {
+  return (
+    window.isSecureContext === true &&
+    typeof navigator !== 'undefined' &&
+    !!navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getUserMedia === 'function'
+  );
+}
+
+/**
+ * Avatar photo: on HTTP LAN (typical phone Wi‑Fi), getUserMedia is blocked.
+ * Use <input capture> first — opens the native camera / gallery and works without HTTPS.
+ * Live in-page preview only when secure context (HTTPS / localhost).
+ */
+function onAvatarClick(fromWaiting) {
+  if (!canUseLiveCamera()) {
+    pickAvatarFile();
+    return;
+  }
+  openLiveCamera(Boolean(fromWaiting)).catch(() => {
+    // Secure context but permission denied — fall back next tick (may need 2nd tap on some browsers).
+    pickAvatarFile();
+  });
+}
+
+async function openLiveCamera(fromWaiting) {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'user' },
+    audio: false,
+  });
+  state.cameraStream = stream;
+  const vidId = fromWaiting ? 'waitingVideo' : 'profileVideo';
+  let video = document.getElementById(vidId);
+  if (!video && fromWaiting) {
+    video = document.createElement('video');
+    video.id = 'waitingVideo';
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.muted = true;
+    video.style.cssText =
+      'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:50;background:#000';
+    document.body.appendChild(video);
+    const bar = document.createElement('div');
+    bar.id = 'waitingCaptureBar';
+    bar.style.cssText =
+      'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:51;width:90%;max-width:320px';
+    bar.innerHTML =
+      '<button class="btn-primary" type="button" onclick="captureWaitingPhoto()">Chụp</button>' +
+      '<button class="btn-secondary" type="button" onclick="cancelWaitingCapture()">Huỷ</button>';
+    document.body.appendChild(bar);
+  }
+  video.srcObject = stream;
+  video.muted = true;
+  video.setAttribute('playsinline', '');
+  video.playsInline = true;
+  video.style.display = 'block';
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user' },
-      audio: false,
-    });
-    state.cameraStream = stream;
-    const vidId = fromWaiting ? 'waitingVideo' : 'profileVideo';
-    let video = document.getElementById(vidId);
-    if (!video && fromWaiting) {
-      video = document.createElement('video');
-      video.id = 'waitingVideo';
-      video.autoplay = true;
-      video.playsInline = true;
-      video.style.cssText =
-        'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:50;background:#000';
-      document.body.appendChild(video);
-      const bar = document.createElement('div');
-      bar.id = 'waitingCaptureBar';
-      bar.style.cssText =
-        'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:51;width:90%;max-width:320px';
-      bar.innerHTML =
-        '<button class="btn-primary" onclick="captureWaitingPhoto()">Chụp</button><button class="btn-secondary" onclick="cancelWaitingCapture()">Huỷ</button>';
-      document.body.appendChild(bar);
-    }
-    video.srcObject = stream;
-    video.style.display = 'block';
-    if (!fromWaiting) {
-      document.getElementById('profileEmoji').style.display = 'none';
-      document.getElementById('profileImg').style.display = 'none';
-      document.getElementById('captureBar').classList.add('show');
-    }
+    await video.play();
   } catch {
-    alert('Không truy cập được camera.');
+    /* muted + playsinline usually enough */
+  }
+  if (!fromWaiting) {
+    document.getElementById('profileEmoji').style.display = 'none';
+    document.getElementById('profileImg').style.display = 'none';
+    document.getElementById('captureBar').classList.add('show');
   }
 }
 
 function captureProfilePhoto() {
   const video = document.getElementById('profileVideo');
+  if (!video || !state.cameraStream) return;
   const c = document.createElement('canvas');
   c.width = 240;
   c.height = 240;
   c.getContext('2d').drawImage(video, 0, 0, 240, 240);
   state.avatarDataUrl = c.toDataURL('image/jpeg', 0.8);
   stopCamera();
-  document.getElementById('captureBar').classList.remove('show');
   updateProfileAvatarUI();
 }
 
 function cancelCapture() {
   stopCamera();
-  document.getElementById('captureBar').classList.remove('show');
   updateProfileAvatarUI();
 }
 
@@ -282,6 +365,12 @@ function cancelWaitingCapture() {
 function stopCamera() {
   state.cameraStream?.getTracks().forEach(t => t.stop());
   state.cameraStream = null;
+  const profileVideo = document.getElementById('profileVideo');
+  if (profileVideo) {
+    profileVideo.srcObject = null;
+    profileVideo.style.display = 'none';
+  }
+  document.getElementById('captureBar')?.classList.remove('show');
 }
 
 function submitProfile() {
@@ -291,7 +380,14 @@ function submitProfile() {
   if (isBackendMode()) {
     const room = HTD.getRoom() || state.backendRoom;
     HTDBridge.init()
-      .then(() => HTDBridge.joinRoom({ pin: room.pin, name: state.studentName, isHost: false }))
+      .then(() =>
+        HTDBridge.joinRoom({
+          pin: room.pin,
+          name: state.studentName,
+          isHost: false,
+          avatar: state.avatarDataUrl || null,
+        })
+      )
       .then(() => {
         state.playerId = state.studentName;
         state.waitingJoinedAt = Date.now();
@@ -374,9 +470,9 @@ function renderWaitingGrid() {
   const players = getPlayersForWaiting();
   document.getElementById('playersGrid').innerHTML = players
     .map(p => {
-      const isMe = p.id === state.playerId;
+      const isMe = Boolean(p.isMe) || p.id === state.playerId || p.name === state.studentName;
       const av = p.avatarDataUrl
-        ? `<img src="${p.avatarDataUrl}">`
+        ? `<img src="${p.avatarDataUrl}" alt="">`
         : p.avatarEmoji || '😀';
       return `<div class="player-card${isMe ? ' me' : ''}">
       <div class="player-av">${av}</div>
@@ -441,6 +537,23 @@ const CHEM_KB_ROWS = [
   ['7', '8', '9', '0', '(', ')'],
 ];
 
+function keyboardHasSendKey(config) {
+  return Boolean(config?.rows?.some(row => row.keys?.some(k => k.type === 'send')));
+}
+
+function getFormulaSmartContext(config) {
+  return config?.smart_context || EquationUI.DEFAULT_SMART_CONTEXT;
+}
+
+function syncInputSubmitButton(config) {
+  const submitBtn = document.getElementById('qAnswerSubmitBtn');
+  const actions = document.getElementById('qInputActions');
+  if (!submitBtn || !actions) return;
+  const hasDynSend = keyboardHasSendKey(config);
+  submitBtn.hidden = hasDynSend;
+  actions.hidden = false;
+}
+
 function buildChemKeyboard(config) {
   const kb = document.getElementById('chemKb');
   const kbWrap = document.getElementById('qKeyboard');
@@ -455,9 +568,12 @@ function buildChemKeyboard(config) {
     if (ok) {
       kb.dataset.built = 'dynamic';
       kbWrap?.classList.add('has-dyn-kb');
+      syncInputSubmitButton(config);
       return;
     }
   }
+
+  syncInputSubmitButton(null);
 
   if (kb.dataset.built === 'static') return;
   kb.dataset.built = 'static';
@@ -519,15 +635,34 @@ function getFocusedSlotType() {
 
 function onChemKey(val) {
   if (!state.eqController) return;
+  const q = getCurrentQuestion();
   const slotType = getFocusedSlotType();
+
   if (val === '⌫') {
-    state.focusedSlotId = state.eqController.backspace(state.focusedSlotId);
-  } else if (/^\d$/.test(val) && slotType === 'coef' && state.eqController.inputDigit) {
-    state.focusedSlotId = state.eqController.inputDigit(val, state.focusedSlotId);
-  } else if (state.eqController.append) {
-    state.focusedSlotId = state.eqController.append(val, state.focusedSlotId);
+    if (q?.inputMode === 'formula') {
+      state.eqController.backspace();
+    } else {
+      state.focusedSlotId = state.eqController.backspace(state.focusedSlotId);
+      state.eqController.render(state.focusedSlotId);
+    }
+    return;
   }
-  state.eqController.render(state.focusedSlotId);
+
+  if (/^\d$/.test(val) && slotType === 'coef' && state.eqController.inputDigit) {
+    state.focusedSlotId = state.eqController.inputDigit(val, state.focusedSlotId);
+    state.eqController.render(state.focusedSlotId);
+    return;
+  }
+
+  if (q?.inputMode === 'formula') {
+    state.eqController.append(val);
+    return;
+  }
+
+  if (state.eqController.append) {
+    state.focusedSlotId = state.eqController.append(val, state.focusedSlotId);
+    state.eqController.render(state.focusedSlotId);
+  }
 }
 
 function onCoefKey(key) {
@@ -544,14 +679,9 @@ function onCoefKey(key) {
 
 function toggleKeyboard(forceOpen) {
   const kb = document.getElementById('qKeyboard');
-  const fab = document.getElementById('kbOpenFab');
-  const toggleBtn = document.getElementById('kbToggleBtn');
-  const open = forceOpen === true ? true : forceOpen === false ? false : !state.keyboardOpen;
-  state.keyboardOpen = open;
-  kb.classList.toggle('open', open);
-  kb.classList.toggle('collapsed', !open);
-  fab.hidden = open;
-  toggleBtn.hidden = !open;
+  state.keyboardOpen = true;
+  kb?.classList.add('open');
+  kb?.classList.remove('collapsed');
 }
 
 // ─── Timer (đồng bộ với giáo viên qua localStorage) ───
@@ -617,7 +747,7 @@ function syncGameState() {
     if (state.screen === 'question') {
       updateSyncedTimerUI();
       const sec = HTD.getQuestionTimeRemaining(game);
-      if (sec <= 0 && !state.submitted && !game.paused) {
+      if (sec <= 0 && !state.awaitingResult && !game.paused) {
         autoEndQuestion();
       }
     } else if (state.screen === 'leaderboard') {
@@ -626,8 +756,8 @@ function syncGameState() {
       showScreen('question');
     }
   } else if (game.phase === 'leaderboard') {
-    if (state.screen === 'question' && !state.submitted) {
-      autoEndQuestion();
+    if (state.screen === 'question' && state.lockedIn && !state.awaitingResult) {
+      showWaitingForResult();
     } else if (state.screen === 'leaderboard') {
       updateLbCountdownFromGame();
     }
@@ -651,8 +781,15 @@ function syncGameState() {
 
 function autoEndQuestion() {
   const q = getCurrentQuestion();
-  if (!q) return;
-  if (q.type === 'mc') finishMC(-1);
+  if (!q || state.awaitingResult) return;
+
+  if (state.lockedIn) {
+    if (isBackendMode()) showWaitingForResult();
+    else finalizeDemoQuestion();
+    return;
+  }
+
+  if (q.type === 'mc') finishMC(state.selectedAnswer ?? -1, true);
   else submitAnswer(true);
 }
 
@@ -669,7 +806,7 @@ function startQuestion() {
   const q = getCurrentQuestion();
   if (!q) return;
 
-  state.submitted = false;
+  resetQuestionAnswerState();
   state.selectedAnswer = null;
   const screen = document.querySelector('.question-screen');
   screen.classList.toggle('mode-input', q.type === 'input');
@@ -700,11 +837,12 @@ function startQuestion() {
 
   if (q.type === 'mc') {
     renderMcOptions(q, answerEl);
-    toggleKeyboard(false);
-    document.getElementById('kbOpenFab').hidden = true;
+    eqEl.hidden = true;
+    inputZone.hidden = true;
   } else {
     eqEl.hidden = false;
     setupInputQuestion(q);
+    inputZone.hidden = false;
     toggleKeyboard(true);
   }
 
@@ -724,7 +862,7 @@ function startQuestionTimer(q, onEnd) {
     const tick = () => {
       const now = Date.now() + offset;
       const elapsed = (now - q.serverTime) / 1000;
-      const sec = Math.max(0, q.timeLimit - elapsed);
+      const sec = Math.max(0, Math.ceil(q.timeLimit - elapsed));
       const text = document.getElementById('qTimerText');
       const pill = document.getElementById('qTimerPill');
       if (text) text.textContent = formatTimer(sec);
@@ -738,7 +876,7 @@ function startQuestionTimer(q, onEnd) {
     tick();
     state.timerInterval = setInterval(() => {
       const sec = tick();
-      if (sec <= 0 && !state.submitted) {
+      if (sec <= 0 && !state.awaitingResult) {
         clearInterval(state.timerInterval);
         onEnd();
       }
@@ -780,7 +918,7 @@ function renderMcOptions(q, container) {
       `<span class="mc-option-text">${EquationUI.chemToHtml(optText)}</span>` +
       `<span class="mc-check" aria-hidden="true">✓</span>`;
     btn.onclick = () => {
-      if (state.submitted) return;
+      if (state.awaitingResult) return;
       wrap.querySelectorAll('.mc-option').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
       state.selectedAnswer = i;
@@ -799,16 +937,13 @@ function renderMcOptions(q, container) {
 }
 
 function submitMcAnswer() {
-  if (state.submitted || state.selectedAnswer === null) return;
-  clearInterval(state.timerInterval);
-  finishMC(state.selectedAnswer);
+  if (state.awaitingResult || state.selectedAnswer === null) return;
+  finishMC(state.selectedAnswer, false);
 }
 
 function setupInputQuestion(q) {
   buildCoefNumpad();
-  state.inputValues = EquationUI.createInputState(q.template);
-  state.focusedSlotId = null;
-
+  const smartContext = getFormulaSmartContext(q.keyboardConfig);
   const eqEl = document.getElementById('qEqDisplay');
   const chemKb = document.getElementById('chemKb');
   const coefPad = document.getElementById('coefNumpad');
@@ -824,12 +959,36 @@ function setupInputQuestion(q) {
   } else {
     HTDKeyboardRuntime.clear(chemKb);
     chemKb.dataset.built = '';
+    syncInputSubmitButton(null);
   }
 
   const onFocus = id => { state.focusedSlotId = id; };
   const onChange = () => {};
 
-  const ctrlOpts = { container: eqEl, template: q.template, values: state.inputValues, onFocus, onChange };
+  if (q.inputMode === 'formula') {
+    state.inputValues = EquationUI.createFormulaState();
+    state.focusedSlotId = null;
+    state.eqController = EquationUI.FormulaController({
+      container: eqEl,
+      values: state.inputValues,
+      smartContext,
+      onChange,
+    });
+    state.eqController.render();
+    return;
+  }
+
+  state.inputValues = EquationUI.createInputState(q.template);
+  state.focusedSlotId = null;
+
+  const ctrlOpts = {
+    container: eqEl,
+    template: q.template,
+    values: state.inputValues,
+    onFocus,
+    onChange,
+    smartContext,
+  };
 
   if (q.inputMode === 'balance') {
     state.eqController = EquationUI.CoefController(ctrlOpts);
@@ -845,84 +1004,283 @@ function setupInputQuestion(q) {
   state.eqController.render(state.focusedSlotId);
 }
 
+const RESULT_DISPLAY_MS = 4000;
+const LEADERBOARD_DISPLAY_MS = 5000;
+
+function resetQuestionAnswerState() {
+  state.submitted = false;
+  state.lockedIn = false;
+  state.lockedElapsedSeconds = 0;
+  state.lockedAnswerDisplay = '';
+  state.awaitingResult = false;
+  hideLockedBanner();
+}
+
+function hideLockedBanner() {
+  const banner = document.getElementById('qLockedBanner');
+  if (banner) banner.hidden = true;
+}
+
+function showLockedBanner(answerDisplay, elapsedSeconds) {
+  state.lockedIn = true;
+  state.lockedAnswerDisplay = answerDisplay || '—';
+  state.lockedElapsedSeconds = Number(elapsedSeconds || 0);
+
+  const banner = document.getElementById('qLockedBanner');
+  const answerEl = document.getElementById('qLockedAnswer');
+  const timeEl = document.getElementById('qLockedTime');
+  if (!banner || !answerEl || !timeEl) return;
+
+  answerEl.textContent = state.lockedAnswerDisplay;
+  timeEl.textContent = `Thời gian nộp: ${state.lockedElapsedSeconds}s`;
+  banner.hidden = false;
+
+  const submitBtn = document.getElementById('mcSubmitBtn');
+  if (submitBtn) submitBtn.textContent = 'Cập nhật đáp án';
+}
+
+function formatAnswerDisplayLocal(q, answerPayload) {
+  if (!q) return '—';
+  if (q.type === 'mc') {
+    const idx = typeof answerPayload === 'object' ? answerPayload.index : answerPayload;
+    if (idx == null || idx < 0) return '—';
+    const labels = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const label = labels[idx] || String(idx + 1);
+    const text = q.options?.[idx] || '';
+    return text ? `${label}. ${text}` : label;
+  }
+  if (answerPayload?.text) return answerPayload.text;
+  return '—';
+}
+
+function lockInAnswer(answerPayload, serverData) {
+  const q = getCurrentQuestion();
+  const display = serverData?.answer_display
+    || formatAnswerDisplayLocal(q, answerPayload);
+  const elapsed = serverData?.elapsed_seconds ?? state.lockedElapsedSeconds;
+  showLockedBanner(display, elapsed);
+}
+
+function showWaitingForResult() {
+  state.awaitingResult = true;
+  const pill = document.getElementById('qTimerText');
+  if (pill) pill.textContent = 'Chờ…';
+}
+
 function clearInputAnswer() {
   if (!state.eqController) return;
   state.focusedSlotId = state.eqController.clearAll();
-  state.eqController.render(state.focusedSlotId);
+  const q = getCurrentQuestion();
+  if (q?.inputMode !== 'formula') {
+    state.eqController.render(state.focusedSlotId);
+  }
 }
 
 function submitAnswer(timedOut) {
-  if (state.submitted) return;
-  state.submitted = true;
-  clearInterval(state.timerInterval);
   const q = getCurrentQuestion();
+  if (!q || state.awaitingResult) return;
 
   if (isBackendMode()) {
     const answer = HTDGameAdapter.buildSubmitPayload(q, {
       inputValues: state.inputValues,
       selectedAnswer: state.selectedAnswer,
     });
-    showScreen('submit');
-    HTDBridge.submitAnswer(q.id, answer).catch(err => {
-      alert(err.message || 'Không nộp được đáp án.');
-      state.submitted = false;
-    });
+    HTDBridge.submitAnswer(q.id, answer)
+      .then(data => {
+        lockInAnswer(answer, data);
+        if (timedOut) showWaitingForResult();
+      })
+      .catch(err => {
+        alert(err.message || 'Không nộp được đáp án.');
+      });
     return;
   }
 
-  const game = HTD.getRoom()?.game;
-  const remaining = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
-  showScreen('submit');
-  setTimeout(() => {
-    const ok = EquationUI.checkAnswer(q, state.inputValues);
-    const pts = ok ? Math.round(1000 * (remaining / q.timeLimit)) : 0;
-    if (ok) state.myScore += pts;
-    const ans = EquationUI.formatCorrectAnswer(q);
-    showResult(ok, pts, ans);
-  }, timedOut ? 0 : 1200);
+  if (timedOut && !state.lockedIn) {
+    finalizeDemoQuestion();
+    return;
+  }
+
+  if (!state.lockedIn) {
+    const game = HTD.getRoom()?.game;
+    const sec = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
+    state.lockedElapsedSeconds = Math.max(1, (q.timeLimit || 20) - sec);
+  }
+  const answerPayload = {
+    text: EquationUI.formulaSerialize(state.inputValues?.formulaTokens || [])
+      || Object.values(state.inputValues?.blank || {})[0] || '',
+  };
+  lockInAnswer(answerPayload, {
+    answer_display: formatAnswerDisplayLocal(q, answerPayload),
+    elapsed_seconds: state.lockedElapsedSeconds,
+  });
+  if (timedOut) finalizeDemoQuestion();
 }
 
-function finishMC(ans) {
-  if (state.submitted) return;
-  state.submitted = true;
-  clearInterval(state.timerInterval);
+function finishMC(ans, timedOut) {
   const q = getCurrentQuestion();
+  if (!q || state.awaitingResult) return;
 
   if (isBackendMode()) {
-    showScreen('submit');
-    HTDBridge.submitAnswer(q.id, { index: ans }).catch(err => {
-      alert(err.message || 'Không nộp được đáp án.');
-      state.submitted = false;
-    });
+    HTDBridge.submitAnswer(q.id, { index: ans })
+      .then(data => {
+        lockInAnswer({ index: ans }, data);
+        if (timedOut) showWaitingForResult();
+      })
+      .catch(err => {
+        alert(err.message || 'Không nộp được đáp án.');
+      });
     return;
   }
 
+  if (timedOut && !state.lockedIn) {
+    finalizeDemoQuestion(ans);
+    return;
+  }
+
+  if (!state.lockedIn) {
+    const game = HTD.getRoom()?.game;
+    const sec = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
+    state.lockedElapsedSeconds = Math.max(1, (q.timeLimit || 20) - sec);
+  }
+  lockInAnswer({ index: ans }, {
+    answer_display: formatAnswerDisplayLocal(q, { index: ans }),
+    elapsed_seconds: state.lockedElapsedSeconds,
+  });
+  if (timedOut) finalizeDemoQuestion(ans);
+}
+
+function finalizeDemoQuestion(fallbackAns) {
+  if (state.awaitingResult) return;
+  state.awaitingResult = true;
+
+  const q = getCurrentQuestion();
   const game = HTD.getRoom()?.game;
-  const remaining = game ? HTD.getQuestionTimeRemaining(game) : state.timer;
-  const ok = ans === q.correct;
-  const pts = ok ? Math.round(1000 * (remaining / q.timeLimit)) : 0;
+  const elapsed = state.lockedElapsedSeconds
+    || Math.max(0, (q?.timeLimit || 20) - (game ? HTD.getQuestionTimeRemaining(game) : 0));
+
+  let ok = false;
+  let ansText = '—';
+  if (q?.type === 'mc') {
+    const idx = state.selectedAnswer ?? fallbackAns ?? -1;
+    ok = idx === q.correct;
+    ansText = q.options?.[q.correct] || '—';
+    if (!state.lockedIn && (fallbackAns === -1 || idx < 0)) ok = false;
+  } else {
+    ok = EquationUI.checkAnswer(q, state.inputValues);
+    ansText = EquationUI.formatCorrectAnswer(q);
+  }
+
+  const remaining = Math.max(0, (q?.timeLimit || 20) - elapsed);
+  const pts = ok ? Math.round(1000 * (remaining / (q?.timeLimit || 20))) : 0;
   if (ok) state.myScore += pts;
-  const correctText = q.options[q.correct] || '—';
-  showResult(ok, pts, correctText);
+
+  showResult({
+    correct: ok,
+    score_earned: pts,
+    total_score: state.myScore,
+    elapsed_seconds: elapsed,
+    my_answer: state.lockedAnswerDisplay || formatAnswerDisplayLocal(q, { index: state.selectedAnswer }),
+    correct_answer: ansText,
+    question_rank_correct: ok ? 1 : null,
+    fastest_correct: ok ? { name: state.studentName || 'Bạn', elapsed_seconds: elapsed } : null,
+  });
 }
 
 // ─── Result / Leaderboard / Final ───
-function showResult(ok, pts, ans) {
+function showResult(result) {
+  state.awaitingResult = true;
+  const ok = Boolean(result.correct);
+  const pts = Number(result.score_earned || 0);
+  const elapsed = Number(result.elapsed_seconds || state.lockedElapsedSeconds || 0);
+  const myAnswer = result.my_answer || state.lockedAnswerDisplay || '—';
+  let correctAns = result.correct_answer || '—';
+  if (typeof correctAns === 'object') correctAns = JSON.stringify(correctAns);
+
   const ov = document.getElementById('resultOverlay');
   document.getElementById('resultCircle').className = 'result-circle ' + (ok ? 'correct' : 'wrong');
   document.getElementById('resultCircle').textContent = ok ? '✓' : '✗';
   document.getElementById('resultTitle').textContent = ok ? 'Đúng rồi!' : 'Chưa đúng!';
+
+  const metaEl = document.getElementById('resultMeta');
+  if (metaEl) {
+    metaEl.innerHTML =
+      `<p class="result-my-answer">Bạn chọn: <strong>${myAnswer}</strong></p>` +
+      `<p class="result-elapsed">Thời gian nộp: <strong>${elapsed}s</strong></p>`;
+  }
+
   document.getElementById('resultPoints').textContent = ok ? `+${pts} điểm` : '+0 điểm';
-  document.getElementById('resultAnswer').textContent = ok ? '' : `Đáp án: ${ans}`;
+  document.getElementById('resultAnswer').textContent = ok ? '' : `Đáp án đúng: ${correctAns}`;
+
+  const rankEl = document.getElementById('resultRank');
+  if (rankEl) {
+    const parts = [];
+    if (ok && result.question_rank_correct) {
+      parts.push(`Hạng đúng nhanh: #${result.question_rank_correct}`);
+    }
+    if (result.fastest_correct?.name) {
+      const fc = result.fastest_correct;
+      const fcLabel = fc.name === state.studentName ? 'Bạn' : fc.name;
+      parts.push(`Nhanh nhất đúng: ${fcLabel} (${fc.elapsed_seconds}s)`);
+    }
+    rankEl.textContent = parts.join(' · ');
+    rankEl.hidden = parts.length === 0;
+  }
+
+  if (isBackendMode() && result.total_score != null) {
+    state.myScore = Number(result.total_score);
+  }
+
   ov.classList.add('show');
   if (ok && typeof confetti === 'function') {
     confetti({ particleCount: 60, spread: 55, origin: { y: 0.6 } });
   }
-  updateScores();
+
+  if (!isBackendMode()) updateScores();
+
   setTimeout(() => {
     ov.classList.remove('show');
+    if (state.pendingLeaderboard) {
+      applyLeaderboardData(state.pendingLeaderboard);
+      state.pendingLeaderboard = null;
+    }
+    renderLeaderboard();
     showScreen('leaderboard');
-  }, 2200);
+    startLbCountdown(LEADERBOARD_DISPLAY_MS / 1000);
+    setTimeout(() => {
+      if (state.pendingNewQuestion) applyNewQuestion(state.pendingNewQuestion);
+    }, LEADERBOARD_DISPLAY_MS);
+  }, RESULT_DISPLAY_MS);
+}
+
+function applyLeaderboardData(data) {
+  state.students = HTDGameAdapter.mapLeaderboard(data.top5).map((s, i) => {
+    const withMe = {
+      ...s,
+      isMe: s.name === state.studentName,
+      id: s.id || `lb-${i}`,
+    };
+    if (withMe.isMe && state.avatarDataUrl && !withMe.avatarDataUrl) {
+      withMe.avatarDataUrl = state.avatarDataUrl;
+      withMe.avatarEmoji = null;
+    }
+    return withMe;
+  });
+}
+
+function startLbCountdown(seconds) {
+  clearInterval(state.lbInterval);
+  let sec = seconds;
+  const el = document.getElementById('lbCountdown');
+  const tick = () => {
+    if (el) el.textContent = sec > 0 ? `Câu tiếp sau ${sec}s...` : '...';
+    sec -= 1;
+  };
+  tick();
+  state.lbInterval = setInterval(() => {
+    tick();
+    if (sec < 0) clearInterval(state.lbInterval);
+  }, 1000);
 }
 
 function updateScores() {
@@ -1132,6 +1490,15 @@ buildCoefNumpad();
 buildNumpad();
 renderPinDisplay();
 
+function applyNewQuestion(payload) {
+  state.serverQuestionIndex += 1;
+  state.questionIndex = state.serverQuestionIndex - 1;
+  state.currentQuestion = HTDGameAdapter.mapNewQuestion(payload, state.questionIndex);
+  state.pendingNewQuestion = null;
+  resetQuestionAnswerState();
+  showScreen('question');
+}
+
 function setupStudentBackendBridge() {
   if (!isBackendMode()) return;
 
@@ -1149,34 +1516,41 @@ function setupStudentBackendBridge() {
   });
 
   HTDBridge.on('newQuestion', payload => {
-    state.serverQuestionIndex += 1;
-    state.questionIndex = state.serverQuestionIndex - 1;
-    state.currentQuestion = HTDGameAdapter.mapNewQuestion(payload, state.questionIndex);
-    state.submitted = false;
-    showScreen('question');
+    if (
+      state.awaitingResult
+      || document.getElementById('resultOverlay')?.classList.contains('show')
+      || state.screen === 'leaderboard'
+    ) {
+      state.pendingNewQuestion = payload;
+      return;
+    }
+    applyNewQuestion(payload);
   });
 
   HTDBridge.on('questionResult', result => {
-    const ok = Boolean(result.correct);
-    const pts = Number(result.score_earned || 0);
-    state.myScore = Number(result.total_score ?? state.myScore);
-    let ans = '—';
-    if (typeof result.correct_answer === 'string') ans = result.correct_answer;
-    else if (result.correct_answer) ans = JSON.stringify(result.correct_answer);
-    showResult(ok, pts, ans);
+    showResult(result);
   });
 
   HTDBridge.on('playersUpdate', data => {
-    state.displayPlayers = HTDGameAdapter.mapPlayersUpdate(data.players);
-    renderWaitingGrid();
+    state.displayPlayers = HTDGameAdapter.mapPlayersUpdate(data.players).map(p => {
+      // Keep own photo locally if server omitted (shouldn't) or while reconnecting.
+      if (p.name === state.studentName && state.avatarDataUrl && !p.avatarDataUrl) {
+        return { ...p, avatarDataUrl: state.avatarDataUrl, avatarEmoji: null };
+      }
+      if (p.name === state.studentName && p.avatarDataUrl) {
+        state.avatarDataUrl = p.avatarDataUrl;
+      }
+      return p;
+    });
+    if (state.screen === 'waiting') renderWaitingGrid();
   });
 
   HTDBridge.on('leaderboardUpdate', data => {
-    state.students = HTDGameAdapter.mapLeaderboard(data.top5).map((s, i) => ({
-      ...s,
-      isMe: s.name === state.studentName,
-      id: s.id || `lb-${i}`,
-    }));
+    state.pendingLeaderboard = data;
+    if (state.screen === 'leaderboard') {
+      applyLeaderboardData(data);
+      renderLeaderboard();
+    }
   });
 
   HTDBridge.on('gameEnded', data => {
@@ -1185,7 +1559,8 @@ function setupStudentBackendBridge() {
         id: `final-${i}`,
         name: row.name,
         score: Number(row.score || 0),
-        avatarEmoji: '😀',
+        avatarDataUrl: row.avatar || null,
+        avatarEmoji: row.avatar ? null : '😀',
         isMe: row.name === state.studentName,
       }));
     }

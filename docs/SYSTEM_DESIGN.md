@@ -2,7 +2,7 @@
 
 > Website đố vui hóa học real-time dạng Kahoot. **Học sinh: mobile only.** Admin + Giáo viên: web desktop.
 
-**Cập nhật lần cuối:** 2026-07-08 (màn HS tại `/join/{pin}`, cùng port admin)
+**Cập nhật lần cuối:** 2026-07-08 (players Redis kèm avatar data URL)
 
 ---
 
@@ -30,6 +30,8 @@ Admin tạo **source of truth** trong MySQL → teacher/student đọc qua WS/AP
 | Realtime | Node.js + Socket.io | **38581** | WebSocket multi-worker, gameplay |
 | Game state | Redis | **38637** (host) | Room state, leaderboard, TTL 2 giờ |
 | Persistence | MySQL 8 | **38306** (host) | games, quizzes, questions (`content` HTML + `answer_type`), sessions, session_answers |
+
+**Public URL:** `APP_URL` (join link + QR) và `WS_PUBLIC_URL` (Socket.io phía admin) set trong `.env`. Local / LAN / production cùng code; chỉ đổi env khi deploy.
 
 ### Sơ đồ kiến trúc
 

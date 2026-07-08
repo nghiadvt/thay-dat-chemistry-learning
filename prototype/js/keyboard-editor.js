@@ -376,22 +376,23 @@ function renderRowList() {
   });
 }
 
-function renderPhoneKb(container) {
+function renderPhoneKb(container, options = {}) {
   const el = container || document.getElementById('kbePhoneKb');
   if (!el) return;
+  const editable = options.editable !== false;
 
   el.innerHTML = editor.data.rows.map(row => {
     if (row.hidden) return `<div class="kbe-kb-row hidden-row" data-row-id="${row.id}"></div>`;
     const units = rowUnits(row);
     const exceeded = units > MAX_UNITS;
-    const sel = row.id === editor.selectedRowId && !editor.selectedKeyId ? ' selected' : '';
+    const sel = editable && row.id === editor.selectedRowId && !editor.selectedKeyId ? ' selected' : '';
     const h = row.height || 'M';
 
     const keysHtml = row.keys.map(k => {
       if (k.type === 'empty') {
         return `<div class="kbe-kb-key type-empty" style="flex:${k.width} 1 0" data-key-id="${k.id}"></div>`;
       }
-      const keySel = k.id === editor.selectedKeyId ? ' selected' : '';
+      const keySel = editable && k.id === editor.selectedKeyId ? ' selected' : '';
       const typeCls = k.type !== 'normal' ? ` type-${k.type}` : '';
       const sizeCls = ` size-${k.fontSize || 'M'}`;
       const dis = k.disabled ? ' disabled' : '';
@@ -402,15 +403,21 @@ function renderPhoneKb(container) {
         title="${k.tooltip || ''}">${label}</button>`;
     }).join('');
 
+    const hoverActions = editable
+      ? `<div class="kbe-row-hover-actions">
+        <button type="button" class="kbe-row-hover-btn" data-menu-row="${row.id}" title="Tùy chọn hàng">⋮</button>
+      </div>`
+      : '';
+
     return `<div class="kbe-kb-row height-${h}${sel}${exceeded ? ' exceeded' : ''}"
       data-row-id="${row.id}"
       style="--row-gap:${row.spacing}px;--row-pad:${row.padding}px;--row-bg:${row.background};--row-border:${row.border}">
-      <div class="kbe-row-hover-actions">
-        <button type="button" class="kbe-row-hover-btn" data-menu-row="${row.id}" title="Tùy chọn hàng">⋮</button>
-      </div>
+      ${hoverActions}
       ${keysHtml}
     </div>`;
   }).join('');
+
+  if (!editable) return;
 
   el.querySelectorAll('.kbe-kb-row').forEach(rowEl => {
     rowEl.addEventListener('click', e => {
@@ -1025,7 +1032,7 @@ function buildOverlayPhone(containerId) {
       </div>
     </div>
   </div>`;
-  renderPhoneKb(document.getElementById(`${containerId}Kb`));
+  renderPhoneKb(document.getElementById(`${containerId}Kb`), { editable: false });
   return container.querySelector('.kbe-phone-wrap');
 }
 
@@ -1057,7 +1064,9 @@ function openTest() {
 
   const kb = document.getElementById('kbeTestPhoneKb');
   kb.querySelectorAll('.kbe-kb-key').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
       const row = findRow(btn.dataset.rowId);
       const key = findKey(row, btn.dataset.keyId);
       if (!key || key.disabled || key.type === 'empty') return;
@@ -1205,14 +1214,14 @@ function initEditor() {
     });
   });
 
-  document.querySelectorAll('.kbe-zoom-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.kbe-zoom-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      editor.zoom = parseFloat(btn.dataset.zoom);
+  const zoomSelect = document.getElementById('kbeZoomSelect');
+  if (zoomSelect) {
+    zoomSelect.value = String(editor.zoom || 1);
+    zoomSelect.addEventListener('change', () => {
+      editor.zoom = parseFloat(zoomSelect.value) || 1;
       applyZoom();
     });
-  });
+  }
 
   document.getElementById('kbeKeySearch').addEventListener('input', e => {
     renderKeyLibrary(e.target.value);
