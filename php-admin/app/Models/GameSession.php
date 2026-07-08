@@ -17,6 +17,8 @@ class GameSession extends Model
         'host_id',
         'game_id',
         'quiz_id',
+        'play_mode_slug',
+        'mode_config',
         'status',
         'is_active',
         'started_at',
@@ -31,6 +33,7 @@ class GameSession extends Model
     {
         return [
             'is_active' => 'boolean',
+            'mode_config' => 'array',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
         ];

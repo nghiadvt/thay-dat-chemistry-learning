@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-09 (lọc multi-tag: `tag_match` AND/OR + hiển thị đủ tên chủ đề)
+**Cập nhật lần cuối:** 2026-07-09 (play mode `duck_race`: events + Redis keys)
 
 ---
 
@@ -313,12 +313,15 @@ Redis: `room:{PIN}:answer:{question_id}:{student_name}` lưu `{ answer, first_su
 | `room_error` | `{ message }` | Lỗi join / gameplay |
 | `players_update` | `{ players: [{ name, connected, score, avatar }] }` | Cập nhật danh sách HS; `avatar` = data URL hoặc `null` |
 | `ntp_pong` | `{ t0, t1, t2 }` | Phản hồi NTP |
-| `game_started` | `{}` | GV bấm Start |
+| `game_started` | `{}` hoặc `{ play_mode, mode_config? }` | GV bấm Start. `duck_race`: kèm config |
 | `new_question` | xem §9.3 | Câu hỏi mới |
+| `answer_feedback` | `{ correct, score_delta, total_score, position, correct_answer?, finish_rank?, target_score? }` | **`duck_race` only** — sau `submit_answer`, gửi riêng HS |
+| `race_update` | `{ players: [{ name, avatar, score, position, finished, finish_rank }], target_score, track_steps }` | **`duck_race`** — broadcast phòng |
+| `player_finished` | `{ name, finish_rank, total_score }` | **`duck_race`** — HS chạm mốc về đích |
 | `question_result` | xem §9.3.1 | **Khi hết câu** (finalize); gửi riêng từng HS |
 | `leaderboard_update` | `{ top5: [{ name, score, delta, avatar }] }` | Broadcast phòng; `avatar` từ Redis player |
 | `submit_count_update` | `{ submitted, total }` | **Chỉ host** |
-| `game_ended` | `{ final_leaderboard: [{ name, score, rank, player_token?, avatar }] }` | Kết thúc game |
+| `game_ended` | `{ final_leaderboard: [{ name, score, rank, finish_rank?, player_token?, avatar }], play_mode? }` | Kết thúc game |
 
 Callback ack (tùy chọn): client truyền function làm tham số cuối → `{ success, data?, error? }`.
 
@@ -350,7 +353,8 @@ Callback ack (tùy chọn): client truyền function làm tham số cuối → `
 }
 ```
 
-- `server_time` = thời điểm server bắt đầu đếm giờ câu này (ms epoch)
+- `time_limit`: giây; **`null`** khi `play_mode: duck_race` (không đếm giờ)
+- `play_mode`: `duck_race` | omitted (kahoot)
 - `options` / `template` / `input_mode`: `null` nếu không dùng
 - `template`: chỉ gửi HS khi `answer_type === structured`
 - `keyboard_config`: từ `quizzes.keyboard_id` → `keyboards.config`
@@ -423,13 +427,15 @@ Sau khi kết thúc, client/teacher có thể đọc `GET /api/reports/sessions/
 
 | Key | Type | TTL | Meaning |
 |---|---|---|---|
-| `room:<PIN>` | Hash | 2h | `status`, `game_id`, `quiz_id`, `current_quiz_id`, `current_question_id` |
+| `room:<PIN>` | Hash | 2h | `status`, `game_id`, `quiz_id`, `play_mode_slug`, `mode_config`, `current_quiz_id`, `current_question_id` |
 | `room:<PIN>:players` | Hash | 2h | Students in room — JSON `{ name, player_token, connected, score fields, avatar? }` |
 | `leaderboard:<PIN>` | ZSET | 2h | Total scores |
 | `submitted:<PIN>:<question_id>` | Set | 2h | Double-submit guard |
 | `room:<PIN>:option_order:<question_id>:<student_name>` | String (JSON) | 2h | Map index hiển thị → index gốc khi `shuffle_options` bật |
 
 | `room:<PIN>:plan` | String (JSON) | 2h | Game plan cache (quizzes + questions) — nội bộ ws-server |
+| `room:<PIN>:race_progress:<student_name>` | String (JSON) | 2h | **`duck_race`:** `{ question_index, finished, finish_rank, finished_at }` |
+| `room:<PIN>:finishers` | List | 2h | **`duck_race`:** thứ tự tên HS về đích |
 
 ---
 

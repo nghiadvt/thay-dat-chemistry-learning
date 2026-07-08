@@ -97,6 +97,20 @@
               </div>
 
               <div class="teacher-game-body">
+                <div class="teacher-game-phase teacher-duck-race-phase" id="teacherDuckRacePhase" hidden>
+                  <div class="duck-race-host" id="duckRaceHost">
+                    <div class="duck-race-host__header">
+                      <h2>Đua vịt hóa học</h2>
+                      <p class="duck-race-host__target">Về đích: <strong id="duckRaceTargetScore">30</strong> điểm</p>
+                    </div>
+                    <div class="duck-race-track" id="duckRaceTrack">
+                      <img class="duck-race-track__bg" src="{{ asset('htd-admin/assets/duck-race/background.png') }}" alt="">
+                      <div class="duck-race-track__lanes" id="duckRaceLanes"></div>
+                    </div>
+                    <div class="duck-race-podium" id="duckRacePodium" aria-live="polite"></div>
+                  </div>
+                </div>
+
                 <div class="teacher-game-phase" id="teacherQuestionPhase">
                   <div class="teacher-q-card" id="teacherQCard">
                     <div class="teacher-q-card-fit" id="teacherQCardFit">

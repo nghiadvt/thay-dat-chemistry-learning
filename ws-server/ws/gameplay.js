@@ -26,12 +26,18 @@ const {
   savePlayer,
 } = require('./room');
 
+const duckRace = require('./engines/duck-race');
+
 function registerGameplayHandlers(io, redis) {
   io.on('connection', (socket) => {
     socket.on('host_start_game', async (_payload, ack) => {
       try {
         await requireHost(socket);
-        const result = await startGame(io, redis, socket);
+        const pin = socket.data.pin;
+        const room = await redis.hgetall(roomKey(pin));
+        const result = duckRace.isDuckRaceRoom(room)
+          ? await duckRace.startGame(io, redis, socket)
+          : await startGame(io, redis, socket);
         if (typeof ack === 'function') ack({ success: true, data: result });
       } catch (err) {
         const message = err.message || 'Không thể bắt đầu game.';
@@ -70,10 +76,14 @@ function registerGameplayHandlers(io, redis) {
         await requireHost(socket);
         const pin = socket.data.pin;
         const room = await redis.hgetall(roomKey(pin));
-        if (room.status === 'playing' && room.current_question_id) {
-          await finalizeCurrentQuestion(io, redis, pin);
+        if (duckRace.isDuckRaceRoom(room)) {
+          await duckRace.endGame(io, redis, pin);
+        } else {
+          if (room.status === 'playing' && room.current_question_id) {
+            await finalizeCurrentQuestion(io, redis, pin);
+          }
+          await endGame(io, redis, pin);
         }
-        await endGame(io, redis, pin);
         if (typeof ack === 'function') ack({ success: true });
       } catch (err) {
         const message = err.message || 'Không thể kết thúc game.';
@@ -84,7 +94,11 @@ function registerGameplayHandlers(io, redis) {
 
     socket.on('submit_answer', async (payload = {}, ack) => {
       try {
-        const result = await handleSubmitAnswer(io, redis, socket, payload);
+        const pin = socket.data?.pin;
+        const room = pin ? await redis.hgetall(roomKey(pin)) : {};
+        const result = duckRace.isDuckRaceRoom(room)
+          ? await duckRace.handleSubmit(io, redis, socket, payload)
+          : await handleSubmitAnswer(io, redis, socket, payload);
         if (typeof ack === 'function') ack({ success: true, data: result });
       } catch (err) {
         const message = err.message || 'Không thể nộp đáp án.';
@@ -260,7 +274,14 @@ async function syncLateJoinStudent(io, redis, socket, pin) {
   if (socket.data?.isHost) return;
 
   const room = await redis.hgetall(roomKey(pin));
-  if (room.status !== 'playing' || !room.current_question_id) return;
+  if (room.status !== 'playing') return;
+
+  if (duckRace.isDuckRaceRoom(room)) {
+    await duckRace.syncLateJoin(io, redis, socket, pin);
+    return;
+  }
+
+  if (!room.current_question_id) return;
 
   const plan = await getPlan(redis, pin);
   const quizIndex = Number(room.quiz_index || 0);

@@ -12,6 +12,9 @@ const HTDBridge = (function () {
     leaderboardUpdate: [],
     submitCountUpdate: [],
     gameEnded: [],
+    answerFeedback: [],
+    raceUpdate: [],
+    playerFinished: [],
   };
 
   let roomMeta = null;
@@ -42,6 +45,9 @@ const HTDBridge = (function () {
     HTDSocket.on('leaderboard_update', data => emitLocal('leaderboardUpdate', data));
     HTDSocket.on('submit_count_update', data => emitLocal('submitCountUpdate', data));
     HTDSocket.on('game_ended', data => emitLocal('gameEnded', data));
+    HTDSocket.on('answer_feedback', data => emitLocal('answerFeedback', data));
+    HTDSocket.on('race_update', data => emitLocal('raceUpdate', data));
+    HTDSocket.on('player_finished', data => emitLocal('playerFinished', data));
   }
 
   async function init() {

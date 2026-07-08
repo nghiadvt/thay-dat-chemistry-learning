@@ -13,7 +13,16 @@ class GameResult extends Model
         'player_token',
         'score',
         'rank',
+        'finish_rank',
+        'finished_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'finished_at' => 'datetime',
+        ];
+    }
 
     public function session(): BelongsTo
     {

@@ -160,6 +160,8 @@ function joinExistingRoomFromAdmin(pin, params) {
         roomName: boot.roomName || null,
         quizName: boot.quizName || roomData.quiz_name || null,
         gameName: boot.gameName || roomData.game_name || null,
+        playModeSlug: boot.playModeSlug || 'kahoot_sync',
+        modeConfig: boot.modeConfig || null,
         joinUrl: boot.joinUrl || null,
         qrUrl: boot.qrUrl || null,
         teacher: boot.hostName || 'Giáo viên',
@@ -968,6 +970,11 @@ function renderTeacherGame(room) {
   const game = room.game;
   if (!game) return;
 
+  if (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode() && game.phase !== 'final') {
+    DuckRaceHost.showPhase();
+    return;
+  }
+
   renderTeacherTimeline(game);
 
   const needsFullRender =
@@ -1058,6 +1065,8 @@ function teacherGameTick() {
 }
 
 function teacherBackendGameTick(room) {
+  if (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode()) return;
+
   const game = room.game;
   if (!game || game.phase === 'final' || room.status === 'ended') return;
 
@@ -1462,6 +1471,7 @@ function resetTeacherSessionLocalState() {
   teacherState.advancingQuestion = false;
   teacherState.liveTimerEndsAt = null;
   teacherState.livePhaseEndsAt = null;
+  if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
   closeTeacherLbModal();
 }
 
@@ -1839,11 +1849,28 @@ function teacherExportCsv() {
 function setupTeacherBackendBridge() {
   if (!isBackendMode()) return;
 
-  HTDBridge.on('gameStarted', () => {
+  HTDBridge.on('gameStarted', (data) => {
     const room = HTD.getRoom();
     if (!room) return;
     room.status = 'started';
     room.backendMode = true;
+    if (data?.play_mode) room.playModeSlug = data.play_mode;
+    if (data?.mode_config) room.modeConfig = data.mode_config;
+
+    if (data?.play_mode === 'duck_race' || (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode())) {
+      const game = ensureTeacherGameState(room);
+      game.phase = 'duck_race';
+      room.startedAt = Date.now();
+      HTD.setRoom(room);
+      teacherState.lastRenderedPhase = null;
+      teacherState.lastRenderedIndex = -1;
+      if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.showPhase();
+      if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
+        renderDashboard();
+      }
+      return;
+    }
+
     teacherState.serverQuestionIndex = 0;
     teacherState.currentQuestion = null;
     teacherState.revealAnswers = false;
@@ -1867,6 +1894,8 @@ function setupTeacherBackendBridge() {
   });
 
   HTDBridge.on('newQuestion', payload => {
+    if (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode()) return;
+
     const room = HTD.getRoom();
     if (!room) return;
     teacherState.serverQuestionIndex += 1;
@@ -1947,7 +1976,20 @@ function setupTeacherBackendBridge() {
     }
   });
 
+  HTDBridge.on('raceUpdate', data => {
+    if (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode()) {
+      DuckRaceHost.applyRaceUpdate(data);
+    }
+  });
+
+  HTDBridge.on('playerFinished', data => {
+    if (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode()) {
+      DuckRaceHost.onPlayerFinished(data);
+    }
+  });
+
   HTDBridge.on('gameEnded', data => {
+    if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
     const room = HTD.getRoom();
     if (!room) return;
     room.status = 'ended';

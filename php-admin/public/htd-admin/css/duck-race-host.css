@@ -1,0 +1,182 @@
+/* Duck race — host track (web desktop) */
+.teacher-duck-race-phase {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.duck-race-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 4px 12px;
+}
+
+.duck-race-host__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.duck-race-host__header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.duck-race-host__target {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+.duck-race-track {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+  background: #7ec8e8;
+}
+
+.duck-race-track__bg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+  pointer-events: none;
+  user-select: none;
+}
+
+.duck-race-track__lanes {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  height: 42%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding: 0 4% 0 6%;
+  pointer-events: none;
+}
+
+.duck-race-lane {
+  position: relative;
+  height: 56px;
+}
+
+.duck-race-duck-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 72px;
+  transform: translateX(var(--duck-x, 0%));
+  transition: transform 0.55s cubic-bezier(0.34, 1.2, 0.64, 1);
+  will-change: transform;
+}
+
+.duck-race-duck-wrap.finished .duck-race-duck-badge {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+}
+
+.duck-race-duck-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  min-width: 88px;
+  max-width: 140px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #2d46d6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.duck-race-duck-badge__name {
+  display: block;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duck-race-duck-badge__score {
+  display: block;
+  font-weight: 800;
+  color: #2d46d6;
+  font-size: 12px;
+}
+
+.duck-race-duck-badge__rank {
+  display: block;
+  font-size: 10px;
+  color: #b45309;
+  font-weight: 700;
+}
+
+.duck-race-duck-badge__avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.duck-race-duck-sprite {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.duck-race-podium {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.duck-race-podium-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.duck-race-podium-chip .medal {
+  font-size: 18px;
+}
+
+.teacher-main-grid.game-active.duck-race-mode .teacher-game-toolbar .teacher-q-timer-pill,
+.teacher-main-grid.game-active.duck-race-mode .teacher-q-progress,
+.teacher-main-grid.game-active.duck-race-mode #teacherQuestionPhase {
+  display: none !important;
+}
+
+.teacher-main-grid.game-active.duck-race-mode .teacher-duck-race-phase {
+  display: flex !important;
+}

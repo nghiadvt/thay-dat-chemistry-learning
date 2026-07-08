@@ -18,6 +18,7 @@
             <thead>
                 <tr>
                     <th>Tên</th>
+                    <th>Kiểu chơi</th>
                     <th>Mô tả</th>
                     <th>Quiz</th>
                     <th>Cập nhật</th>
@@ -28,6 +29,7 @@
                 @foreach ($games as $game)
                 <tr>
                     <td><strong>{{ $game->name }}</strong></td>
+                    <td>{{ $game->playMode?->name ?? 'Quiz đồng bộ' }}</td>
                     <td>{{ Str::limit($game->description, 60) }}</td>
                     <td>{{ $game->quizzes_count }}</td>
                     <td>{{ $game->updated_at?->format('d/m/Y H:i') }}</td>

@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-09 (lọc multi-tag `tag_match` AND/OR)
+**Cập nhật lần cuối:** 2026-07-09 (play_modes + đua vịt `duck_race`)
 
 ---
 
@@ -11,6 +11,7 @@
 
 ```mermaid
 erDiagram
+  PLAY_MODES ||--o{ GAMES : "mechanic"
   USERS ||--o{ GAMES : creates
   USERS ||--o{ GAME_SESSIONS : hosts
   GAMES ||--o{ QUIZZES : contains
@@ -82,6 +83,27 @@ Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Pr
 
 ---
 
+## 4.1 Bảng `play_modes`
+
+Đăng ký kiểu chơi (~10 mode dự kiến). Mỗi row = một engine WS + UI host/HS.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `slug` | VARCHAR(64) UNIQUE | VD: `kahoot_sync`, `duck_race` |
+| `name` | VARCHAR(255) | Tên hiển thị admin |
+| `description` | TEXT NULL | |
+| `student_ui` | VARCHAR(64) | VD: `quiz-sync`, `duck-race` |
+| `host_ui` | VARCHAR(64) | VD: `host-quiz`, `host-duck-race` |
+| `banner_path` | VARCHAR(255) NULL | Ảnh preview trong `storage/app/public/` |
+| `default_config` | JSON NULL | Luật mặc định của mode |
+| `is_active` | BOOLEAN DEFAULT true | |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+Seed: `kahoot_sync`, `duck_race`.
+
+---
+
 ## 5. Bảng `games`
 
 | Cột | Kiểu | Ghi chú |
@@ -89,6 +111,8 @@ Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Pr
 | `id` | BIGINT PK | |
 | `name` | VARCHAR(255) | |
 | `description` | TEXT NULL | |
+| `play_mode_id` | BIGINT FK → `play_modes.id` NULL | Kiểu chơi; game cũ backfill `kahoot_sync` |
+| `mode_config` | JSON NULL | Override `default_config` (VD đua vịt: +3/-5, mốc 30) |
 | `created_by` | BIGINT FK → `users.id` NULL | GV tạo game |
 | `created_at`, `updated_at` | TIMESTAMP | |
 
@@ -213,6 +237,8 @@ Admin: `/admin/question-bank` — CRUD + **lọc nhiều chủ đề** (checkbox
 | `host_id` | BIGINT FK → `users.id` | GV host |
 | `game_id` | BIGINT FK → `games.id` | Game chứa quiz (denormalized) |
 | `quiz_id` | BIGINT FK → `quizzes.id` NULL | Quiz được chơi trong phòng; NULL = legacy (chơi cả game) |
+| `play_mode_slug` | VARCHAR(64) NULL | Snapshot từ `games.play_mode` lúc tạo phòng |
+| `mode_config` | JSON NULL | Snapshot config lúc tạo phòng |
 | `status` | ENUM('waiting','playing','ended') NOT NULL DEFAULT 'waiting' | |
 | `is_active` | BOOLEAN NOT NULL DEFAULT true | Tắt → xóa Redis room, HS không join được |
 | `started_at` | TIMESTAMP NULL | Khi GV bấm Start |
@@ -237,6 +263,8 @@ Tổng kết cuối session (1 dòng / học sinh / session).
 | `player_token` | CHAR(36) NULL | UUID reconnect (Phase 2) |
 | `score` | INT NOT NULL DEFAULT 0 | Tổng điểm |
 | `rank` | INT NOT NULL | Hạng cuối |
+| `finish_rank` | TINYINT UNSIGNED NULL | Đua vịt: thứ tự về đích (1–3); NULL nếu chưa về / mode khác |
+| `finished_at` | TIMESTAMP NULL | Thời điểm chạm mốc về đích |
 | `created_at`, `updated_at` | TIMESTAMP | |
 
 ---

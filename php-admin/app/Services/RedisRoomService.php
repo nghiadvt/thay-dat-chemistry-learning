@@ -2,14 +2,23 @@
 
 namespace App\Services;
 
+use App\Models\Game;
 use Illuminate\Support\Facades\Redis;
 
 class RedisRoomService
 {
     private const TTL_SECONDS = 7200;
 
-    public function createWaitingRoom(string $pin, int $gameId, ?int $quizId = null): void
-    {
+    /**
+     * @param  array<string, mixed>|null  $modeConfig
+     */
+    public function createWaitingRoom(
+        string $pin,
+        int $gameId,
+        ?int $quizId = null,
+        ?string $playModeSlug = null,
+        ?array $modeConfig = null,
+    ): void {
         $key = "room:{$pin}";
         $redis = Redis::connection('rooms');
 
@@ -17,6 +26,12 @@ class RedisRoomService
         $redis->hSet($key, 'game_id', (string) $gameId);
         if ($quizId) {
             $redis->hSet($key, 'quiz_id', (string) $quizId);
+        }
+        if ($playModeSlug) {
+            $redis->hSet($key, 'play_mode_slug', $playModeSlug);
+        }
+        if ($modeConfig) {
+            $redis->hSet($key, 'mode_config', json_encode($modeConfig, JSON_UNESCAPED_UNICODE));
         }
         $redis->expire($key, self::TTL_SECONDS);
     }
@@ -39,6 +54,23 @@ class RedisRoomService
             $redis->del(...$keys);
         }
 
-        $this->createWaitingRoom($pin, $gameId, $quizId);
+        $game = Game::with('playMode')->find($gameId);
+        $playModeSlug = $game?->playMode?->slug ?? 'kahoot_sync';
+        $modeConfig = $game?->resolvedModeConfig() ?? [];
+
+        $this->createWaitingRoom($pin, $gameId, $quizId, $playModeSlug, $modeConfig);
+    }
+
+    /**
+     * @return array{play_mode_slug: string, mode_config: array<string, mixed>}
+     */
+    public function resolvePlayModeForGame(int $gameId): array
+    {
+        $game = Game::with('playMode')->find($gameId);
+
+        return [
+            'play_mode_slug' => $game?->playMode?->slug ?? 'kahoot_sync',
+            'mode_config' => $game?->resolvedModeConfig() ?? [],
+        ];
     }
 }

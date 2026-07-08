@@ -83,6 +83,7 @@ class StudentJoinController extends Controller
             'js/student.js' => public_path('app/js/student.js'),
             'css/shared.css' => public_path('app/css/shared.css'),
             'css/student.css' => public_path('app/css/student.css'),
+            'css/duck-race-student.css' => public_path('app/css/duck-race-student.css'),
             'css/keyboard-runtime.css' => public_path('app/css/keyboard-runtime.css'),
         ];
         foreach ($assetMap as $rel => $abs) {

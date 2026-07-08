@@ -3,7 +3,7 @@
 > Logic ứng dụng: luồng màn hình, state, scoring, bàn phím, WebSocket events.
 > Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
 
-**Cập nhật lần cuối:** 2026-07-09 (HS: trang chủ hub 4 chức năng; join QR = camera quét)
+**Cập nhật lần cuối:** 2026-07-09 (play mode `duck_race` — đua vịt)
 
 ---
 
@@ -109,6 +109,28 @@ streak bonus   : đúng liên tiếp ≥3 câu → +50 mỗi câu tiếp theo
 **Ví dụ:** Câu 30s, submit sau 3s, đúng → `1000 × (27/30) = 900 điểm`
 
 > Prototype hiện tại: hiển thị điểm fake, chưa tính theo công thức.
+
+---
+
+## 3.2 Play mode — Đua vịt (`duck_race`)
+
+Gắn ở `games.play_mode_id` + `mode_config`; snapshot vào `game_sessions` và Redis `room:{pin}`.
+
+| Khía cạnh | Quiz Kahoot (`kahoot_sync`) | Đua vịt (`duck_race`) |
+|---|---|---|
+| Đồng bộ câu | Cả phòng | **Mỗi HS riêng** |
+| Timer | Có | **Không** |
+| Chấm điểm | Hết giờ, Kahoot formula | **Ngay khi submit** |
+| Đúng / sai | 0 hoặc +theo tốc độ | **+3 / -5** (config) |
+| Thắng | Hết câu, điểm cao | **Chạm 30 điểm** — top 3 về đích |
+| Host UI | Đề bài + timer | **Đường đua** + vịt (tên, avatar, điểm) |
+| HS UI | Timer + lock-in | **Điểm vịt** + feedback ngay, tự sang câu mới |
+
+**Luồng HS:** `game_started` → `new_question` (riêng từng HS) → `submit_answer` → `answer_feedback` (+ `race_update` broadcast) → `new_question` tiếp (nếu chưa về đích). Chạm `target_score` → `player_finished`; đủ `podium_size` người về đích → `game_ended`.
+
+**Xếp hạng cuối:** (1) thứ tự về đích `finish_rank` 1–3; (2) còn lại theo `score` tại kết thúc (có thể âm).
+
+**Assets:** `prototype/assets/duck-race/` (`duck-blue.png`, `background.png`, `banner.png`).
 
 ---
 

@@ -133,11 +133,20 @@ async function saveGameResults(sessionId, leaderboardEntries) {
 
     for (let i = 0; i < leaderboardEntries.length; i += 1) {
       const entry = leaderboardEntries[i];
+      const finishedAt = entry.finished_at ? new Date(entry.finished_at) : null;
       await conn.execute(
         `INSERT INTO game_results
-           (session_id, student_name, player_token, score, \`rank\`, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-        [sessionId, entry.name, entry.player_token || null, entry.score, i + 1]
+           (session_id, student_name, player_token, score, \`rank\`, finish_rank, finished_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          sessionId,
+          entry.name,
+          entry.player_token || null,
+          entry.score,
+          entry.rank ?? (i + 1),
+          entry.finish_rank ?? null,
+          finishedAt,
+        ]
       );
     }
 

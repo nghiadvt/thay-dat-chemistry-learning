@@ -39,12 +39,71 @@ const state = {
   serverQuestionIndex: 0,
   backendRoom: null,
   qrScanner: null,
+  playMode: null,
+  submitting: false,
 };
 
 const FAKE_QUESTIONS = HTD.FAKE_QUESTIONS;
 
 function isBackendMode() {
   return Boolean(window.HTD_CONFIG?.useBackend);
+}
+
+function isDuckRaceMode() {
+  return state.playMode === 'duck_race';
+}
+
+function updateDuckScoreDisplay(score) {
+  const pill = document.getElementById('qDuckScorePill');
+  const text = document.getElementById('qDuckScoreText');
+  const val = score ?? state.myScore ?? 0;
+  if (text) text.textContent = String(val);
+  if (pill) pill.hidden = !isDuckRaceMode();
+}
+
+function showDuckRaceFeedback(data) {
+  const el = document.getElementById('duckRaceFeedback');
+  const deltaEl = document.getElementById('duckRaceFeedbackDelta');
+  const totalEl = document.getElementById('duckRaceFeedbackTotal');
+  const finishEl = document.getElementById('duckRaceFeedbackFinish');
+  if (!el || !deltaEl || !totalEl) return;
+
+  const correct = Boolean(data.correct);
+  const delta = Number(data.score_delta ?? 0);
+  deltaEl.textContent = delta > 0 ? `+${delta}` : String(delta);
+  totalEl.textContent = `Tổng: ${data.total_score ?? state.myScore}`;
+  el.classList.remove('correct', 'wrong', 'visible');
+  el.classList.add(correct ? 'correct' : 'wrong');
+  if (finishEl) {
+    if (data.finish_rank) {
+      finishEl.hidden = false;
+      finishEl.textContent = `🏁 Về đích #${data.finish_rank}!`;
+    } else {
+      finishEl.hidden = true;
+      finishEl.textContent = '';
+    }
+  }
+  requestAnimationFrame(() => el.classList.add('visible'));
+  clearTimeout(state.duckFeedbackTimer);
+  state.duckFeedbackTimer = setTimeout(() => {
+    el.classList.remove('visible');
+  }, 900);
+}
+
+function handleDuckRaceSubmitResult(data) {
+  state.awaitingResult = false;
+  state.lockedIn = false;
+  state.selectedAnswer = null;
+  state.submitted = false;
+  if (data?.total_score != null) state.myScore = Number(data.total_score);
+  updateDuckScoreDisplay();
+  showDuckRaceFeedback(data);
+  const q = getCurrentQuestion();
+  if (q?.type === 'mc') {
+    document.querySelectorAll('.mc-option').forEach(b => b.classList.remove('selected'));
+    const submitBtn = document.getElementById('mcSubmitBtn');
+    if (submitBtn) submitBtn.disabled = true;
+  }
 }
 
 function getCurrentQuestion() {
@@ -1023,6 +1082,15 @@ function startQuestion() {
 }
 
 function startQuestionTimer(q, onEnd) {
+  if (q.noTimer || isDuckRaceMode()) {
+    clearInterval(state.timerInterval);
+    const timerPill = document.getElementById('qTimerPill');
+    if (timerPill) timerPill.hidden = true;
+    updateDuckScoreDisplay();
+    return;
+  }
+  const timerPill = document.getElementById('qTimerPill');
+  if (timerPill) timerPill.hidden = false;
   if (isBackendMode() && q.serverTime) {
     clearInterval(state.timerInterval);
     const offset = HTDSocket.getNtpOffset();
@@ -1085,10 +1153,14 @@ function renderMcOptions(q, container) {
       `<span class="mc-option-text">${EquationUI.chemToHtml(optText)}</span>` +
       `<span class="mc-check" aria-hidden="true">✓</span>`;
     btn.onclick = () => {
-      if (state.awaitingResult) return;
+      if (state.awaitingResult || state.submitting) return;
       wrap.querySelectorAll('.mc-option').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
       state.selectedAnswer = i;
+      if (isDuckRaceMode()) {
+        finishMC(i, false);
+        return;
+      }
       const submitBtn = document.getElementById('mcSubmitBtn');
       if (submitBtn) submitBtn.disabled = false;
     };
@@ -1096,11 +1168,13 @@ function renderMcOptions(q, container) {
   });
   container.appendChild(wrap);
 
-  const submitRow = document.createElement('div');
-  submitRow.className = 'mc-submit-row';
-  submitRow.innerHTML =
-    '<button type="button" class="btn-mc-submit" id="mcSubmitBtn" disabled onclick="submitMcAnswer()">Gửi đáp án</button>';
-  container.appendChild(submitRow);
+  if (!isDuckRaceMode()) {
+    const submitRow = document.createElement('div');
+    submitRow.className = 'mc-submit-row';
+    submitRow.innerHTML =
+      '<button type="button" class="btn-mc-submit" id="mcSubmitBtn" disabled onclick="submitMcAnswer()">Gửi đáp án</button>';
+    container.appendChild(submitRow);
+  }
 }
 
 function submitMcAnswer() {
@@ -1252,6 +1326,15 @@ function submitAnswer(timedOut) {
       inputValues: state.inputValues,
       selectedAnswer: state.selectedAnswer,
     });
+    if (isDuckRaceMode()) {
+      if (state.submitting) return;
+      state.submitting = true;
+      HTDBridge.submitAnswer(q.id, answer)
+        .then(ack => handleDuckRaceSubmitResult(ack?.data || ack))
+        .catch(err => alert(err.message || 'Không nộp được đáp án.'))
+        .finally(() => { state.submitting = false; });
+      return;
+    }
     HTDBridge.submitAnswer(q.id, answer)
       .then(data => {
         lockInAnswer(answer, data);
@@ -1289,6 +1372,15 @@ function finishMC(ans, timedOut) {
   if (!q || state.awaitingResult) return;
 
   if (isBackendMode()) {
+    if (isDuckRaceMode()) {
+      if (state.submitting) return;
+      state.submitting = true;
+      HTDBridge.submitAnswer(q.id, { index: ans })
+        .then(ack => handleDuckRaceSubmitResult(ack?.data || ack))
+        .catch(err => alert(err.message || 'Không nộp được đáp án.'))
+        .finally(() => { state.submitting = false; });
+      return;
+    }
     HTDBridge.submitAnswer(q.id, { index: ans })
       .then(data => {
         lockInAnswer({ index: ans }, data);
@@ -1664,18 +1756,22 @@ buildNumpad();
 renderPinDisplay();
 
 function applyNewQuestion(payload) {
+  if (payload?.play_mode) state.playMode = payload.play_mode;
   state.serverQuestionIndex += 1;
   state.questionIndex = state.serverQuestionIndex - 1;
   state.currentQuestion = HTDGameAdapter.mapNewQuestion(payload, state.questionIndex);
   state.pendingNewQuestion = null;
   resetQuestionAnswerState();
+  document.querySelector('.question-screen')?.classList.toggle('duck-race-mode', isDuckRaceMode());
+  updateDuckScoreDisplay();
   showScreen('question');
 }
 
 function setupStudentBackendBridge() {
   if (!isBackendMode()) return;
 
-  HTDBridge.on('gameStarted', () => {
+  HTDBridge.on('gameStarted', (data) => {
+    if (data?.play_mode) state.playMode = data.play_mode;
     clearInterval(state.waitingPoll);
     if (!state.lateJoinSync) {
       state.questionIndex = 0;
@@ -1686,8 +1782,11 @@ function setupStudentBackendBridge() {
     if (room) {
       room.status = 'started';
       room.startedAt = Date.now();
+      if (data?.play_mode) room.playModeSlug = data.play_mode;
       HTD.setRoom(room);
     }
+    document.querySelector('.question-screen')?.classList.toggle('duck-race-mode', isDuckRaceMode());
+    updateDuckScoreDisplay();
   });
 
   HTDBridge.on('newQuestion', payload => {
@@ -1719,6 +1818,15 @@ function setupStudentBackendBridge() {
     if (state.screen === 'leaderboard') {
       applyLeaderboardData(data);
       renderLeaderboard();
+    }
+  });
+
+  HTDBridge.on('raceUpdate', data => {
+    if (!isDuckRaceMode() || !data?.players) return;
+    const me = data.players.find(p => p.name === state.studentName);
+    if (me && me.score != null) {
+      state.myScore = Number(me.score);
+      updateDuckScoreDisplay();
     }
   });
 

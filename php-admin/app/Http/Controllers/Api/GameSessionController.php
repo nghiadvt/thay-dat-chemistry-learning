@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\GameSession;
 use App\Models\Quiz;
+use App\Services\GamePlayModeResolver;
 use App\Services\PinGenerator;
 use App\Services\RedisRoomService;
 use App\Services\SessionQrService;
@@ -50,6 +51,8 @@ class GameSessionController extends Controller
         }
 
         $pin = $this->pinGenerator->generateUniquePin();
+        $game = \App\Models\Game::with('playMode')->find($gameId);
+        $playMode = app(GamePlayModeResolver::class)->forGame($game);
 
         $session = GameSession::create([
             'pin' => $pin,
@@ -57,11 +60,19 @@ class GameSessionController extends Controller
             'host_id' => Auth::id(),
             'game_id' => $gameId,
             'quiz_id' => $quizId,
+            'play_mode_slug' => $playMode['play_mode_slug'],
+            'mode_config' => $playMode['mode_config'],
             'status' => 'waiting',
             'is_active' => true,
         ]);
 
-        $this->redisRoomService->createWaitingRoom($pin, $gameId, $quizId);
+        $this->redisRoomService->createWaitingRoom(
+            $pin,
+            $gameId,
+            $quizId,
+            $playMode['play_mode_slug'],
+            $playMode['mode_config'],
+        );
 
         try {
             $this->sessionQrService->ensureQr($session);

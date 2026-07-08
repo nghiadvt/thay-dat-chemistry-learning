@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\GameSession;
 use App\Models\Quiz;
+use App\Services\GamePlayModeResolver;
 use App\Services\PinGenerator;
 use App\Services\RedisRoomService;
 use App\Services\SessionQrService;
@@ -61,6 +62,7 @@ class SessionController extends Controller
         }
 
         $pin = $this->pinGenerator->generateUniquePin();
+        $playMode = app(GamePlayModeResolver::class)->forGame($quiz->game);
 
         $session = GameSession::create([
             'pin' => $pin,
@@ -68,11 +70,19 @@ class SessionController extends Controller
             'host_id' => Auth::id(),
             'game_id' => $quiz->game_id,
             'quiz_id' => $quiz->id,
+            'play_mode_slug' => $playMode['play_mode_slug'],
+            'mode_config' => $playMode['mode_config'],
             'status' => 'waiting',
             'is_active' => true,
         ]);
 
-        $this->redisRoomService->createWaitingRoom($pin, $quiz->game_id, $quiz->id);
+        $this->redisRoomService->createWaitingRoom(
+            $pin,
+            $quiz->game_id,
+            $quiz->id,
+            $playMode['play_mode_slug'],
+            $playMode['mode_config'],
+        );
 
         try {
             $this->sessionQrService->ensureQr($session);
@@ -141,8 +151,18 @@ class SessionController extends Controller
             $session->quiz_id = $quiz->id;
             $session->game_id = $quiz->game_id;
 
+            $playMode = app(GamePlayModeResolver::class)->forGame($quiz->game);
+            $session->play_mode_slug = $playMode['play_mode_slug'];
+            $session->mode_config = $playMode['mode_config'];
+
             if ($quizChanged && $session->is_active) {
-                $this->redisRoomService->createWaitingRoom($session->pin, $quiz->game_id, $quiz->id);
+                $this->redisRoomService->createWaitingRoom(
+                    $session->pin,
+                    $quiz->game_id,
+                    $quiz->id,
+                    $playMode['play_mode_slug'],
+                    $playMode['mode_config'],
+                );
             }
         }
 
@@ -154,7 +174,7 @@ class SessionController extends Controller
 
     public function show(GameSession $session): View
     {
-        $session->load(['game', 'quiz', 'host']);
+        $session->load(['game.playMode', 'quiz', 'host']);
 
         $joinUrl = $this->sessionQrService->joinUrl($session);
         // Always a scannable QR for /join/{pin} — never the mock qr-login.png asset.

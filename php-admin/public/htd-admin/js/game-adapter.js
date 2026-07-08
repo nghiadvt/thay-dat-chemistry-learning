@@ -40,12 +40,15 @@ const HTDGameAdapter = (function () {
   }
 
   function mapNewQuestion(payload, index) {
+    const noTimer = payload.time_limit == null || payload.play_mode === 'duck_race';
     const base = {
       id: String(payload.question_id),
       quizId: payload.quiz_id,
       prompt: stripHtml(payload.content),
       contentHtml: payload.content,
-      timeLimit: Number(payload.time_limit || 30),
+      timeLimit: noTimer ? 0 : Number(payload.time_limit || 30),
+      noTimer,
+      playMode: payload.play_mode || null,
       serverTime: Number(payload.server_time || Date.now()),
       keyboardConfig: payload.keyboard_config || null,
       index: typeof index === 'number' ? index : 0,

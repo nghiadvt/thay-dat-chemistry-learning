@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=STIX+Two+Text&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('htd-admin/css/shared.css') }}">
 <link rel="stylesheet" href="{{ asset('htd-admin/css/session-host.css') }}?v={{ file_exists(public_path('htd-admin/css/session-host.css')) ? filemtime(public_path('htd-admin/css/session-host.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('htd-admin/css/duck-race-host.css') }}?v={{ file_exists(public_path('htd-admin/css/duck-race-host.css')) ? filemtime(public_path('htd-admin/css/duck-race-host.css')) : time() }}">
 @endpush
 
 @section('content')
@@ -26,6 +27,8 @@ window.ADMIN_BOOT = {
         roomName: @json($session->name ?? 'Phòng '.$session->pin),
         quizName: @json($session->quiz?->name),
         gameName: @json($session->game?->name),
+        playModeSlug: @json($session->play_mode_slug ?? $session->game?->playMode?->slug ?? 'kahoot_sync'),
+        modeConfig: @json($session->mode_config ?? $session->game?->resolvedModeConfig() ?? []),
         gameId: {{ (int) $session->game_id }},
         quizId: {{ (int) ($session->quiz_id ?? 0) }},
         sessionId: {{ (int) $session->id }},
@@ -49,6 +52,7 @@ $htdJs = fn ($path) => asset($path) . '?v=' . (file_exists(public_path($path)) ?
 <script src="{{ $htdJs('htd-admin/js/socket.js') }}"></script>
 <script src="{{ $htdJs('htd-admin/js/game-adapter.js') }}"></script>
 <script src="{{ $htdJs('htd-admin/js/backend-bridge.js') }}"></script>
+<script src="{{ $htdJs('htd-admin/js/duck-race-host.js') }}"></script>
 <script src="{{ $htdJs('htd-admin/js/teacher.js') }}"></script>
 <script src="{{ $htdJs('htd-admin/js/admin-session-init.js') }}"></script>
 @endpush

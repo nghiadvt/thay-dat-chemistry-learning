@@ -12,7 +12,35 @@ class Game extends Model
         'name',
         'description',
         'created_by',
+        'play_mode_id',
+        'mode_config',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'mode_config' => 'array',
+        ];
+    }
+
+    public function playMode(): BelongsTo
+    {
+        return $this->belongsTo(PlayMode::class);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function resolvedModeConfig(): array
+    {
+        $mode = $this->relationLoaded('playMode') ? $this->playMode : $this->playMode()->first();
+
+        if (! $mode) {
+            return [];
+        }
+
+        return $mode->resolvedConfig($this->mode_config);
+    }
 
     public function creator(): BelongsTo
     {

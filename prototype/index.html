@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="css/shared.css">
   <link rel="stylesheet" href="css/student.css">
   <link rel="stylesheet" href="css/keyboard-runtime.css">
+  <link rel="stylesheet" href="css/duck-race-student.css">
 </head>
 <body class="student-app">
 
@@ -179,6 +180,10 @@
         <span class="q-timer-icon" aria-hidden="true">⏱</span>
         <span id="qTimerText">00:20</span>
       </div>
+      <div class="q-duck-score-pill" id="qDuckScorePill" hidden>
+        <img src="assets/duck-race/duck-blue.png" alt="" width="28" height="28">
+        <span id="qDuckScoreText">0</span>
+      </div>
     </div>
 
     <div class="q-body">
@@ -248,6 +253,12 @@
     </div>
   </section>
 
+</div>
+
+<div class="duck-race-feedback" id="duckRaceFeedback" aria-live="polite">
+  <span class="duck-race-feedback__delta" id="duckRaceFeedbackDelta">+3</span>
+  <span class="duck-race-feedback__total" id="duckRaceFeedbackTotal">Tổng: 0</span>
+  <span class="duck-race-feedback__finish" id="duckRaceFeedbackFinish" hidden></span>
 </div>
 
 <div class="result-overlay" id="resultOverlay">
