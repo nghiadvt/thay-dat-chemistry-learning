@@ -20,15 +20,15 @@
                 @endforeach
             </select>
         </div>
-        <div class="form-group">
-            <label for="tag_id">Lọc theo chủ đề</label>
-            <select id="tag_id" name="tag_id" onchange="this.form.submit()">
-                <option value="">Tất cả chủ đề</option>
-                @foreach ($tags as $tag)
-                    <option value="{{ $tag->id }}" @selected($filterTagId === $tag->id)>{{ $tag->name }}</option>
-                @endforeach
-            </select>
-        </div>
+        @include('admin.partials.tag-select', [
+            'mode' => 'filter',
+            'tags' => $tags,
+            'selected' => $filterTagId ?? '',
+            'name' => 'tag_id',
+            'autoSubmit' => true,
+            'showAll' => true,
+            'showUntagged' => true,
+        ])
         @if ($filterGameId || $filterTagId)
             <div class="form-group">
                 <label>&nbsp;</label>
@@ -64,7 +64,10 @@
                         @else
                             <div class="tag-list tag-list--compact">
                                 @foreach ($quiz->tags as $tag)
-                                    <a href="{{ route('admin.quizzes.index', ['tag_id' => $tag->id]) }}" class="tag-chip tag-chip--link">{{ $tag->name }}</a>
+                                    @include('admin.partials.tag-chip', [
+                                        'tag' => $tag,
+                                        'link' => route('admin.quizzes.index', ['tag_id' => $tag->id]),
+                                    ])
                                 @endforeach
                             </div>
                         @endif

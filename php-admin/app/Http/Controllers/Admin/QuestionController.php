@@ -4,8 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Question;
+use App\Models\QuestionBankItem;
 use App\Models\Quiz;
+use App\Models\Tag;
+use App\Services\QuestionBankCopyService;
+use App\Services\QuestionBankSyncService;
+use App\Services\QuestionBankTagService;
 use App\Services\QuestionValidator;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -15,6 +21,9 @@ class QuestionController extends Controller
 {
     public function __construct(
         private QuestionValidator $questionValidator,
+        private QuestionBankCopyService $bankCopyService,
+        private QuestionBankSyncService $bankSyncService,
+        private QuestionBankTagService $bankTagService,
     ) {}
 
     public function create(Quiz $quiz): View
@@ -22,6 +31,8 @@ class QuestionController extends Controller
         return view('admin.questions.form', [
             'quiz' => $quiz,
             'question' => null,
+            'tags' => Tag::query()->orderBy('name')->get(),
+            'selectedTagIds' => old('tag_ids', []),
         ]);
     }
 
@@ -35,13 +46,17 @@ class QuestionController extends Controller
             return back()->withInput()->withErrors($e->errors());
         }
 
-        $quiz->questions()->create([
+        $question = $quiz->questions()->create([
             ...$prepared,
-            'sort_order' => $prepared['sort_order'] ?? 0,
+            'sort_order' => $prepared['sort_order'] ?? $this->bankCopyService->nextSortOrder($quiz),
             'time_limit_seconds' => $prepared['time_limit_seconds'] ?? 30,
             'points' => $prepared['points'] ?? 1,
             'is_active' => true,
         ]);
+
+        $this->bankSyncService->syncToBank($question);
+        $bankItem = $this->bankSyncService->ensureBankItem($question->fresh());
+        $this->bankTagService->syncFromIds($bankItem, $request->input('tag_ids', []));
 
         return redirect()->route('admin.quizzes.show', $quiz)
             ->with('success', 'Đã thêm câu hỏi.');
@@ -50,8 +65,14 @@ class QuestionController extends Controller
     public function edit(Quiz $quiz, Question $question): View
     {
         $this->ensureBelongsToQuiz($quiz, $question);
+        $question->load('sourceBankItem.tags');
 
-        return view('admin.questions.form', compact('quiz', 'question'));
+        return view('admin.questions.form', [
+            'quiz' => $quiz,
+            'question' => $question,
+            'tags' => Tag::query()->orderBy('name')->get(),
+            'selectedTagIds' => old('tag_ids', $question->sourceBankItem?->tags->pluck('id')->all() ?? []),
+        ]);
     }
 
     public function update(Request $request, Quiz $quiz, Question $question): RedirectResponse
@@ -67,6 +88,9 @@ class QuestionController extends Controller
         }
 
         $question->update($prepared);
+        $this->bankSyncService->syncToBank($question->fresh());
+        $bankItem = $this->bankSyncService->ensureBankItem($question->fresh());
+        $this->bankTagService->syncFromIds($bankItem, $request->input('tag_ids', []));
 
         return redirect()->route('admin.quizzes.show', $quiz)
             ->with('success', 'Đã cập nhật câu hỏi.');
@@ -90,6 +114,184 @@ class QuestionController extends Controller
 
         return redirect()->route('admin.quizzes.show', $quiz)
             ->with('success', "Câu hỏi #{$question->sort_order} {$label}.");
+    }
+
+    public function updateTags(Request $request, Quiz $quiz, Question $question): JsonResponse
+    {
+        $this->ensureBelongsToQuiz($quiz, $question);
+
+        $validated = $request->validate([
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', 'exists:tags,id'],
+        ]);
+
+        $bankItem = $this->bankSyncService->ensureBankItem($question);
+        $this->bankTagService->syncFromIds($bankItem, $validated['tag_ids'] ?? []);
+
+        $bankItem->load('tags');
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'tag_ids' => $bankItem->tags->pluck('id'),
+                'tags' => $bankItem->tags->map(fn (Tag $tag) => [
+                    'id' => $tag->id,
+                    'name' => $tag->name,
+                    'color' => $tag->color,
+                ]),
+            ],
+        ]);
+    }
+
+    public function fromBank(Request $request, Quiz $quiz): RedirectResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'bank_ids' => ['required', 'array', 'min:1'],
+            'bank_ids.*' => ['integer', 'exists:question_bank_items,id'],
+        ]);
+
+        $bankItems = QuestionBankItem::query()
+            ->whereIn('id', $validated['bank_ids'])
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+
+        $sortOrder = $this->bankCopyService->nextSortOrder($quiz);
+        $added = 0;
+
+        foreach ($validated['bank_ids'] as $bankId) {
+            $item = $bankItems->get((int) $bankId);
+            if (! $item) {
+                continue;
+            }
+
+            $exists = $quiz->questions()
+                ->where('source_bank_question_id', $item->id)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $this->bankCopyService->copyToQuiz($item, $quiz, $sortOrder);
+            $sortOrder++;
+            $added++;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'data' => ['added' => $added],
+            ]);
+        }
+
+        return redirect()->route('admin.quizzes.show', $quiz)
+            ->with('success', $added > 0 ? "Đã thêm {$added} câu hỏi từ bộ." : 'Không có câu hỏi mới được thêm.');
+    }
+
+    public function reorder(Request $request, Quiz $quiz): JsonResponse
+    {
+        $validated = $request->validate([
+            'order' => ['required', 'array', 'min:1'],
+            'order.*' => ['integer'],
+        ]);
+
+        $questionIds = collect($validated['order'])->map(fn ($id) => (int) $id)->values();
+        $owned = $quiz->questions()->whereIn('id', $questionIds)->pluck('id');
+
+        if ($owned->count() !== $questionIds->count()) {
+            return response()->json(['success' => false, 'error' => 'Danh sách câu hỏi không hợp lệ.'], 422);
+        }
+
+        foreach ($questionIds as $index => $questionId) {
+            Question::query()
+                ->where('id', $questionId)
+                ->where('quiz_id', $quiz->id)
+                ->update(['sort_order' => $index]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function bulkUpdate(Request $request, Quiz $quiz): RedirectResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'question_ids' => ['required', 'array', 'min:1'],
+            'question_ids.*' => ['integer'],
+            'time_limit_seconds' => ['nullable', 'integer', 'min:5', 'max:300'],
+            'points' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'is_active' => ['nullable', 'boolean'],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', 'exists:tags,id'],
+            'action' => ['nullable', 'in:update,delete'],
+        ]);
+
+        $wantsJson = $request->expectsJson() || $request->isJson();
+
+        $questionIds = collect($validated['question_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        $questions = $quiz->questions()->whereIn('id', $questionIds)->get();
+
+        if ($questions->count() !== $questionIds->count()) {
+            if ($wantsJson) {
+                return response()->json(['success' => false, 'error' => 'Danh sách câu hỏi không hợp lệ.'], 422);
+            }
+
+            return back()->withErrors(['bulk' => 'Danh sách câu hỏi không hợp lệ.']);
+        }
+
+        if (($validated['action'] ?? 'update') === 'delete') {
+            $count = $questions->count();
+            Question::query()->whereIn('id', $questionIds)->where('quiz_id', $quiz->id)->delete();
+
+            if ($wantsJson) {
+                return response()->json(['success' => true, 'data' => ['deleted' => $count]]);
+            }
+
+            return redirect()->route('admin.quizzes.show', $quiz)
+                ->with('success', "Đã xóa {$count} câu hỏi.");
+        }
+
+        $updates = [];
+        if ($request->has('time_limit_seconds') && $validated['time_limit_seconds'] !== null) {
+            $updates['time_limit_seconds'] = (int) $validated['time_limit_seconds'];
+        }
+        if ($request->has('points') && $validated['points'] !== null) {
+            $updates['points'] = (int) $validated['points'];
+        }
+        if ($request->has('is_active')) {
+            $updates['is_active'] = $request->boolean('is_active');
+        }
+
+        $hasTagUpdate = $request->has('tag_ids');
+
+        if ($updates === [] && ! $hasTagUpdate) {
+            if ($wantsJson) {
+                return response()->json(['success' => false, 'error' => 'Không có thay đổi nào.'], 422);
+            }
+
+            return back()->withErrors(['bulk' => 'Chọn ít nhất một thuộc tính để cập nhật.']);
+        }
+
+        if ($updates !== []) {
+            Question::query()
+                ->whereIn('id', $questionIds)
+                ->where('quiz_id', $quiz->id)
+                ->update($updates);
+        }
+
+        if ($hasTagUpdate) {
+            foreach ($questions as $question) {
+                $bankItem = $this->bankSyncService->ensureBankItem($question);
+                $this->bankTagService->syncFromIds($bankItem, $validated['tag_ids'] ?? []);
+            }
+        }
+
+        if ($wantsJson) {
+            return response()->json(['success' => true, 'data' => ['updated' => $questions->count()]]);
+        }
+
+        return redirect()->route('admin.quizzes.show', $quiz)
+            ->with('success', "Đã cập nhật {$questions->count()} câu hỏi.");
     }
 
     /**

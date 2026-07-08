@@ -3,14 +3,27 @@
 > Logic ứng dụng: luồng màn hình, state, scoring, bàn phím, WebSocket events.
 > Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
 
-**Cập nhật lần cuối:** 2026-07-09 (Admin: builder câu `structured`)
+**Cập nhật lần cuối:** 2026-07-09 (HS: trang chủ hub 4 chức năng; join QR = camera quét)
 
 ---
 
 ## 1. Luồng học sinh (state machine)
 
+### Trang chủ & module
+
 ```
-Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
+Home (hub) ──► Chơi game (/join) ──► PIN / Quét QR ──► Profile ──► Phòng chờ ──► ...
+            ├── Đọc nguyên tố (sắp ra mắt)
+            ├── Cân bằng phương trình (sắp ra mắt)
+            └── Ôn trắc nghiệm (sắp ra mắt)
+```
+
+**URL:** `GET /home` = trang chủ hub · `GET /join` = luồng chơi game (PIN/QR) · `GET /join/{pin}` = deep-link QR (bỏ qua home + PIN).
+
+### Luồng chơi game (realtime)
+
+```
+Join PIN / Quét QR → Nhập tên → Avatar (skip OK) → Phòng chờ
   → [GV START] → Question → Submit → Result → Leaderboard → Question ... → Final
 ```
 
@@ -18,18 +31,18 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 
 | Màn hình | ID | Bắt buộc | Mô tả |
 |---|---|---|---|
-| Welcome | `welcome` | — | Landing, nút "Tham gia phòng" + "Hướng dẫn" |
-| Join PIN | `join` | PIN 6 số | Nhập PIN thủ công; tab QR placeholder. **Bỏ qua** khi mở `/join/{pin}` hoặc quét QR |
-| Hướng dẫn | `guide` | — | Text tĩnh, nút quay lại |
+| Trang chủ | `home` | — | Hub 4 chức năng (icon + tên). **Chơi game** → `/join`; 3 module còn lại placeholder «sắp ra mắt» |
+| Join PIN / QR | `join` | PIN 6 số | Tab **Nhập mã PIN** hoặc **Quét QR** (camera live trên HTTPS; HTTP LAN dùng camera native `<input capture>`). **Bỏ qua** khi mở `/join/{pin}` |
+| Hướng dẫn | `guide` | — | Text tĩnh (demo nav), nút quay lại trang chủ |
 | Nhập tên | `name` / `profile` | Tên ≤20 ký tự | Không cho rỗng, trim whitespace (cùng màn với avatar) |
 | Avatar | `avatar` / `profile` | Tùy chọn | HTTP LAN: `<input capture>` mở camera native; HTTPS: `getUserMedia`. Bỏ qua → emoji mặc định |
 | Phòng chờ | `waiting` | — | Hiển thị tên phòng, GV, danh sách người join. Chờ event `START` |
 | Question MC | `question-mc` | — | Trắc nghiệm 4 đáp án A–D |
 | Question Formula | `question-formula` | — | Nhập công thức qua bàn phím ảo 3 tab |
-| Lock-in (trên màn Question) | — | — | Sau nộp: hiện **đáp án của mình** + **thời gian nộp** (từ lần đầu); **không** hiện điểm; có thể đổi đáp án (thời gian chấm giữ lần nộp đầu) |
+| Lock-in (trên màn Question) | — | — | Sau nộp: hiện **đáp án của mình** + **thời gian nộp** (lần cập nhật gần nhất); **không** hiện điểm; có thể đổi đáp án — thời gian hiển thị cập nhật theo lần nộp mới; **chấm điểm** vẫn theo lần nộp đầu |
 | Result | `result` | — | **Sau hết giờ câu:** đúng/sai, điểm, thời gian nộp, hạng nhanh trong nhóm đúng; confetti nếu đúng |
 | Leaderboard | `leaderboard` | — | Top 5, ~5 giây sau Result, animation reorder |
-| Final | `final` | — | Podium top 3, nút "Chơi lại" / "Về trang chủ" |
+| Final | `final` | — | Podium top 3, nút "Chơi lại" / "Về trang chủ" (`/home`) |
 
 ### Quy tắc join phòng
 
@@ -38,6 +51,7 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 - Tên hiển thị: bắt buộc, tối đa 20 ký tự
 - Avatar: tùy chọn — trên HTTP LAN (điện thoại Wi‑Fi) mở camera/thư viện native qua `<input type="file" capture>`; live preview `getUserMedia` chỉ khi HTTPS/`localhost`. Bỏ qua → emoji mặc định. Ảnh gửi kèm `join_room.avatar` → Redis + `players_update` / BXH (host + HS)
 - **QR / deep-link** `GET /join/{pin}`: server inject `window.HTD_JOIN_PIN` + validate PIN → màn **profile** (tên + avatar) → phòng chờ. **Không** dừng ở màn nhập PIN. QR trên host admin luôn mã hóa `{APP_URL}/join/{pin}` (không dùng ảnh mock `qr-login.png`)
+- **Join muộn** (game đã `playing`): HS vẫn vào được — server gửi `game_started` + `new_question` câu hiện tại (`server_time` = `question_started_at` gốc); điểm tích lũy từ leaderboard (mới vào = 0)
 - Production: WebSocket handshake + NTP sync ngay tại bước join (sau khi bấm "Vào phòng")
 - Danh sách HS (host + grid phòng chờ HS): dùng `players_update` có `avatar`; không pad fake
 
@@ -194,7 +208,7 @@ serialize(tokens) → '2H2O'  // plain text, server normalize
 | `game_started` | S→C | `{}` | GV bắt đầu |
 | `new_question` | S→C | xem payload bên dưới | Câu hỏi mới |
 | `submit_answer` | C→S | `{ question_id, answer, hybrid_timestamp }` | Nộp / cập nhật đáp án (có thể đổi cho đến hết giờ) |
-| `submit_answer` ack | S→C | `{ locked, elapsed_seconds, answer_display, can_change }` | Lock-in — **không** chấm điểm |
+| `submit_answer` ack | S→C | `{ locked, elapsed_seconds, answer_display, can_change }` | Lock-in — **không** chấm điểm; `elapsed_seconds` = lần nộp **gần nhất** (đổi đáp án → cập nhật thời gian hiển thị) |
 | `question_result` | S→C | xem §5.1 | **Khi hết câu** (finalize); kèm điểm + thời gian nộp |
 | `leaderboard_update` | S→C | `{ top5: [...] }` | Sau finalize câu (~4s trước khi HS xem BXH) |
 | `game_ended` | S→C | `{ final_leaderboard }` | Kết thúc (kèm `avatar` từng người) |
@@ -309,7 +323,7 @@ const FAKE_STUDENTS = [
 
 ```javascript
 const appState = {
-  screen: 'welcome',
+  screen: 'home',
   pin: '',
   studentName: '',
   avatarDataUrl: null,
@@ -335,7 +349,7 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 
 **Mục tiêu:** chạy end-to-end với UI hiện tại; **không** redesign CSS/HTML (Phase 3B polish sau).
 
-**Serve UI học sinh:** `http://localhost:38480/join` hoặc `/join/{PIN}` — cùng port với admin/API; static assets (`css/`, `js/`) vẫn tại `/app/` (Docker mount `prototype/`).
+**Serve UI học sinh:** `http://localhost:38480/home` (trang chủ) · `/join` (chơi game) · `/join/{PIN}` (deep-link QR) — cùng port với admin/API; static assets (`css/`, `js/`) vẫn tại `/app/` (Docker mount `prototype/`).
 
 **Test trên điện thoại (cùng Wi‑Fi):** set trong root `.env`:
 `APP_URL=http://<IP-LAN>:38480` và `WS_PUBLIC_URL=http://<IP-LAN>:38581` (vd. `192.168.1.9`), rồi recreate `php-admin`. Join/QR/link copy từ admin đều dùng `APP_URL` (không phụ thuộc việc GV mở admin bằng localhost). Phone mở `/join/{PIN}` hoặc quét QR. Firewall Windows: inbound TCP `38480` + `38581`. Production: chỉ đổi `APP_URL` / `WS_PUBLIC_URL` sang domain HTTPS — cùng code path, không nhánh riêng.
@@ -392,7 +406,7 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 | **3B** ✅ | UI polish theo mockup | Teacher web · Student mobile |
 | **4** ✅ | Test end-to-end (`phase4-test.js`) | — |
 
-**Quy tắc:** Teacher host + keyboard editor chạy **trong** `/admin` (iframe). Học sinh luôn `/join` hoặc `/join/{pin}` (URL cũ `/app/index.html?pin=` vẫn hoạt động qua query `pin`).
+**Quy tắc:** Teacher host + keyboard editor chạy **trong** `/admin` (iframe). Học sinh: trang chủ `/home`; chơi game `/join` hoặc deep-link `/join/{pin}` (URL cũ `/app/index.html?pin=` vẫn hoạt động qua query `pin`).
 
 Chi tiết checklist: [`local-deployment-plan.md`](../local-deployment-plan.md).
 

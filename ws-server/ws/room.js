@@ -31,6 +31,10 @@ function registerRoomHandlers(io, redis) {
       try {
         const result = await handleJoinRoom(io, redis, socket, payload);
         socket.emit('room_joined', result);
+        if (!payload.is_host && result.room_status === 'playing') {
+          const { syncLateJoinStudent } = require('./gameplay');
+          await syncLateJoinStudent(io, redis, socket, result.pin);
+        }
         if (typeof ack === 'function') ack({ success: true, data: result });
       } catch (err) {
         const message = err.message || 'Không thể vào phòng.';
@@ -153,6 +157,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
     score,
     is_host: player.is_host,
     room_status: room.status || 'waiting',
+    question_index: room.status === 'playing' ? Number(room.question_index || 0) : null,
   };
 }
 

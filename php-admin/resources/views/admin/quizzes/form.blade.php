@@ -37,14 +37,13 @@
         </div>
 
         <div class="form-group">
-            <label for="tags_input">Chủ đề (tag)</label>
-            <input type="text" id="tags_input" name="tags_input" value="{{ old('tags_input') }}" placeholder="Ví dụ: Hóa vô cơ, Hóa hữu cơ" list="quiz-tag-suggestions">
-            <datalist id="quiz-tag-suggestions">
-                @foreach ($allTags as $tagName)
-                    <option value="{{ $tagName }}"></option>
-                @endforeach
-            </datalist>
-            <p class="hint">Phân cách bằng dấu phẩy.</p>
+            @include('admin.partials.tag-select', [
+                'mode' => 'multi',
+                'tags' => $bankTags,
+                'selected' => $selectedQuizTagIds ?? [],
+                'label' => 'Chủ đề (tag)',
+            ])
+            @error('tag_ids')<div class="field-error">{{ $message }}</div>@enderror
         </div>
 
         <div class="form-row">

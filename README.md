@@ -17,11 +17,11 @@ Website đố vui hóa học real-time dạng Kahoot. **Học sinh: mobile only.
 | Surface | Platform | URL local |
 |---|---|---|
 | **Admin (GV)** | Web desktop | `http://localhost:38480/admin` |
-| **Học sinh** | Mobile | `http://localhost:38480/join/{PIN}` |
+| **Học sinh** | Mobile | `http://localhost:38480/home` (trang chủ) · `/join` (chơi game) |
 
 **Luồng GV:** Login → Admin → soạn game/quiz/bàn phím → **Phòng chơi** → tạo phòng → **Vào phòng** (điều khiển + link HS).
 
-**Luồng HS:** Mở link `/join/123456` hoặc `/join` → nhập PIN → chơi. (Cùng port `38480` với admin; WS ở `38581`.)
+**Luồng HS:** Trang chủ `/home` → **Chơi game** → nhập PIN / quét QR → chơi. Deep-link QR: `/join/123456`. (Cùng port `38480` với admin; WS ở `38581`.)
 
 **Trải nghiệm app (không thanh URL):** học sinh **Thêm vào Màn hình chính** trên điện thoại (PWA). Mở link thường trong trình duyệt vẫn hiện thanh địa chỉ — đó là giới hạn bảo mật của trình duyệt, không tắt được bằng code.
 

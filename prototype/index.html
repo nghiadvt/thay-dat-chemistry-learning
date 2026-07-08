@@ -21,20 +21,30 @@
 
 <div id="app">
 
-  <!-- Welcome -->
-  <section class="screen welcome-screen active" data-screen="welcome">
-    <div class="welcome-bg-pattern"></div>
-    <div class="welcome-inner">
-      <img src="assets/logo.png" alt="Hóa Thầy Đạt" class="welcome-logo-img">
-      <h1 class="welcome-hero-title">ĐỐ VUI HÓA HỌC<br>REAL-TIME</h1>
-      <p class="welcome-hero-sub">Học vui – Nhớ lâu – Điểm cao</p>
-      <div class="welcome-hero-wrap">
-        <img src="assets/teacher-hero.png" alt="" class="welcome-hero-img">
-      </div>
-      <div class="welcome-actions">
-        <button class="btn-join-room" onclick="showScreen('join')">Tham gia phòng</button>
-        <button class="btn-guide" onclick="showScreen('guide')">Hướng dẫn</button>
-      </div>
+  <!-- Home hub -->
+  <section class="screen home-screen active" data-screen="home">
+    <div class="home-bg-pattern"></div>
+    <div class="home-inner">
+      <img src="assets/logo.png" alt="Hóa Thầy Đạt" class="home-logo">
+      <h1 class="home-title">Hóa Thầy Đạt</h1>
+      <nav class="home-menu" aria-label="Chức năng học sinh">
+        <button type="button" class="home-menu-item" onclick="openHomeFeature('play')">
+          <span class="home-menu-icon" aria-hidden="true">🎮</span>
+          <span class="home-menu-label">Chơi game</span>
+        </button>
+        <button type="button" class="home-menu-item" onclick="openHomeFeature('elements')">
+          <span class="home-menu-icon" aria-hidden="true">🔊</span>
+          <span class="home-menu-label">Đọc nguyên tố</span>
+        </button>
+        <button type="button" class="home-menu-item" onclick="openHomeFeature('balance')">
+          <span class="home-menu-icon" aria-hidden="true">⚖️</span>
+          <span class="home-menu-label">Cân bằng phương trình</span>
+        </button>
+        <button type="button" class="home-menu-item" onclick="openHomeFeature('quiz')">
+          <span class="home-menu-icon" aria-hidden="true">📚</span>
+          <span class="home-menu-label">Ôn trắc nghiệm</span>
+        </button>
+      </nav>
     </div>
   </section>
 
@@ -42,8 +52,8 @@
   <section class="screen join-screen no-pad" data-screen="join">
     <div class="join-top">
       <div class="join-nav">
-        <button class="join-back" onclick="showScreen('welcome')" aria-label="Quay lại">←</button>
-        <h2>Tham gia phòng</h2>
+        <button class="join-back" onclick="goStudentHome()" aria-label="Quay lại">←</button>
+        <h2>Chơi game</h2>
         <button class="join-profile-btn" aria-label="Hồ sơ">👤</button>
       </div>
       <div class="join-tabs-line">
@@ -59,16 +69,22 @@
     </div>
     <div class="join-content qr-content" id="joinQrContent" style="display:none">
       <p class="join-instruction">Quét mã QR do giáo viên cung cấp</p>
-      <div class="qr-scanner-wrap" onclick="simulateQrScan()">
-        <div class="qr-frame">
-          <img src="assets/qr-login.png" alt="QR Code" class="qr-mock-img">
-          <span class="qr-bracket tl"></span>
-          <span class="qr-bracket tr"></span>
-          <span class="qr-bracket bl"></span>
-          <span class="qr-bracket br"></span>
-        </div>
+      <div class="qr-scanner-wrap" id="qrScannerIdle">
+        <button type="button" class="qr-scanner-start" id="btnQrStart" onclick="startQrScanner()">
+          <div class="qr-scanner-frame">
+            <span class="qr-bracket tl"></span>
+            <span class="qr-bracket tr"></span>
+            <span class="qr-bracket bl"></span>
+            <span class="qr-bracket br"></span>
+            <span class="qr-scanner-icon" aria-hidden="true">📷</span>
+          </div>
+          <span class="qr-scanner-cta">Chạm để quét mã QR</span>
+        </button>
       </div>
-      <p class="join-instruction qr-bottom">Hướng camera vào mã QR của giáo viên</p>
+      <div id="qrReader" class="qr-reader-host" hidden></div>
+      <input type="file" id="qrFileInput" accept="image/*" capture="environment" hidden onchange="onQrCaptureSelected(event)">
+      <button type="button" class="btn-qr-cancel" id="btnQrCancel" onclick="stopQrScanner()" hidden>Huỷ quét</button>
+      <p class="join-instruction qr-bottom">Hướng camera vào mã QR trên màn hình giáo viên</p>
     </div>
     <div class="numpad join-numpad" id="numpadPin"></div>
   </section>
@@ -76,7 +92,7 @@
   <!-- Guide -->
   <section class="screen" data-screen="guide">
     <div class="screen-header">
-      <button class="back-btn" onclick="showScreen('welcome')">←</button>
+      <button class="back-btn" onclick="goStudentHome()">←</button>
       <h2>Hướng dẫn</h2>
     </div>
     <div class="card" style="flex:1;overflow-y:auto">
@@ -88,7 +104,7 @@
           <li>Chờ giáo viên bắt đầu — có thể sửa tên/ảnh trong lúc chờ.</li>
         </ol>
       </div>
-      <button class="btn-outline-dark" style="margin-top:20px" onclick="showScreen('welcome')">Quay lại</button>
+      <button class="btn-outline-dark" style="margin-top:20px" onclick="goStudentHome()">Quay lại</button>
     </div>
   </section>
 
@@ -96,7 +112,7 @@
   <section class="screen" data-screen="profile">
     <div class="screen-header">
       <button class="back-btn" onclick="showScreen('join')">←</button>
-      <h2>Tham gia phòng</h2>
+      <h2>Chơi game</h2>
     </div>
     <div class="profile-body">
       <div class="avatar-wrap" onclick="onAvatarClick()">
@@ -228,7 +244,7 @@
     <div class="podium" id="podium"></div>
     <div class="btn-group" style="flex-shrink:0">
       <button class="btn-primary" onclick="restartGame()">Chơi lại</button>
-      <button class="btn-secondary" onclick="showScreen('welcome')">Về trang chủ</button>
+      <button class="btn-secondary" onclick="goStudentHome()">Về trang chủ</button>
     </div>
   </section>
 
@@ -248,6 +264,7 @@
 <div class="demo-nav" id="demoNav"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>

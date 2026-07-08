@@ -9,6 +9,23 @@ use Illuminate\Support\Collection;
 class QuizTagService
 {
     /**
+     * @param  list<int|string>  $tagIds
+     * @return Collection<int, Tag>
+     */
+    public function syncFromIds(Quiz $quiz, array $tagIds): Collection
+    {
+        $ids = collect($tagIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $quiz->tags()->sync($ids);
+
+        return $quiz->tags()->orderBy('name')->get();
+    }
+
+    /**
      * @return Collection<int, Tag>
      */
     public function syncFromInput(Quiz $quiz, ?string $tagsInput): Collection

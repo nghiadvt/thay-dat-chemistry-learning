@@ -3,7 +3,7 @@
 > Design tokens, layout, component patterns cho **UI học sinh (mobile only)**.
 > **Admin + Teacher:** web desktop — Laravel `/admin` nhúng prototype qua iframe (`embedded=admin`); CSS embed ghi ở §12.
 
-**Cập nhật lần cuối:** 2026-07-08 (PWA standalone — học sinh cài màn hình chính)
+**Cập nhật lần cuối:** 2026-07-09 (trang chủ hub HS; join tab QR = camera quét)
 
 ---
 
@@ -261,10 +261,17 @@ Full viewport height, flex column, **không scroll**:
 
 ## 7. Screen-specific notes
 
-### Welcome
-- Gradient background full screen
-- Illustration placeholder (emoji 🧪 hoặc SVG)
-- 2 nút stacked: Primary "Tham gia phòng", Secondary "Hướng dẫn"
+### Home (trang chủ hub)
+- Nền gradient tối, logo + tiêu đề «Hóa Thầy Đạt»
+- Menu 4 mục dọc: icon + tên (không mô tả phụ). **Chơi game** · **Đọc nguyên tố** · **Cân bằng phương trình** · **Ôn trắc nghiệm**
+- 3 mục sau (chưa làm) → toast «sắp ra mắt»
+
+### Join — tab Quét QR
+- Khung viewfinder + icon camera; chạm **Chạm để quét mã QR**
+- **HTTPS / localhost:** camera live trong trang (`html5-qrcode` + `getUserMedia`)
+- **HTTP LAN (Wi‑Fi):** mở **camera native** qua `<input capture>` → decode ảnh QR (không cần HTTPS)
+- **Cách khác (luôn dùng được):** app Camera điện thoại quét QR GV → mở thẳng `/join/{pin}` (deep-link)
+- **Không** hiển thị ảnh QR tĩnh (đó là mã GV cho HS quét)
 
 ### Waiting room
 - Card trắng center

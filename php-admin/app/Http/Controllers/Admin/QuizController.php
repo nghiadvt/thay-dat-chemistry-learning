@@ -31,8 +31,12 @@ class QuizController extends Controller
         }
 
         if ($request->filled('tag_id')) {
-            $tagId = $request->integer('tag_id');
-            $query->whereHas('tags', fn ($q) => $q->where('tags.id', $tagId));
+            if ($request->string('tag_id')->toString() === 'none') {
+                $query->whereDoesntHave('tags');
+            } else {
+                $tagId = $request->integer('tag_id');
+                $query->whereHas('tags', fn ($q) => $q->where('tags.id', $tagId));
+            }
         }
 
         return view('admin.quizzes.index', [
@@ -40,7 +44,7 @@ class QuizController extends Controller
             'games' => Game::orderBy('name')->get(),
             'tags' => Tag::query()->orderBy('name')->get(),
             'filterGameId' => $request->integer('game_id') ?: null,
-            'filterTagId' => $request->integer('tag_id') ?: null,
+            'filterTagId' => $request->filled('tag_id') ? $request->string('tag_id')->toString() : null,
         ]);
     }
 
@@ -50,7 +54,8 @@ class QuizController extends Controller
             'quiz' => null,
             'games' => Game::orderBy('name')->get(),
             'keyboards' => Keyboard::orderBy('name')->get(),
-            'allTags' => Tag::query()->orderBy('name')->pluck('name'),
+            'bankTags' => Tag::query()->orderBy('name')->get(),
+            'selectedQuizTagIds' => old('tag_ids', []),
         ]);
     }
 
@@ -66,7 +71,7 @@ class QuizController extends Controller
             'shuffle_options' => $request->boolean('shuffle_options'),
         ]);
 
-        $this->quizTagService->syncFromInput($quiz, $request->input('tags_input'));
+        $this->quizTagService->syncFromIds($quiz, $request->input('tag_ids', []));
 
         return redirect()->route('admin.quizzes.show', $quiz)
             ->with('success', 'Đã tạo quiz. Thêm câu hỏi bên dưới.');
@@ -74,13 +79,19 @@ class QuizController extends Controller
 
     public function show(Quiz $quiz): View
     {
-        $quiz->load(['game', 'keyboard', 'tags', 'questions' => fn ($q) => $q->orderBy('sort_order')]);
+        $quiz->load([
+            'game',
+            'keyboard',
+            'tags',
+            'questions' => fn ($q) => $q->orderBy('sort_order')->with('sourceBankItem.tags'),
+        ]);
 
         return view('admin.quizzes.show', [
             'quiz' => $quiz,
             'games' => Game::orderBy('name')->get(),
             'keyboards' => Keyboard::orderBy('name')->get(),
-            'allTags' => Tag::query()->orderBy('name')->pluck('name'),
+            'bankTags' => Tag::query()->orderBy('name')->get(),
+            'selectedQuizTagIds' => old('tag_ids', $quiz->tags->pluck('id')->all()),
         ]);
     }
 
@@ -104,7 +115,7 @@ class QuizController extends Controller
             $quiz->update(['is_active' => $request->boolean('is_active')]);
         }
 
-        $this->quizTagService->syncFromInput($quiz, $request->input('tags_input'));
+        $this->quizTagService->syncFromIds($quiz, $request->input('tag_ids', []));
 
         return redirect()->route('admin.quizzes.show', $quiz)
             ->with('success', 'Đã cập nhật quiz.');
@@ -140,7 +151,8 @@ class QuizController extends Controller
             'is_active' => ['nullable'],
             'show_explanation' => ['nullable'],
             'shuffle_options' => ['nullable'],
-            'tags_input' => ['nullable', 'string', 'max:1000'],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', 'exists:tags,id'],
         ]);
     }
 }

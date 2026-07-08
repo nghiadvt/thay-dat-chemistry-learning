@@ -1,0 +1,298 @@
+/* Quiz questions — bank modal, drag-drop, bulk */
+
+.qq-add-actions .qq-split-btn {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.qq-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.qq-bulk-bar--idle {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.qq-bulk-bar--idle .qq-bulk-count {
+  color: #9ca3af;
+}
+
+.qq-bulk-bar--active {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.qq-bulk-bar--active .qq-bulk-count {
+  color: #1e40af;
+}
+
+.qq-bulk-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(0.15);
+}
+
+.qq-bulk-actions .btn.btn-danger:disabled {
+  background: #fca5a5;
+  border-color: #fca5a5;
+  color: #fff;
+  opacity: 0.45;
+}
+
+.qq-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.qq-col-check { width: 36px; }
+.qq-col-drag { width: 32px; }
+
+.qq-drag-handle {
+  cursor: grab;
+  color: #9ca3af;
+  font-size: 1.1rem;
+  user-select: none;
+}
+
+.qq-question-row.dragging { opacity: 0.45; }
+.qq-question-row.drag-over td { background: #eff6ff !important; }
+
+.qq-questions-table .btn-link {
+  background: none;
+  border: none;
+  color: #2D46D6;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+}
+
+/* Modal */
+.qq-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.qq-modal[hidden] { display: none; }
+
+.qq-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.qq-modal-dialog {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+  width: min(920px, 100%);
+  max-height: min(88vh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.qq-bank-modal { width: min(1040px, 100%); }
+
+.qq-modal-header,
+.qq-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  flex-shrink: 0;
+}
+
+.qq-modal-header {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.qq-modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.qq-modal-footer {
+  border-top: 1px solid #e5e7eb;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.qq-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px 8px;
+}
+
+.qq-modal-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.qq-modal-filters .form-group { margin: 0; min-width: 140px; }
+.qq-filter-search { flex: 1; min-width: 200px; }
+
+.qq-bank-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.qq-bank-list-wrap,
+.qq-bank-selected-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 16px;
+}
+
+.qq-bank-selected-wrap {
+  border-left: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.qq-bank-list-label,
+.qq-bank-selected-label {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.qq-bank-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 200px;
+  max-height: 380px;
+}
+
+.qq-bank-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.qq-bank-item:hover { border-color: #93c5fd; }
+.qq-bank-item.is-selected { border-color: #2D46D6; background: #eff6ff; }
+.qq-bank-item.is-disabled { opacity: 0.55; cursor: not-allowed; }
+
+.qq-bank-item input { margin-top: 3px; flex-shrink: 0; }
+
+.qq-bank-item-body { flex: 1; min-width: 0; }
+
+.qq-bank-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.qq-bank-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.qq-bank-badge--warn { background: #fef3c7; color: #92400e; }
+
+.qq-bank-item-preview {
+  font-size: 0.85rem;
+  color: #374151;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.qq-bank-selected {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-content: flex-start;
+  min-height: 120px;
+  max-height: 380px;
+}
+
+.qq-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 8px 4px 10px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.qq-selected-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.qq-selected-chip button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.qq-bank-empty,
+.qq-bank-loading {
+  color: #6b7280;
+  font-size: 0.9rem;
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.qq-modal-body { padding: 16px 20px; }
+
+.qb-tag-select {
+  width: 100%;
+  min-height: 120px;
+}

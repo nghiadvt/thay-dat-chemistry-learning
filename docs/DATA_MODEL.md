@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-09 (thêm `answer_type: structured`)
+**Cập nhật lần cuối:** 2026-07-09 (lọc multi-tag `tag_match` AND/OR)
 
 ---
 
@@ -17,6 +17,8 @@ erDiagram
   KEYBOARDS ||--o{ QUIZZES : "used by"
   QUIZZES ||--o{ QUESTIONS : contains
   QUIZZES }o--o{ TAGS : "tagged with"
+  QUESTION_BANK_ITEMS }o--o{ TAGS : "tagged with"
+  QUESTION_BANK_ITEMS ||--o{ QUESTIONS : "copied to"
   GAMES ||--o{ GAME_SESSIONS : "played as"
   GAME_SESSIONS ||--o{ GAME_RESULTS : "final scores"
   GAME_SESSIONS ||--o{ SESSION_ANSWERS : "per question"
@@ -114,7 +116,7 @@ Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Pr
 
 | Bảng | Cột | Ghi chú |
 |---|---|---|
-| `tags` | `id`, `name` UNIQUE, `slug` UNIQUE, `timestamps` | Chủ đề: "Hóa vô cơ", "Lớp 10", … |
+| `tags` | `id`, `name` UNIQUE, `slug` UNIQUE, `color` CHAR(7) DEFAULT `#2D46D6`, `timestamps` | Chủ đề có màu — 7 preset + custom qua admin UI |
 | `quiz_tag` | `quiz_id` FK, `tag_id` FK | PK composite — 1 quiz nhiều tag |
 
 Admin nhập tag dạng chuỗi phân cách dấu phẩy; lọc quiz theo tag trên `/admin/quizzes`.
@@ -129,6 +131,7 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 |---|---|---|
 | `id` | BIGINT PK | |
 | `quiz_id` | BIGINT FK → `quizzes.id` ON DELETE CASCADE | |
+| `source_bank_question_id` | BIGINT FK → `question_bank_items.id` ON DELETE SET NULL NULL | Nguồn từ bộ câu hỏi (nếu copy); NULL nếu tạo trực tiếp trong quiz |
 | `content` | LONGTEXT NOT NULL | HTML: đề text + `<img>` + `<video>` (sanitize trước lưu) |
 | `explanation` | LONGTEXT NULL | HTML giải thích đáp án (tuỳ chọn, sanitize trước lưu) |
 | `answer_type` | ENUM('mc','essay','structured') NOT NULL | |
@@ -163,6 +166,39 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 <p>Quan sát video thí nghiệm:</p>
 <video src="/storage/questions/demo.mp4" poster="/storage/questions/demo-poster.jpg" controls></video>
 ```
+
+---
+
+## 7.1 Bảng `question_bank_items` (bộ câu hỏi)
+
+Câu hỏi mẫu tái sử dụng — **không** gắn `quiz_id`. Khi thêm vào quiz → **copy** sang `questions` (bản sao độc lập).
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `content` | LONGTEXT NOT NULL | Giống `questions.content` |
+| `explanation` | LONGTEXT NULL | |
+| `answer_type` | ENUM('mc','essay','structured') NOT NULL | |
+| `options` | JSON NULL | `mc` |
+| `correct_index` | TINYINT UNSIGNED NULL | `mc` |
+| `correct_answer_normalized` | TEXT NULL | `essay` |
+| `input_mode` | VARCHAR(32) NULL | `structured` |
+| `template` | JSON NULL | `structured` |
+| `correct_answer` | JSON NULL | `structured` |
+| `time_limit_seconds` | INT NOT NULL DEFAULT 30 | Mặc định khi copy |
+| `points` | SMALLINT UNSIGNED NOT NULL DEFAULT 1 | Mặc định khi copy |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true | |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+**Tag câu hỏi:** N–N qua `question_bank_tag` (dùng chung bảng `tags`).
+
+| Bảng | Cột | Ghi chú |
+|---|---|---|
+| `question_bank_tag` | `question_bank_item_id` FK, `tag_id` FK | PK composite |
+
+Admin: `/admin/question-bank` — CRUD + **lọc nhiều chủ đề** (checkbox, chế độ **VÀ/HOẶC** qua `tag_match`) + checkbox bulk đổi tag. Cột chủ đề chip + ⋮ editor. Modal thêm từ bộ trong quiz cũng lọc multi-tag.
+
+**Đồng bộ với quiz:** Mọi câu tạo/sửa trong quiz tự có bản tương ứng trong bộ (`source_bank_question_id`). Câu quiz cũ được backfill khi migrate. Câu chưa gán tag → lọc **Chưa có chủ đề**.
 
 ---
 

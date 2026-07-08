@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-08 (submit lock-in; question_result khi hết câu)
+**Cập nhật lần cuối:** 2026-07-09 (lọc multi-tag: `tag_match` AND/OR + hiển thị đủ tên chủ đề)
 
 ---
 
@@ -58,6 +58,17 @@ Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/
 | GET/POST | `/admin/games` | CRUD game |
 | GET/POST | `/admin/quizzes` | CRUD quiz (+ `show` xem câu hỏi) |
 | GET/POST | `/admin/quizzes/{quiz}/questions` | CRUD câu hỏi nested |
+| POST | `/admin/quizzes/{quiz}/questions/from-bank` | JSON `{ bank_ids: [1,2,3] }` — copy từ bộ câu hỏi |
+| PATCH | `/admin/quizzes/{quiz}/questions/reorder` | JSON `{ order: [qid, ...] }` — cập nhật `sort_order` |
+| PATCH | `/admin/quizzes/{quiz}/questions/bulk` | JSON `{ question_ids, time_limit_seconds?, points?, is_active?, tag_ids?, action?: "delete" }` |
+| PATCH | `/admin/quizzes/{quiz}/questions/{question}/tags` | JSON `{ tag_ids: [1,2] }` — đổi chủ đề nhanh (sync qua `source_bank_question_id`) |
+| GET/POST | `/admin/question-bank` | CRUD bộ câu hỏi (tag multi-select) |
+| PATCH | `/admin/question-bank/bulk-tags` | JSON `{ item_ids: [1,2], tag_ids: [3] }` — đổi chủ đề hàng loạt |
+| PATCH | `/admin/question-bank/{id}/tags` | JSON `{ tag_ids: [1,2] }` — đổi chủ đề nhanh trên danh sách bộ |
+| GET | `/admin/question-bank/search` | JSON lọc câu cho modal; query `tag_ids[]`, `tag_match=and\|or` (mặc định `and`), `tag_none=1`, `answer_type`, `q`, `quiz_id` (tương thích `tag_id` cũ) |
+| GET | `/admin/tags` | JSON danh sách tag `{ id, name, color, text_color }` |
+| POST | `/admin/tags` | JSON `{ name, color }` — tạo chủ đề mới (màu `#RRGGBB`) |
+| PATCH | `/admin/tags/{id}` | JSON `{ name, color }` — sửa chủ đề |
 | GET/POST | `/admin/sessions` | Tạo phòng |
 | GET | `/admin/sessions/{id}/edit` | Sửa phòng: **tên** luôn; **quiz** chỉ khi `status=waiting` (cập nhật Redis `game_id`/`quiz_id`). PIN + QR không đổi |
 | PUT | `/admin/sessions/{id}` | Cập nhật sau form edit |
@@ -67,11 +78,12 @@ Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/
 | GET | `/admin/reports/{id}` | Chi tiết điểm |
 | GET | `/admin/reports/{id}/export` | Tải CSV UTF-8 |
 
-| GET | `/join` | Màn học sinh — nhập PIN / quét QR |
+| GET | `/home` | Trang chủ học sinh — hub 4 chức năng (inject `HTD_ENTRY_SCREEN=home`) |
+| GET | `/join` | Chơi game — nhập PIN / quét QR camera (inject `HTD_ENTRY_SCREEN=join`) |
 | GET | `/join/{pin}` | Deep-link QR: inject `HTD_JOIN_PIN` → validate → tên/avatar; **không** dừng ở nhập PIN |
-| GET | `/app/index.html` | Legacy — redirect → `/join` hoặc `/join/{pin}` nếu có `?pin=` |
+| GET | `/app/index.html` | Legacy — redirect → `/home`, `/join/{pin}` nếu có `?pin=` |
 
-Học sinh tham gia: `http://192.168.x.x:38480/join/123456` (hoặc `/join` rồi nhập PIN). Quét QR = mở `/join/{pin}` → sau khi PIN hợp lệ vào thẳng bước đặt tên / ảnh.
+Học sinh: trang chủ `http://192.168.x.x:38480/home` · chơi game `/join` · deep-link `/join/123456` (quét QR bằng app Camera điện thoại). Tab **Quét QR** trong app: live camera (HTTPS) hoặc chụp ảnh QR (HTTP LAN).
 
 **QR trên trang host:** `SessionQrService::displayQrUrl()` — PNG lưu storage nếu tạo được; không được thì CDN `qrserver` với `data={APP_URL}/join/{pin}`. **Không** fallback `htd-admin/assets/qr-login.png` (ảnh mock). Dưới QR hiển thị text `joinUrl` để đối chiếu.
 
@@ -273,7 +285,7 @@ TTL room:482910   → ~7200
 | `host_end_game` | `{}` | **Host only** — kết thúc sớm, lưu `game_results` |
 | `submit_answer` | `{ question_id, answer, hybrid_timestamp }` | **Student only** — nộp / đổi đáp án trong lúc câu mở |
 
-**Ack `submit_answer` thành công:** `{ success: true, data: { locked, elapsed_seconds, answer_display, can_change } }` — **không** chấm điểm.
+**Ack `submit_answer` thành công:** `{ success: true, data: { locked, elapsed_seconds, answer_display, can_change } }` — **không** chấm điểm. `elapsed_seconds` = giây từ `question_started_at` đến `last_submit_at` (cập nhật khi HS đổi đáp án). Chấm điểm khi finalize vẫn dùng `first_submit_at`.
 
 **Lỗi `submit_answer` (ack `{ success: false, error }` hoặc `room_error`):**
 
@@ -297,7 +309,7 @@ Redis: `room:{PIN}:answer:{question_id}:{student_name}` lưu `{ answer, first_su
 
 | Event | Payload | Ghi chú |
 |---|---|---|
-| `room_joined` | `{ pin, name, player_token, reconnected, score, is_host, room_status }` | Sau `join_room` thành công |
+| `room_joined` | `{ pin, name, player_token, reconnected, score, is_host, room_status, question_index? }` | Sau `join_room` thành công. `question_index` (0-based) chỉ khi `room_status === 'playing'`. Join muộn: server tiếp theo emit `game_started` + `new_question` câu hiện tại |
 | `room_error` | `{ message }` | Lỗi join / gameplay |
 | `players_update` | `{ players: [{ name, connected, score, avatar }] }` | Cập nhật danh sách HS; `avatar` = data URL hoặc `null` |
 | `ntp_pong` | `{ t0, t1, t2 }` | Phản hồi NTP |

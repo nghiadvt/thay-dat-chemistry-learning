@@ -8,7 +8,12 @@
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ file_exists(public_path('css/admin.css')) ? filemtime(public_path('css/admin.css')) : time() }}">
     @stack('head')
 </head>
-<body class="admin-body @yield('body-class')">
+<body class="admin-body @yield('body-class')"
+      data-tags-index-url="{{ route('admin.tags.index') }}"
+      data-tags-store-url="{{ route('admin.tags.store') }}"
+      data-tags-update-url="{{ url('/admin/tags') }}">
+@include('admin.partials.tag-create-modal')
+
 <div class="admin-shell" id="adminShell">
     <aside class="admin-sidebar" id="adminSidebar" aria-label="Menu điều hướng">
         <div class="admin-brand">
@@ -20,13 +25,14 @@
             <a href="{{ route('admin.keyboards.index') }}" class="{{ request()->routeIs('admin.keyboards.*') ? 'active' : '' }}">Bàn phím</a>
             <a href="{{ route('admin.games.index') }}" class="{{ request()->routeIs('admin.games.*') ? 'active' : '' }}">Game</a>
             <a href="{{ route('admin.quizzes.index') }}" class="{{ request()->routeIs('admin.quizzes.*') || request()->routeIs('admin.questions.*') ? 'active' : '' }}">Quiz</a>
+            <a href="{{ route('admin.question-bank.index') }}" class="{{ request()->routeIs('admin.question-bank.*') ? 'active' : '' }}">Bộ câu hỏi</a>
             <a href="{{ route('admin.sessions.index') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Báo cáo</a>
         </nav>
     </aside>
 
     <div class="admin-main">
-        @unless(request()->routeIs('admin.keyboards.editor', 'admin.questions.create', 'admin.questions.edit'))
+        @unless(request()->routeIs('admin.keyboards.editor', 'admin.questions.create', 'admin.questions.edit', 'admin.question-bank.create', 'admin.question-bank.edit'))
         <header class="admin-topbar">
             <div class="admin-topbar-left">
                 <button type="button" class="admin-sidebar-toggle" data-admin-sidebar-toggle aria-label="Đóng/mở menu" aria-expanded="true" aria-controls="adminSidebar">
@@ -70,6 +76,8 @@ window.__ADMIN_FLASH__ = @json(array_filter([
 @endif
 <script src="{{ asset('js/admin-toast.js') }}?v={{ file_exists(public_path('js/admin-toast.js')) ? filemtime(public_path('js/admin-toast.js')) : time() }}"></script>
 <script src="{{ asset('js/admin-sidebar.js') }}?v={{ file_exists(public_path('js/admin-sidebar.js')) ? filemtime(public_path('js/admin-sidebar.js')) : time() }}"></script>
+<script>window.TAG_PRESET_COLORS = @json(\App\Models\Tag::PRESET_COLORS);</script>
+<script src="{{ asset('js/admin-tags.js') }}?v={{ file_exists(public_path('js/admin-tags.js')) ? filemtime(public_path('js/admin-tags.js')) : time() }}"></script>
 @if (session('success') || session('error'))
 <script>
 document.addEventListener('DOMContentLoaded', function () {

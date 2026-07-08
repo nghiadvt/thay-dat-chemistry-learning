@@ -3,10 +3,12 @@
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\Admin\KeyboardController as AdminKeyboardController;
+use App\Http\Controllers\Admin\QuestionBankController as AdminQuestionBankController;
 use App\Http\Controllers\Admin\QuestionController as AdminQuestionController;
 use App\Http\Controllers\Admin\QuizController as AdminQuizController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\SessionController as AdminSessionController;
+use App\Http\Controllers\Admin\TagController as AdminTagController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\GameSessionController;
 use App\Http\Controllers\Api\KeyboardController;
@@ -44,6 +46,8 @@ Route::get('sw.js', function () {
     ]);
 });
 
+Route::get('home', [StudentJoinController::class, 'home'])->name('student.home');
+
 Route::get('join', [StudentJoinController::class, 'show'])->name('student.join');
 Route::get('join/{pin}', [StudentJoinController::class, 'show'])
     ->where('pin', '[0-9]{6}')
@@ -71,8 +75,21 @@ Route::middleware('auth')->group(function () {
         Route::resource('quizzes', AdminQuizController::class);
         Route::patch('quizzes/{quiz}/active', [AdminQuizController::class, 'toggleActive'])->name('quizzes.toggle-active');
 
+        Route::get('question-bank/search', [AdminQuestionBankController::class, 'search'])->name('question-bank.search');
+        Route::patch('question-bank/bulk-tags', [AdminQuestionBankController::class, 'bulkUpdateTags'])->name('question-bank.bulk-tags');
+        Route::patch('question-bank/{question_bank}/tags', [AdminQuestionBankController::class, 'updateTags'])->name('question-bank.update-tags');
+        Route::resource('question-bank', AdminQuestionBankController::class)->except(['show']);
+
+        Route::get('tags', [AdminTagController::class, 'index'])->name('tags.index');
+        Route::post('tags', [AdminTagController::class, 'store'])->name('tags.store');
+        Route::patch('tags/{tag}', [AdminTagController::class, 'update'])->name('tags.update');
+
         Route::get('quizzes/{quiz}/questions/create', [AdminQuestionController::class, 'create'])->name('questions.create');
         Route::post('quizzes/{quiz}/questions', [AdminQuestionController::class, 'store'])->name('questions.store');
+        Route::post('quizzes/{quiz}/questions/from-bank', [AdminQuestionController::class, 'fromBank'])->name('questions.from-bank');
+        Route::patch('quizzes/{quiz}/questions/reorder', [AdminQuestionController::class, 'reorder'])->name('questions.reorder');
+        Route::patch('quizzes/{quiz}/questions/bulk', [AdminQuestionController::class, 'bulkUpdate'])->name('questions.bulk');
+        Route::patch('quizzes/{quiz}/questions/{question}/tags', [AdminQuestionController::class, 'updateTags'])->name('questions.update-tags');
         Route::get('quizzes/{quiz}/questions/{question}/edit', [AdminQuestionController::class, 'edit'])->name('questions.edit');
         Route::put('quizzes/{quiz}/questions/{question}', [AdminQuestionController::class, 'update'])->name('questions.update');
         Route::patch('quizzes/{quiz}/questions/{question}/active', [AdminQuestionController::class, 'toggleActive'])->name('questions.toggle-active');

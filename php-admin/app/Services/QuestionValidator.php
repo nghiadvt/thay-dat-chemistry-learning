@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Question;
+use App\Models\QuestionBankItem;
 use Illuminate\Validation\ValidationException;
 
 class QuestionValidator
@@ -19,7 +20,7 @@ class QuestionValidator
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function validateAndPrepare(array $data, ?Question $existing = null): array
+    public function validateAndPrepare(array $data, Question|QuestionBankItem|null $existing = null): array
     {
         $answerType = $data['answer_type'] ?? $existing?->answer_type;
         if (! in_array($answerType, ['mc', 'essay', 'structured'], true)) {
@@ -56,7 +57,7 @@ class QuestionValidator
     /**
      * @param  array<string, mixed>  $data
      */
-    private function validateMultipleChoice(array $data, ?Question $existing): void
+    private function validateMultipleChoice(array $data, Question|QuestionBankItem|null $existing): void
     {
         $options = $data['options'] ?? $existing?->options;
         $correctIndex = $data['correct_index'] ?? $existing?->correct_index;
@@ -77,7 +78,7 @@ class QuestionValidator
     /**
      * @param  array<string, mixed>  $data
      */
-    private function validateEssay(array $data, ?Question $existing): void
+    private function validateEssay(array $data, Question|QuestionBankItem|null $existing): void
     {
         $answer = $data['correct_answer_normalized'] ?? $existing?->correct_answer_normalized;
         if (empty(trim((string) $answer))) {
@@ -90,7 +91,7 @@ class QuestionValidator
     /**
      * @param  array<string, mixed>  $data
      */
-    private function validateStructured(array $data, ?Question $existing): void
+    private function validateStructured(array $data, Question|QuestionBankItem|null $existing): void
     {
         $inputMode = $data['input_mode'] ?? $existing?->input_mode;
         if (! in_array($inputMode, self::STRUCTURED_INPUT_MODES, true)) {

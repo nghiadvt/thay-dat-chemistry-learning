@@ -207,6 +207,79 @@ async function advanceQuestion(io, redis, pin) {
   return emitCurrentQuestion(io, redis, pin);
 }
 
+function buildStudentQuestionPayload(quiz, question, serverTime) {
+  return {
+    quiz_id: quiz.quiz_id,
+    question_id: question.id,
+    content: question.content,
+    answer_type: question.answer_type,
+    options: question.answer_type === 'mc' ? question.options : null,
+    template: question.answer_type === 'structured' ? question.template : null,
+    input_mode: question.input_mode || null,
+    keyboard_config: quiz.keyboard_config,
+    time_limit: question.time_limit_seconds,
+    server_time: serverTime,
+  };
+}
+
+function shouldShuffleOptions(quiz, question) {
+  return question.answer_type === 'mc'
+    && quiz.shuffle_options
+    && Array.isArray(question.options)
+    && question.options.length > 1;
+}
+
+async function getOrCreateOptionOrder(redis, pin, question, studentName) {
+  const key = optionOrderKey(pin, question.id, studentName);
+  const existing = await redis.get(key);
+  if (existing) {
+    return JSON.parse(existing);
+  }
+  const order = shuffleIndices(question.options.length);
+  await redis.set(key, JSON.stringify(order), 'EX', 7200);
+  return order;
+}
+
+async function emitNewQuestionToStudentSocket(io, redis, pin, socket, quiz, question, startedAt) {
+  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt);
+
+  if (shouldShuffleOptions(quiz, question)) {
+    const order = await getOrCreateOptionOrder(redis, pin, question, socket.data.name);
+    socket.emit('new_question', {
+      ...studentPayload,
+      options: order.map((originalIndex) => question.options[originalIndex]),
+    });
+    return;
+  }
+
+  socket.emit('new_question', studentPayload);
+}
+
+/** HS join sau khi game đã bắt đầu — đồng bộ câu hiện tại + timer theo question_started_at. */
+async function syncLateJoinStudent(io, redis, socket, pin) {
+  if (socket.data?.isHost) return;
+
+  const room = await redis.hgetall(roomKey(pin));
+  if (room.status !== 'playing' || !room.current_question_id) return;
+
+  const plan = await getPlan(redis, pin);
+  const quizIndex = Number(room.quiz_index || 0);
+  const questionIndex = Number(room.question_index || 0);
+  const quiz = plan[quizIndex];
+  const question = quiz.questions[questionIndex];
+  const startedAt = Number(room.question_started_at);
+  const finalized = await redis.get(finalizedKey(pin, question.id));
+
+  socket.emit('game_started', {});
+  if (finalized) {
+    // Giữa các câu (đã finalize) — chờ new_question tiếp theo.
+    return;
+  }
+
+  await emitNewQuestionToStudentSocket(io, redis, pin, socket, quiz, question, startedAt);
+  await emitSubmitCount(io, redis, pin, question.id);
+}
+
 async function emitCurrentQuestion(io, redis, pin) {
   const room = await redis.hgetall(roomKey(pin));
   const plan = await getPlan(redis, pin);
@@ -226,18 +299,7 @@ async function emitCurrentQuestion(io, redis, pin) {
   await refreshRoomTtl(redis, pin);
   await redis.expire(submittedKey(pin, question.id), 7200);
 
-  const studentPayload = {
-    quiz_id: quiz.quiz_id,
-    question_id: question.id,
-    content: question.content,
-    answer_type: question.answer_type,
-    options: question.answer_type === 'mc' ? question.options : null,
-    template: question.answer_type === 'structured' ? question.template : null,
-    input_mode: question.input_mode || null,
-    keyboard_config: quiz.keyboard_config,
-    time_limit: question.time_limit_seconds,
-    server_time: startedAt,
-  };
+  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt);
 
   const hostPayload = {
     ...studentPayload,
@@ -247,12 +309,7 @@ async function emitCurrentQuestion(io, redis, pin) {
     explanation: question.explanation,
   };
 
-  const shouldShuffle = question.answer_type === 'mc'
-    && quiz.shuffle_options
-    && Array.isArray(question.options)
-    && question.options.length > 1;
-
-  if (shouldShuffle) {
+  if (shouldShuffleOptions(quiz, question)) {
     const studentSockets = await getStudentSockets(io, pin);
     for (const studentSocket of studentSockets) {
       const order = shuffleIndices(question.options.length);
@@ -347,12 +404,13 @@ async function handleSubmitAnswer(io, redis, socket, payload) {
 
   await emitSubmitCount(io, redis, pin, questionId);
 
-  const elapsedSeconds = Math.max(0, Math.ceil((firstSubmitAt - startedAt) / 1000));
+  const lastSubmitAt = Number(hybridTimestamp);
+  const displayElapsedSeconds = Math.max(0, Math.ceil((lastSubmitAt - startedAt) / 1000));
   const answerDisplay = formatAnswerDisplay(question, answer);
 
   return {
     locked: true,
-    elapsed_seconds: elapsedSeconds,
+    elapsed_seconds: displayElapsedSeconds,
     answer_display: answerDisplay,
     can_change: true,
   };
@@ -648,4 +706,5 @@ async function mapShuffledAnswer(redis, pin, questionId, studentName, question, 
 
 module.exports = {
   registerGameplayHandlers,
+  syncLateJoinStudent,
 };

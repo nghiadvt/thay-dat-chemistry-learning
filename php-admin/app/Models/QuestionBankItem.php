@@ -3,14 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Question extends Model
+class QuestionBankItem extends Model
 {
     protected $fillable = [
-        'quiz_id',
-        'source_bank_question_id',
         'content',
         'explanation',
         'answer_type',
@@ -22,7 +20,6 @@ class Question extends Model
         'correct_answer',
         'time_limit_seconds',
         'points',
-        'sort_order',
         'is_active',
     ];
 
@@ -36,18 +33,13 @@ class Question extends Model
         ];
     }
 
-    public function quiz(): BelongsTo
+    public function tags(): BelongsToMany
     {
-        return $this->belongsTo(Quiz::class);
+        return $this->belongsToMany(Tag::class, 'question_bank_tag');
     }
 
-    public function sourceBankItem(): BelongsTo
+    public function quizCopies(): HasMany
     {
-        return $this->belongsTo(QuestionBankItem::class, 'source_bank_question_id');
-    }
-
-    public function sessionAnswers(): HasMany
-    {
-        return $this->hasMany(SessionAnswer::class);
+        return $this->hasMany(Question::class, 'source_bank_question_id');
     }
 }

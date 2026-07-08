@@ -7,15 +7,42 @@ use Illuminate\Http\Response;
 
 class StudentJoinController extends Controller
 {
+    public function home(): Response
+    {
+        return $this->serveStudentApp(['entry' => 'home']);
+    }
+
     public function show(?string $pin = null): Response
     {
+        $normalizedPin = null;
         if ($pin !== null) {
-            $pin = preg_replace('/\D/', '', $pin);
-            if (strlen($pin) !== 6) {
+            $normalizedPin = preg_replace('/\D/', '', $pin);
+            if (strlen($normalizedPin) !== 6) {
                 abort(404);
             }
         }
 
+        return $this->serveStudentApp([
+            'entry' => 'join',
+            'pin' => $normalizedPin,
+        ]);
+    }
+
+    public function legacyIndex(): RedirectResponse
+    {
+        $pin = preg_replace('/\D/', '', (string) request('pin', ''));
+        if (strlen($pin) === 6) {
+            return redirect('/join/'.$pin);
+        }
+
+        return redirect('/home');
+    }
+
+    /**
+     * @param  array{entry?: string, pin?: string|null}  $options
+     */
+    private function serveStudentApp(array $options = []): Response
+    {
         $path = public_path('app/index.html');
         if (! is_readable($path)) {
             abort(503, 'Student app chưa được mount tại public/app/.');
@@ -29,13 +56,21 @@ class StudentJoinController extends Controller
             $html = preg_replace('/<head>/i', '<head>'.$baseTag, $html, 1);
         }
 
-        // QR deep-link: inject PIN so student.js skips Join PIN even if pathname is rewritten by <base>.
-        if ($pin !== null && strlen($pin) === 6) {
-            $boot = '<script>window.HTD_JOIN_PIN='.json_encode($pin).';</script>';
-            $html = preg_replace('/<\/head>/i', $boot.'</head>', $html, 1);
+        $bootScripts = '';
+        $entry = $options['entry'] ?? 'home';
+        if (in_array($entry, ['home', 'join'], true)) {
+            $bootScripts .= '<script>window.HTD_ENTRY_SCREEN='.json_encode($entry).';</script>';
         }
 
-        // Cache-bust student assets so phone always gets latest join/avatar fixes.
+        $pin = $options['pin'] ?? null;
+        if ($pin !== null && strlen($pin) === 6) {
+            $bootScripts .= '<script>window.HTD_JOIN_PIN='.json_encode($pin).';</script>';
+        }
+
+        if ($bootScripts !== '') {
+            $html = preg_replace('/<\/head>/i', $bootScripts.'</head>', $html, 1);
+        }
+
         $assetMap = [
             'js/config.js' => public_path('app/js/config.js'),
             'js/api.js' => public_path('app/js/api.js'),
@@ -68,15 +103,5 @@ class StudentJoinController extends Controller
             'Content-Type' => 'text/html; charset=UTF-8',
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
         ]);
-    }
-
-    public function legacyIndex(): RedirectResponse
-    {
-        $pin = preg_replace('/\D/', '', (string) request('pin', ''));
-        if (strlen($pin) === 6) {
-            return redirect('/join/'.$pin);
-        }
-
-        return redirect('/join');
     }
 }

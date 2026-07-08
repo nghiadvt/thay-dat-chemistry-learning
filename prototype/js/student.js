@@ -23,6 +23,8 @@ const state = {
   awaitingResult: false,
   pendingLeaderboard: null,
   pendingNewQuestion: null,
+  resultPhaseTimers: [],
+  lateJoinSync: false,
   students: [],
   displayPlayers: [],
   fakeScores: {},
@@ -36,6 +38,7 @@ const state = {
   currentQuestion: null,
   serverQuestionIndex: 0,
   backendRoom: null,
+  qrScanner: null,
 };
 
 const FAKE_QUESTIONS = HTD.FAKE_QUESTIONS;
@@ -51,6 +54,7 @@ function getCurrentQuestion() {
 
 function showScreen(id) {
   stopCamera();
+  stopQrScanner();
   if (state.screen === 'question') {
     document.getElementById('qVideo')?.pause();
   }
@@ -71,6 +75,27 @@ function showScreen(id) {
   syncGamePoll();
 }
 
+// ─── Home hub ───
+const HOME_FEATURE_LABELS = {
+  elements: 'Đọc nguyên tố',
+  balance: 'Cân bằng phương trình',
+  quiz: 'Ôn trắc nghiệm',
+};
+
+function goStudentHome() {
+  stopQrScanner();
+  window.location.href = '/home';
+}
+
+function openHomeFeature(feature) {
+  if (feature === 'play') {
+    window.location.href = '/join';
+    return;
+  }
+  const label = HOME_FEATURE_LABELS[feature] || 'Tính năng';
+  alert(`${label} — sắp ra mắt!`);
+}
+
 // ─── Join PIN / QR ───
 function initJoin() {
   state.pinDigits = '';
@@ -86,6 +111,7 @@ function switchJoinTab(tab) {
   document.getElementById('joinPinContent').style.display = tab === 'pin' ? 'flex' : 'none';
   document.getElementById('joinQrContent').style.display = tab === 'qr' ? 'flex' : 'none';
   document.getElementById('numpadPin').style.display = tab === 'pin' ? 'grid' : 'none';
+  if (tab !== 'qr') stopQrScanner();
 }
 
 function renderPinDisplay() {
@@ -165,14 +191,112 @@ function validatePinAndContinue(opts = {}) {
   showScreen('profile');
 }
 
-function simulateQrScan() {
-  const room = HTD.getRoom();
-  if (!room) {
-    alert('Chưa có phòng. Giáo viên mở teacher.html để tạo phòng trước.');
+function parsePinFromQrText(text) {
+  const raw = String(text || '').trim();
+  const joinMatch = raw.match(/\/join\/(\d{6})\b/i);
+  if (joinMatch) return joinMatch[1];
+  const pinParam = raw.match(/[?&]pin=(\d{6})\b/i);
+  if (pinParam) return pinParam[1];
+  const digitsOnly = raw.replace(/\D/g, '');
+  if (/^\d{6}$/.test(digitsOnly)) return digitsOnly;
+  const embedded = digitsOnly.match(/(\d{6})/);
+  return embedded ? embedded[1] : null;
+}
+
+function resetQrScannerUi() {
+  const idle = document.getElementById('qrScannerIdle');
+  const reader = document.getElementById('qrReader');
+  const cancel = document.getElementById('btnQrCancel');
+  if (idle) idle.style.display = '';
+  if (reader) {
+    reader.hidden = true;
+    reader.innerHTML = '';
+  }
+  if (cancel) cancel.hidden = true;
+}
+
+async function stopQrScanner() {
+  const scanner = state.qrScanner;
+  state.qrScanner = null;
+  if (!scanner) {
+    resetQrScannerUi();
     return;
   }
-  state.pinDigits = room.pin;
-  validatePinAndContinue();
+  try {
+    await scanner.stop();
+  } catch (_) {}
+  try {
+    scanner.clear();
+  } catch (_) {}
+  resetQrScannerUi();
+}
+
+async function startQrScanner() {
+  if (!window.Html5Qrcode) {
+    alert('Không tải được thư viện quét QR. Thử nhập PIN thủ công.');
+    return;
+  }
+  // HTTP LAN: trình duyệt chặn getUserMedia — dùng camera native qua <input capture> (giống avatar).
+  if (!canUseLiveCamera()) {
+    openQrFileCapture();
+    return;
+  }
+  if (state.qrScanner) return;
+
+  document.getElementById('qrScannerIdle').style.display = 'none';
+  const readerEl = document.getElementById('qrReader');
+  readerEl.hidden = false;
+  document.getElementById('btnQrCancel').hidden = false;
+
+  const scanner = new Html5Qrcode('qrReader');
+  state.qrScanner = scanner;
+  try {
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
+      decodedText => {
+        handleQrDecoded(decodedText);
+      },
+      () => {}
+    );
+  } catch (_) {
+    await stopQrScanner();
+    openQrFileCapture();
+  }
+}
+
+function openQrFileCapture() {
+  const input = document.getElementById('qrFileInput');
+  if (!input) {
+    alert('Không mở được camera. Nhập PIN thủ công.');
+    return;
+  }
+  input.value = '';
+  input.click();
+}
+
+function handleQrDecoded(decodedText) {
+  const pin = parsePinFromQrText(decodedText);
+  if (!pin) {
+    alert('Mã QR không hợp lệ. Quét mã phòng do giáo viên hiển thị.');
+    return;
+  }
+  stopQrScanner().then(() => {
+    state.pinDigits = pin;
+    validatePinAndContinue();
+  });
+}
+
+async function onQrCaptureSelected(ev) {
+  const file = ev.target?.files?.[0];
+  if (!file || !window.Html5Qrcode) return;
+  try {
+    const scanner = new Html5Qrcode('qrReader');
+    const decoded = await scanner.scanFile(file, false);
+    handleQrDecoded(decoded);
+  } catch (_) {
+    alert('Không đọc được mã QR. Chụp lại cho rõ hoặc nhập PIN thủ công.');
+  }
 }
 
 (function checkUrlPin() {
@@ -188,6 +312,19 @@ function simulateQrScan() {
   // QR / deep-link: skip Join PIN → validate → name/avatar (profile).
   state.pinDigits = pin;
   setTimeout(() => validatePinAndContinue({ fromDeepLink: true }), 100);
+})();
+
+(function initEntryScreen() {
+  if (window.HTD_JOIN_PIN) {
+    document.querySelector('[data-screen="home"]')?.classList.remove('active');
+    return;
+  }
+  const entry = window.HTD_ENTRY_SCREEN || 'home';
+  if (entry === 'join') {
+    showScreen('join');
+  } else {
+    showScreen('home');
+  }
 })();
 
 // ─── Profile ───
@@ -388,11 +525,11 @@ function submitProfile() {
           avatar: state.avatarDataUrl || null,
         })
       )
-      .then(() => {
+      .then(data => {
         state.playerId = state.studentName;
         state.waitingJoinedAt = Date.now();
         state.backendMode = true;
-        showScreen('waiting');
+        handleBackendRoomJoined(data);
       })
       .catch(err => alert(err.message || 'Không vào được phòng.'));
     return;
@@ -402,6 +539,36 @@ function submitProfile() {
   state.waitingJoinedAt = Date.now();
   saveMyPlayer();
   showScreen('waiting');
+}
+
+function handleBackendRoomJoined(data) {
+  state.myScore = Number(data?.score || 0);
+
+  if (data?.room_status === 'playing') {
+    state.lateJoinSync = true;
+    state.serverQuestionIndex = Number(data.question_index ?? 0);
+    const room = HTD.getRoom() || state.backendRoom;
+    if (room) {
+      room.status = 'started';
+      room.startedAt = Date.now();
+      HTD.setRoom(room);
+    }
+    showScreen('waiting');
+    return;
+  }
+
+  showScreen('waiting');
+}
+
+function cancelResultPhase() {
+  state.resultPhaseTimers.forEach(id => clearTimeout(id));
+  state.resultPhaseTimers = [];
+  clearInterval(state.lbInterval);
+  state.lbInterval = null;
+  document.getElementById('resultOverlay')?.classList.remove('show');
+  state.pendingNewQuestion = null;
+  state.pendingLeaderboard = null;
+  state.awaitingResult = false;
 }
 
 function saveMyPlayer() {
@@ -768,7 +935,7 @@ function syncGameState() {
     }
   }
 
-  if (room.status === 'waiting' && !['waiting', 'welcome', 'join', 'profile'].includes(state.screen)) {
+  if (room.status === 'waiting' && !['waiting', 'home', 'join', 'profile'].includes(state.screen)) {
     clearInterval(state.gamePoll);
     state.questionIndex = 0;
     state.myScore = 0;
@@ -1189,6 +1356,7 @@ function finalizeDemoQuestion(fallbackAns) {
 
 // ─── Result / Leaderboard / Final ───
 function showResult(result) {
+  cancelResultPhase();
   state.awaitingResult = true;
   const ok = Boolean(result.correct);
   const pts = Number(result.score_earned || 0);
@@ -1238,7 +1406,7 @@ function showResult(result) {
 
   if (!isBackendMode()) updateScores();
 
-  setTimeout(() => {
+  const resultTimer = setTimeout(() => {
     ov.classList.remove('show');
     if (state.pendingLeaderboard) {
       applyLeaderboardData(state.pendingLeaderboard);
@@ -1247,10 +1415,15 @@ function showResult(result) {
     renderLeaderboard();
     showScreen('leaderboard');
     startLbCountdown(LEADERBOARD_DISPLAY_MS / 1000);
-    setTimeout(() => {
-      if (state.pendingNewQuestion) applyNewQuestion(state.pendingNewQuestion);
+    const lbTimer = setTimeout(() => {
+      if (state.pendingNewQuestion) {
+        cancelResultPhase();
+        applyNewQuestion(state.pendingNewQuestion);
+      }
     }, LEADERBOARD_DISPLAY_MS);
+    state.resultPhaseTimers.push(lbTimer);
   }, RESULT_DISPLAY_MS);
+  state.resultPhaseTimers = [resultTimer];
 }
 
 function applyLeaderboardData(data) {
@@ -1428,7 +1601,7 @@ function restartGame() {
 
 // ─── Demo nav ───
 const SCREENS = [
-  'welcome',
+  'home',
   'join',
   'profile',
   'waiting',
@@ -1504,9 +1677,11 @@ function setupStudentBackendBridge() {
 
   HTDBridge.on('gameStarted', () => {
     clearInterval(state.waitingPoll);
-    state.questionIndex = 0;
-    state.serverQuestionIndex = 0;
-    state.myScore = 0;
+    if (!state.lateJoinSync) {
+      state.questionIndex = 0;
+      state.serverQuestionIndex = 0;
+      state.myScore = 0;
+    }
     const room = HTD.getRoom();
     if (room) {
       room.status = 'started';
@@ -1516,14 +1691,8 @@ function setupStudentBackendBridge() {
   });
 
   HTDBridge.on('newQuestion', payload => {
-    if (
-      state.awaitingResult
-      || document.getElementById('resultOverlay')?.classList.contains('show')
-      || state.screen === 'leaderboard'
-    ) {
-      state.pendingNewQuestion = payload;
-      return;
-    }
+    cancelResultPhase();
+    state.lateJoinSync = false;
     applyNewQuestion(payload);
   });
 
