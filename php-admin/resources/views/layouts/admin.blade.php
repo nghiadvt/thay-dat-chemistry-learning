@@ -9,8 +9,8 @@
     @stack('head')
 </head>
 <body class="admin-body @yield('body-class')">
-<div class="admin-shell">
-    <aside class="admin-sidebar">
+<div class="admin-shell" id="adminShell">
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Menu điều hướng">
         <div class="admin-brand">
             <h1>Hóa Thầy Đạt</h1>
             <p>Quản trị nội dung</p>
@@ -20,7 +20,7 @@
             <a href="{{ route('admin.keyboards.index') }}" class="{{ request()->routeIs('admin.keyboards.*') ? 'active' : '' }}">Bàn phím</a>
             <a href="{{ route('admin.games.index') }}" class="{{ request()->routeIs('admin.games.*') ? 'active' : '' }}">Game</a>
             <a href="{{ route('admin.quizzes.index') }}" class="{{ request()->routeIs('admin.quizzes.*') || request()->routeIs('admin.questions.*') ? 'active' : '' }}">Quiz</a>
-            <a href="{{ route('admin.sessions.create') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
+            <a href="{{ route('admin.sessions.index') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Báo cáo</a>
         </nav>
     </aside>
@@ -28,7 +28,14 @@
     <div class="admin-main">
         @unless(request()->routeIs('admin.keyboards.editor', 'admin.questions.create', 'admin.questions.edit'))
         <header class="admin-topbar">
-            <h2>@yield('page-title', 'Admin')</h2>
+            <div class="admin-topbar-left">
+                <button type="button" class="admin-sidebar-toggle" data-admin-sidebar-toggle aria-label="Đóng/mở menu" aria-expanded="true" aria-controls="adminSidebar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+                <h2>@yield('page-title', 'Admin')</h2>
+            </div>
             <div class="admin-user">
                 <span>{{ auth()->user()->name }}</span>
                 <form method="POST" action="{{ route('logout') }}" style="margin:0;">
@@ -37,6 +44,14 @@
                 </form>
             </div>
         </header>
+        @else
+        <div class="admin-topbar admin-topbar--minimal">
+            <button type="button" class="admin-sidebar-toggle" data-admin-sidebar-toggle aria-label="Đóng/mở menu" aria-expanded="true" aria-controls="adminSidebar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
         @endunless
 
         <main class="admin-content @yield('content-class')">
@@ -54,6 +69,7 @@ window.__ADMIN_FLASH__ = @json(array_filter([
 </script>
 @endif
 <script src="{{ asset('js/admin-toast.js') }}?v={{ file_exists(public_path('js/admin-toast.js')) ? filemtime(public_path('js/admin-toast.js')) : time() }}"></script>
+<script src="{{ asset('js/admin-sidebar.js') }}?v={{ file_exists(public_path('js/admin-sidebar.js')) ? filemtime(public_path('js/admin-sidebar.js')) : time() }}"></script>
 @if (session('success') || session('error'))
 <script>
 document.addEventListener('DOMContentLoaded', function () {

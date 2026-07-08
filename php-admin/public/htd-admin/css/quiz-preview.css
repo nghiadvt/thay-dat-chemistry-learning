@@ -259,6 +259,18 @@
   line-height: 1.5;
 }
 
+.htd-preview-post-answer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #d1d5db;
+}
+
+.htd-preview-post-answer h4 {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
 .htd-preview-explanation img {
   max-width: 100%;
   height: auto;

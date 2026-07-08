@@ -26,15 +26,21 @@ class RoomController extends Controller
         $gameId = (int) ($redis->hGet($key, 'game_id') ?: 0);
         $session = GameSession::query()
             ->where('pin', $pin)
-            ->with('game:id,name')
+            ->with(['game:id,name', 'quiz:id,name'])
             ->first();
+
+        if (! $session || ! $session->is_active) {
+            return $this->jsonError('PIN không hợp lệ hoặc phòng đã bị tắt.', 404);
+        }
 
         return $this->jsonSuccess([
             'pin' => $pin,
             'status' => $status,
             'game_id' => $gameId,
-            'game_name' => $session?->game?->name,
-            'session_id' => $session?->id,
+            'game_name' => $session->game?->name,
+            'quiz_id' => $session->quiz_id,
+            'quiz_name' => $session->quiz?->name,
+            'session_id' => $session->id,
         ]);
     }
 }

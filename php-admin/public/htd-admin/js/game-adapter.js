@@ -23,7 +23,7 @@ const HTDGameAdapter = (function () {
         });
       }
       if (Array.isArray(template.blank)) {
-        template.blank.forEach((id, idx) => {
+        template.blank.forEach((id) => {
           if (parts.length) parts.push({ t: 'txt', text: ' ' });
           parts.push({ t: 'blank', id });
         });
@@ -49,6 +49,13 @@ const HTDGameAdapter = (function () {
       serverTime: Number(payload.server_time || Date.now()),
       keyboardConfig: payload.keyboard_config || null,
       index: typeof index === 'number' ? index : 0,
+      correctIndex:
+        payload.correct_index === null || payload.correct_index === undefined
+          ? null
+          : Number(payload.correct_index),
+      correctAnswerNormalized: payload.correct_answer_normalized || null,
+      correctAnswer: payload.correct_answer || null,
+      explanation: payload.explanation || null,
     };
 
     switch (payload.answer_type) {
@@ -57,7 +64,7 @@ const HTDGameAdapter = (function () {
           ...base,
           type: 'mc',
           media: 'text',
-          options: payload.options || [],
+          options: Array.isArray(payload.options) ? payload.options : [],
         };
       case 'essay':
         return {
@@ -67,12 +74,28 @@ const HTDGameAdapter = (function () {
           media: 'text',
           template: [{ t: 'blank', id: 'b0' }],
         };
+      case 'formula':
+        return {
+          ...base,
+          type: 'input',
+          inputMode: 'formula',
+          media: 'text',
+          template: null,
+        };
+      case 'structured':
+        return {
+          ...base,
+          type: 'input',
+          inputMode: payload.input_mode || 'blank',
+          media: 'text',
+          template: structuredTemplateToUi(payload.template, payload.content),
+        };
       default:
         return {
           ...base,
           type: 'mc',
           media: 'text',
-          options: payload.options || ['—'],
+          options: Array.isArray(payload.options) ? payload.options : [],
         };
     }
   }

@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-06 (`tags`, `quiz_tag` — migration `2026_07_06_140000`)
+**Cập nhật lần cuối:** 2026-07-08 (QR phòng lưu PNG `qr_path`; chơi lại phòng ended)
 
 ---
 
@@ -35,7 +35,7 @@ erDiagram
 | HTML sanitize | Bắt buộc server-side trước khi lưu (HTMLPurifier hoặc tương đương) |
 | Xóa `games` có quiz | **RESTRICT** — chặn xóa, bắt xóa/chuyển quiz trước |
 | Xóa `keyboards` đang dùng | **RESTRICT** |
-| 1 `game_session` (MVP) | Chơi **tất cả** quiz trong game, theo `quizzes.sort_order` |
+| 1 `game_session` (MVP) | Chơi **1 quiz** đã chọn (`quiz_id`); `game_id` giữ để nhóm/báo cáo. Session cũ không có `quiz_id` → ws chơi toàn bộ quiz trong game |
 
 ---
 
@@ -58,7 +58,7 @@ Giữ nguyên: `id`, `name`, `email` UNIQUE, `password`, `remember_token`, `emai
 | `id` | BIGINT PK | |
 | `name` | VARCHAR(255) | VD: "Bàn phím hóa vô cơ" |
 | `subject` | VARCHAR(64) NULL | VD: "chemistry" — chuẩn bị v2.0 đa môn |
-| `config` | JSON | Layout bàn phím — cấu trúc `rows[]` + `defaults` + `smart_context` — xem [`KEYBOARD_SCHEMA.md`](KEYBOARD_SCHEMA.md) |
+| `config` | JSON | Layout bàn phím — cấu trúc `rows[]` + `defaults` + `smart_context` — xem [`KEYBOARD_SCHEMA.md`](KEYBOARD_SCHEMA.md). `smart_context` quy định hành vi nhập số (hệ số vs chỉ số dưới) khi HS gõ và trong **Test** overlay của editor |
 | `preview_path` | VARCHAR(255) NULL | Đường dẫn tương đối file PNG preview (disk `public`) — VD: `keyboards/06-07-2026-ban-phim-hoa-vo-co.png` |
 | `created_at`, `updated_at` | TIMESTAMP | |
 
@@ -73,6 +73,8 @@ Giữ nguyên: `id`, `name`, `email` UNIQUE, `password`, `remember_token`, `emai
 | `{ defaults, rows, smart_context }` | `keyboards.config` |
 | Chụp `#kbePhoneKb` (html2canvas) | `keyboards.preview_path` — PNG qua API upload |
 | `data.id`, `data.updatedAt` | **Không lưu** — dùng `keyboards.id`, `updated_at` |
+
+**Test overlay (editor):** nút **Test** mô phỏng nhập công thức HS — dùng `config.smart_context` để tự phân loại phím số (`0`–`9`): hệ số (số to) ở đầu công thức / sau `+`; chỉ số dưới (hiển thị `<sub>`) sau nguyên tố / sau `)`. Backspace xóa theo **token** (vd. `Cl` = 1 token). Plain text serialize (vd. `2CO2`) lưu tạm `data-serialized` trên `#kbeTestOutput` — **không** ghi DB; format này khớp `answer` formula gửi WS (xem [`API_CONTRACTS.md`](API_CONTRACTS.md) §9.1).
 
 Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Production: tách `name` → cột, phần còn lại → `config` JSON.
 
@@ -102,6 +104,8 @@ Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Pr
 | `grade` | VARCHAR(32) NULL | VD: "10", "11" |
 | `sort_order` | SMALLINT NOT NULL DEFAULT 0 | Thứ tự trong game khi chơi |
 | `is_active` | BOOLEAN NOT NULL DEFAULT true | Ẩn quiz không dùng |
+| `show_explanation` | BOOLEAN NOT NULL DEFAULT false | Bật → gửi `explanation` trong `question_result` sau khi HS trả lời |
+| `shuffle_options` | BOOLEAN NOT NULL DEFAULT false | Bật → xáo trộn thứ tự `options` trắc nghiệm riêng từng HS |
 | `created_at`, `updated_at` | TIMESTAMP | |
 
 **Chủ đề (tag):** quan hệ N–N qua `quiz_tag` — xem §6.1.
@@ -167,11 +171,17 @@ Nội dung câu hỏi gộp trong `content`. Loại tương tác học sinh qua 
 |---|---|---|
 | `id` | BIGINT PK | |
 | `pin` | CHAR(6) NOT NULL UNIQUE | 6 chữ số |
+| `qr_path` | VARCHAR(255) NULL | Ảnh QR join (`/join/{pin}`) — PNG trên disk `public`, VD: `sessions/123456.png`. Tạo khi **Tạo phòng**; backfill khi mở trang host nếu thiếu. Model expose `qr_url` (accessor) |
+| `name` | VARCHAR(255) NULL | Tên phòng do GV đặt (hiển thị danh sách) |
 | `host_id` | BIGINT FK → `users.id` | GV host |
-| `game_id` | BIGINT FK → `games.id` | Game được chơi |
+| `game_id` | BIGINT FK → `games.id` | Game chứa quiz (denormalized) |
+| `quiz_id` | BIGINT FK → `quizzes.id` NULL | Quiz được chơi trong phòng; NULL = legacy (chơi cả game) |
 | `status` | ENUM('waiting','playing','ended') NOT NULL DEFAULT 'waiting' | |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true | Tắt → xóa Redis room, HS không join được |
 | `started_at` | TIMESTAMP NULL | Khi GV bấm Start |
 | `ended_at` | TIMESTAMP NULL | Khi game kết thúc |
+
+**Chơi lại:** Admin `POST .../reset` hoặc API `POST /api/game-sessions/{id}/reset` — đặt lại `status=waiting`, xóa state Redis (players, leaderboard, plan…), **giữ** bản ghi `game_results` / `session_answers` của lần chơi trước.
 | `created_at`, `updated_at` | TIMESTAMP | |
 
 ---
@@ -202,7 +212,7 @@ Chi tiết từng câu — phục vụ scoring, CSV, thống kê sai (v1.2).
 | `session_id` | BIGINT FK → `game_sessions.id` ON DELETE CASCADE | |
 | `question_id` | BIGINT FK → `questions.id` | |
 | `student_name` | VARCHAR(20) NOT NULL | |
-| `answer_submitted` | JSON NULL | Đáp án HS gửi (index / string / structured) |
+| `answer_submitted` | JSON NULL | Đáp án HS gửi (index / string / structured). Câu `formula`: chuỗi plain text đã serialize từ token bàn phím (vd. `"2CO2"`, không Unicode subscript) |
 | `is_correct` | BOOLEAN NOT NULL | |
 | `score_earned` | INT NOT NULL DEFAULT 0 | Điểm câu này |
 | `answered_at` | TIMESTAMP NOT NULL | |

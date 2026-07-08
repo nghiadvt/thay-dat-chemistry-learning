@@ -8,6 +8,7 @@ const {
   getSessionByPin,
   updateSessionStatus,
   getGameQuizzes,
+  getQuizById,
   getQuizQuestions,
   getQuestionById,
   getKeyboardConfig,
@@ -82,8 +83,10 @@ function requireHost(socket) {
   }
 }
 
-async function loadGamePlan(gameId) {
-  const quizzes = await getGameQuizzes(gameId);
+async function loadGamePlan(gameId, quizId = null) {
+  const quizzes = quizId
+    ? [await getQuizById(quizId)].filter(Boolean)
+    : await getGameQuizzes(gameId);
   const plan = [];
 
   for (const quiz of quizzes) {
@@ -92,6 +95,8 @@ async function loadGamePlan(gameId) {
     const keyboardConfig = await getKeyboardConfig(quiz.keyboard_id);
     plan.push({
       quiz_id: quiz.id,
+      show_explanation: Boolean(Number(quiz.show_explanation)),
+      shuffle_options: Boolean(Number(quiz.shuffle_options)),
       keyboard_id: quiz.keyboard_id,
       keyboard_config: keyboardConfig,
       questions,
@@ -116,8 +121,12 @@ async function startGame(io, redis, socket) {
   if (!session) {
     throw new Error('Session không tồn tại.');
   }
+  if (!Number(session.is_active)) {
+    throw new Error('Phòng đã bị tắt.');
+  }
 
-  const plan = await loadGamePlan(room.game_id);
+  const quizId = room.quiz_id ? Number(room.quiz_id) : (session.quiz_id ? Number(session.quiz_id) : null);
+  const plan = await loadGamePlan(room.game_id, quizId);
   if (plan.length === 0) {
     throw new Error('Game không có câu hỏi.');
   }
@@ -186,18 +195,63 @@ async function emitCurrentQuestion(io, redis, pin) {
   await refreshRoomTtl(redis, pin);
   await redis.expire(submittedKey(pin, question.id), 7200);
 
-  const payload = {
+  const studentPayload = {
     quiz_id: quiz.quiz_id,
     question_id: question.id,
     content: question.content,
     answer_type: question.answer_type,
     options: question.answer_type === 'mc' ? question.options : null,
+    template: question.answer_type === 'structured' ? question.template : null,
+    input_mode: question.input_mode || null,
     keyboard_config: quiz.keyboard_config,
     time_limit: question.time_limit_seconds,
     server_time: startedAt,
   };
 
-  io.to(pin).emit('new_question', payload);
+  const hostPayload = {
+    ...studentPayload,
+    correct_index: question.correct_index,
+    correct_answer_normalized: question.correct_answer_normalized,
+    correct_answer: question.correct_answer,
+    explanation: question.explanation,
+  };
+
+  const shouldShuffle = question.answer_type === 'mc'
+    && quiz.shuffle_options
+    && Array.isArray(question.options)
+    && question.options.length > 1;
+
+  if (shouldShuffle) {
+    const studentSockets = await getStudentSockets(io, pin);
+    for (const studentSocket of studentSockets) {
+      const order = shuffleIndices(question.options.length);
+      await redis.set(
+        optionOrderKey(pin, question.id, studentSocket.data.name),
+        JSON.stringify(order),
+        'EX',
+        7200,
+      );
+      studentSocket.emit('new_question', {
+        ...studentPayload,
+        options: order.map((originalIndex) => question.options[originalIndex]),
+      });
+    }
+
+    const hostSockets = await getHostSockets(io, pin);
+    for (const hostSocket of hostSockets) {
+      hostSocket.emit('new_question', hostPayload);
+    }
+  } else {
+    const studentSockets = await getStudentSockets(io, pin);
+    const hostSockets = await getHostSockets(io, pin);
+    studentSockets.forEach((studentSocket) => {
+      studentSocket.emit('new_question', studentPayload);
+    });
+    hostSockets.forEach((hostSocket) => {
+      hostSocket.emit('new_question', hostPayload);
+    });
+  }
+
   await emitSubmitCount(io, redis, pin, question.id);
 
   return { question_id: question.id, quiz_id: quiz.quiz_id };
@@ -237,7 +291,11 @@ async function handleSubmitAnswer(io, redis, socket, payload) {
     throw new Error('Câu hỏi không tồn tại.');
   }
 
-  const { correct, correctAnswer } = checkAnswer(question, answer);
+  const plan = await getPlan(redis, pin);
+  const quizIndex = Number(room.quiz_index || 0);
+  const quiz = plan[quizIndex];
+  const answerForScoring = await mapShuffledAnswer(redis, pin, questionId, name, question, answer);
+  const { correct, correctAnswer } = checkAnswer(question, answerForScoring);
   const player = await getPlayer(redis, pin, name);
   const streakBefore = player?.streak_correct || 0;
 
@@ -284,6 +342,9 @@ async function handleSubmitAnswer(io, redis, socket, payload) {
     score_earned: scoreEarned,
     rank,
     total_score: totalScore,
+    ...(quiz.show_explanation && question.explanation
+      ? { explanation: question.explanation }
+      : {}),
   };
 }
 
@@ -365,6 +426,47 @@ async function getPlan(redis, pin) {
     throw new Error('Game plan chưa được khởi tạo. Host cần bắt đầu game.');
   }
   return JSON.parse(raw);
+}
+
+function optionOrderKey(pin, questionId, studentName) {
+  return `room:${pin}:option_order:${questionId}:${studentName}`;
+}
+
+function shuffleIndices(length) {
+  const indices = Array.from({ length }, (_, index) => index);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return indices;
+}
+
+async function getStudentSockets(io, pin) {
+  const sockets = await io.in(pin).fetchSockets();
+  return sockets.filter((socket) => !socket.data?.isHost);
+}
+
+async function mapShuffledAnswer(redis, pin, questionId, studentName, question, answer) {
+  if (question.answer_type !== 'mc') {
+    return answer;
+  }
+
+  const orderRaw = await redis.get(optionOrderKey(pin, questionId, studentName));
+  if (!orderRaw) {
+    return answer;
+  }
+
+  const order = JSON.parse(orderRaw);
+  const submitted = typeof answer === 'object' && answer !== null && 'index' in answer
+    ? answer.index
+    : answer;
+  const originalIndex = order[Number(submitted)];
+
+  if (typeof answer === 'object' && answer !== null) {
+    return { ...answer, index: originalIndex };
+  }
+
+  return originalIndex;
 }
 
 module.exports = {

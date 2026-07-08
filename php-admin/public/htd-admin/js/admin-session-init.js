@@ -7,6 +7,9 @@
       console.error('admin-session-init: teacher.js not loaded');
       return;
     }
+    if (window.HTD) {
+      HTD.setPlayers([]);
+    }
     const params = new URLSearchParams({
       game_id: String(boot.gameId || ''),
       session_id: String(boot.sessionId || ''),

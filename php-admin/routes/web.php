@@ -16,20 +16,18 @@ use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\StudentJoinController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('login');
 });
 
-Route::get('join/{pin}', function (string $pin) {
-    $pin = preg_replace('/\D/', '', $pin);
-    if (strlen($pin) !== 6) {
-        abort(404);
-    }
-
-    return redirect('/app/index.html?pin='.$pin);
-})->where('pin', '[0-9]{6}');
+Route::get('join', [StudentJoinController::class, 'show'])->name('student.join');
+Route::get('join/{pin}', [StudentJoinController::class, 'show'])
+    ->where('pin', '[0-9]{6}')
+    ->name('student.join.pin');
+Route::get('app/index.html', [StudentJoinController::class, 'legacyIndex']);
 
 Route::get('api/rooms/{pin}', [RoomController::class, 'show']);
 
@@ -59,9 +57,12 @@ Route::middleware('auth')->group(function () {
         Route::patch('quizzes/{quiz}/questions/{question}/active', [AdminQuestionController::class, 'toggleActive'])->name('questions.toggle-active');
         Route::delete('quizzes/{quiz}/questions/{question}', [AdminQuestionController::class, 'destroy'])->name('questions.destroy');
 
+        Route::get('sessions', [AdminSessionController::class, 'index'])->name('sessions.index');
         Route::get('sessions/create', [AdminSessionController::class, 'create'])->name('sessions.create');
         Route::post('sessions', [AdminSessionController::class, 'store'])->name('sessions.store');
         Route::get('sessions/{session}', [AdminSessionController::class, 'show'])->name('sessions.show');
+        Route::post('sessions/{session}/reset', [AdminSessionController::class, 'reset'])->name('sessions.reset');
+        Route::patch('sessions/{session}/active', [AdminSessionController::class, 'toggleActive'])->name('sessions.toggle-active');
 
         Route::get('reports', [AdminReportController::class, 'index'])->name('reports.index');
         Route::get('reports/{session}', [AdminReportController::class, 'show'])->name('reports.show');
@@ -85,6 +86,7 @@ Route::middleware('auth')->group(function () {
 
         Route::post('game-sessions', [GameSessionController::class, 'store']);
         Route::get('game-sessions/{session}', [GameSessionController::class, 'show']);
+        Route::post('game-sessions/{session}/reset', [GameSessionController::class, 'reset']);
 
         Route::get('reports/sessions', [ReportController::class, 'sessions']);
         Route::get('reports/sessions/{session}', [ReportController::class, 'sessionDetail']);

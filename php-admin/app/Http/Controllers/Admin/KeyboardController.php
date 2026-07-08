@@ -178,8 +178,14 @@ class KeyboardController extends Controller
      */
     private function key(string $text): array
     {
+        if (preg_match('/^[A-Za-z][a-z]?$/', $text)) {
+            $id = 'key-'.strtolower($text);
+        } else {
+            $id = 'key-sym-'.bin2hex($text);
+        }
+
         return [
-            'id' => 'key-'.strtolower(preg_replace('/[^a-z0-9]/i', '', $text) ?: 'x'),
+            'id' => $id,
             'text' => $text,
             'value' => $text,
             'width' => 1,

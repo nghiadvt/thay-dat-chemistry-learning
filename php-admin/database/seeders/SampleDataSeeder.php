@@ -218,9 +218,12 @@ class SampleDataSeeder extends Seeder
         $session = GameSession::updateOrCreate(
             ['pin' => '123456'],
             [
+                'name' => 'Phòng mẫu — Hóa vô cơ',
                 'host_id' => $teacher->id,
                 'game_id' => $game->id,
+                'quiz_id' => $quiz->id,
                 'status' => 'ended',
+                'is_active' => false,
                 'started_at' => now()->subHour(),
                 'ended_at' => now()->subMinutes(30),
             ]

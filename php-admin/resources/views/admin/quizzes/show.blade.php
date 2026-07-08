@@ -110,6 +110,28 @@
             <input type="number" id="sort_order" name="sort_order" min="0" value="{{ old('sort_order', $quiz->sort_order ?? 0) }}" style="max-width:160px;">
         </div>
 
+        <div class="form-group quiz-play-settings">
+            <label>Tùy chọn khi chơi</label>
+            <div class="toggle-field">
+                <input type="hidden" name="show_explanation" value="0">
+                @include('admin.partials.toggle-switch', [
+                    'name' => 'show_explanation',
+                    'checked' => (bool) old('show_explanation', $quiz->show_explanation ?? false),
+                    'label' => 'Hiển thị giải thích đáp án',
+                ])
+                <span class="toggle-field-label">Hiển thị giải thích đáp án sau khi học sinh trả lời</span>
+            </div>
+            <div class="toggle-field">
+                <input type="hidden" name="shuffle_options" value="0">
+                @include('admin.partials.toggle-switch', [
+                    'name' => 'shuffle_options',
+                    'checked' => (bool) old('shuffle_options', $quiz->shuffle_options ?? false),
+                    'label' => 'Xáo trộn đáp án trắc nghiệm',
+                ])
+                <span class="toggle-field-label">Xáo trộn thứ tự đáp án trắc nghiệm (mỗi học sinh khác nhau)</span>
+            </div>
+        </div>
+
         <button type="submit" class="btn btn-primary">Lưu thông tin quiz</button>
     </form>
 </div>

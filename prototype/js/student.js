@@ -162,7 +162,12 @@ function simulateQrScan() {
 }
 
 (function checkUrlPin() {
-  const p = new URLSearchParams(location.search).get('pin');
+  const params = new URLSearchParams(location.search);
+  let p = params.get('pin');
+  if (!p) {
+    const m = location.pathname.match(/\/join\/(\d{6})\/?$/);
+    if (m) p = m[1];
+  }
   if (p) {
     state.pinDigits = p.replace(/\D/g, '').slice(0, 6);
     setTimeout(() => {

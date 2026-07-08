@@ -33,6 +33,8 @@ class QuizController extends Controller
             'grade' => ['nullable', 'string', 'max:32'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
+            'show_explanation' => ['nullable', 'boolean'],
+            'shuffle_options' => ['nullable', 'boolean'],
         ]);
 
         if (! Game::whereKey($validated['game_id'])->exists()) {
@@ -47,6 +49,8 @@ class QuizController extends Controller
             ...$validated,
             'sort_order' => $validated['sort_order'] ?? 0,
             'is_active' => $validated['is_active'] ?? true,
+            'show_explanation' => $validated['show_explanation'] ?? false,
+            'shuffle_options' => $validated['shuffle_options'] ?? false,
         ]);
 
         $quiz->load(['game', 'keyboard']);
@@ -71,6 +75,8 @@ class QuizController extends Controller
             'grade' => ['nullable', 'string', 'max:32'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
+            'show_explanation' => ['nullable', 'boolean'],
+            'shuffle_options' => ['nullable', 'boolean'],
         ]);
 
         $quiz->update($validated);

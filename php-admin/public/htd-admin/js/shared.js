@@ -165,6 +165,8 @@ const HTD = {
     balance: 'Cân bằng hệ số',
     blank: 'Điền chỗ thiếu',
     blank_balance: 'Cân bằng + điền thiếu',
+    essay: 'Tự luận ngắn',
+    formula: 'Công thức hóa học',
   },
 
   getRoom() {

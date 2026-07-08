@@ -19,7 +19,7 @@ function getPool() {
 
 async function getSessionByPin(pin) {
   const [rows] = await getPool().execute(
-    `SELECT id, pin, host_id, game_id, status, started_at, ended_at
+    `SELECT id, pin, host_id, game_id, quiz_id, status, is_active, started_at, ended_at
      FROM game_sessions WHERE pin = ? LIMIT 1`,
     [pin]
   );
@@ -48,7 +48,7 @@ async function updateSessionStatus(pin, status, extra = {}) {
 
 async function getGameQuizzes(gameId) {
   const [rows] = await getPool().execute(
-    `SELECT id, game_id, keyboard_id, name, sort_order
+    `SELECT id, game_id, keyboard_id, name, sort_order, show_explanation, shuffle_options
      FROM quizzes
      WHERE game_id = ? AND is_active = 1
      ORDER BY sort_order ASC, id ASC`,
@@ -57,9 +57,20 @@ async function getGameQuizzes(gameId) {
   return rows;
 }
 
+async function getQuizById(quizId) {
+  const [rows] = await getPool().execute(
+    `SELECT id, game_id, keyboard_id, name, sort_order, show_explanation, shuffle_options
+     FROM quizzes
+     WHERE id = ? AND is_active = 1
+     LIMIT 1`,
+    [quizId]
+  );
+  return rows[0] || null;
+}
+
 async function getQuizQuestions(quizId) {
   const [rows] = await getPool().execute(
-    `SELECT id, quiz_id, content, answer_type, options, correct_index,
+    `SELECT id, quiz_id, content, explanation, answer_type, options, correct_index,
             correct_answer_normalized, input_mode, template, correct_answer,
             time_limit_seconds, sort_order
      FROM questions
@@ -72,7 +83,7 @@ async function getQuizQuestions(quizId) {
 
 async function getQuestionById(questionId) {
   const [rows] = await getPool().execute(
-    `SELECT id, quiz_id, content, answer_type, options, correct_index,
+    `SELECT id, quiz_id, content, explanation, answer_type, options, correct_index,
             correct_answer_normalized, input_mode, template, correct_answer,
             time_limit_seconds, sort_order
      FROM questions WHERE id = ? LIMIT 1`,
@@ -163,6 +174,7 @@ module.exports = {
   getSessionByPin,
   updateSessionStatus,
   getGameQuizzes,
+  getQuizById,
   getQuizQuestions,
   getQuestionById,
   getKeyboardConfig,

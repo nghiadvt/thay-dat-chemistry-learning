@@ -69,6 +69,10 @@ window.HTDApi = (function () {
     async exportSessionCsv(sessionId) {
       window.open(apiUrl(`/admin/reports/${sessionId}/export`), '_blank');
     },
+    async resetSession(sessionId) {
+      await ensureCsrf();
+      return request(`/api/game-sessions/${sessionId}/reset`, { method: 'POST' });
+    },
     async getKeyboard(id) {
       await ensureCsrf();
       const data = await request(`/api/keyboards/${id}`);

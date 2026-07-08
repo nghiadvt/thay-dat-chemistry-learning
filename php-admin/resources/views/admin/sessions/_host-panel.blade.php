@@ -8,50 +8,63 @@
         <div class="teacher-room-card" id="teacherRoomCard">
           <header class="teacher-room-card-header" id="teacherRoomHeader">
             <div class="teacher-room-card-info" id="teacherRoomInfo">
-              <span class="teacher-join-room-label">Phòng</span>
+              <div class="teacher-room-title-row">
+                <a href="{{ route('admin.sessions.index') }}" class="teacher-room-back" title="Danh sách phòng">← Phòng chơi</a>
+                <span class="teacher-join-room-label">Đang host</span>
+              </div>
               <h1 class="teacher-join-room-name" id="teacherRoomName"></h1>
+              <div class="teacher-room-meta-row" id="teacherRoomMetaRow">
+                <span class="teacher-room-meta-chip teacher-room-meta-chip--quiz" id="teacherQuizName" hidden></span>
+                <span class="teacher-room-meta-chip teacher-room-meta-chip--game" id="teacherGameName" hidden></span>
+              </div>
               <span class="teacher-join-teacher" id="teacherTeacherName"></span>
             </div>
             <div class="teacher-room-card-actions">
               <span class="teacher-status-pill" id="teacherStatusPill">Đang chờ</span>
+              <div class="teacher-room-quick-actions" id="teacherRoomQuickActions">
+                <button type="button" class="teacher-room-quick-btn" id="teacherCopyPinBtn" title="Copy PIN">Copy PIN</button>
+                <button type="button" class="teacher-room-quick-btn" id="teacherCopyLinkBtn" title="Copy link tham gia">Copy link HS</button>
+              </div>
               <button type="button" class="btn-end-room" id="btnEndRoom" onclick="resetTeacherRoom()">Kết thúc phòng</button>
             </div>
           </header>
 
           <div class="teacher-room-card-body">
             <div class="teacher-waiting-view" id="teacherWaitingView">
-            <div class="teacher-join-illustration-wrap">
-              <img src="{{ asset('htd-admin/assets/waiting-room.png') }}" alt="" class="teacher-join-illustration">
-            </div>
-
-            <div class="teacher-join-inner-card">
-            <button type="button" class="teacher-qr-enlarge-btn" id="teacherQrEnlargeBtn" aria-label="Phóng to QR và PIN">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>
-              </svg>
-            </button>
-            <div class="teacher-join-card-qr">
-              <div class="qr-frame teacher-qr-presentation">
-                <img src="{{ asset('htd-admin/assets/qr-login.png') }}" alt="QR Code" class="qr-mock-img">
-                <span class="qr-bracket tl"></span>
-                <span class="qr-bracket tr"></span>
-                <span class="qr-bracket bl"></span>
-                <span class="qr-bracket br"></span>
+              <div class="teacher-join-illustration-wrap">
+                <img src="{{ asset('htd-admin/assets/waiting-room.png') }}" alt="" class="teacher-join-illustration">
+                <p class="teacher-waiting-caption">Chia sẻ PIN hoặc QR để học sinh tham gia trên điện thoại</p>
               </div>
-              <p class="teacher-qr-hint">Quét mã QR để tham gia</p>
-            </div>
-            <div class="teacher-join-card-divider" aria-hidden="true"></div>
-            <div class="teacher-join-card-pin">
-              <div class="teacher-pin-digits" id="teacherPinDigits"></div>
-              <!-- <p class="teacher-pin-label">Mã PIN</p> -->
-            </div>
-            </div>
+
+              <div class="teacher-join-bottom">
+                <div class="teacher-join-card-pin">
+                  <p class="teacher-pin-label">Mã PIN</p>
+                  <div class="teacher-pin-digits" id="teacherPinDigits"></div>
+                </div>
+
+                <div class="teacher-join-card-qr">
+                  <button type="button" class="teacher-qr-enlarge-btn" id="teacherQrEnlargeBtn" aria-label="Phóng to QR và PIN">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>
+                    </svg>
+                  </button>
+                  <div class="qr-frame teacher-qr-presentation">
+                    <img src="{{ $qrUrl ?? asset('htd-admin/assets/qr-login.png') }}" alt="QR Code PIN {{ $session->pin }}" class="qr-mock-img">
+                    <span class="qr-bracket tl"></span>
+                    <span class="qr-bracket tr"></span>
+                    <span class="qr-bracket bl"></span>
+                    <span class="qr-bracket br"></span>
+                  </div>
+                  <p class="teacher-qr-hint">Quét mã QR để tham gia</p>
+                </div>
+              </div>
             </div>
 
             <div class="teacher-game-view" id="teacherGameView" hidden>
               <div class="teacher-game-toolbar">
                 <div class="teacher-game-controls">
                   <div class="teacher-game-controls-left">
+                    <span class="teacher-q-progress" id="teacherQProgress">Câu 1</span>
                     <div class="teacher-q-timer-pill" id="teacherTimerPill">
                       <span class="teacher-q-timer-icon" aria-hidden="true">⏱</span>
                       <span id="teacherTimerText">00:00</span>
@@ -64,48 +77,70 @@
                       <button type="button" class="teacher-zoom-btn" onclick="teacherZoomIn()" aria-label="Phóng to chữ">A+</button>
                     </div>
                     <div class="teacher-action-wrap">
-                    <button type="button" class="teacher-action-btn" id="teacherActionBtn" aria-haspopup="true" aria-expanded="false">
-                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-                      Hành động
-                    </button>
-                    <div class="teacher-action-menu" id="teacherActionMenu" hidden>
-                      <button type="button" id="teacherPresentationMenuBtn" onclick="toggleTeacherPresentation()">Bật trình chiếu</button>
-                      <button type="button" id="teacherToggleScoresMenuBtn" onclick="toggleTeacherScorePanel()">Ẩn bảng điểm</button>
-                      <button type="button" id="teacherPauseBtn" onclick="teacherTogglePause()">Tạm dừng</button>
-                      <button type="button" onclick="teacherEndGame()">Kết thúc trò chơi</button>
-                      <button type="button" onclick="teacherPlayAgain()">Chơi lại</button>
-                      <button type="button" class="teacher-action-danger" onclick="resetTeacherRoom()">Kết thúc phòng</button>
-                    </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="teacher-game-phase" id="teacherQuestionPhase">
-                <div class="teacher-q-card" id="teacherQCard">
-                  <div class="teacher-q-card-fit" id="teacherQCardFit">
-                    <div class="teacher-q-card-inner" id="teacherQCardInner">
-                      <p class="teacher-q-prompt" id="teacherQPrompt"></p>
-                      <img class="teacher-q-media" id="teacherQImage" alt="" hidden>
-                      <div class="teacher-q-video-wrap" id="teacherQVideoWrap" hidden>
-                        <video id="teacherQVideo" controls playsinline></video>
+                      <button type="button" class="teacher-action-btn" id="teacherActionBtn" aria-haspopup="true" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                        Hành động
+                      </button>
+                      <div class="teacher-action-menu" id="teacherActionMenu" hidden>
+                        <button type="button" id="teacherPresentationMenuBtn" onclick="toggleTeacherPresentation()">Bật trình chiếu</button>
+                        <button type="button" id="teacherToggleScoresMenuBtn" onclick="toggleTeacherScorePanel()">Ẩn bảng điểm</button>
+                        <button type="button" id="teacherPauseBtn" onclick="teacherTogglePause()">Tạm dừng</button>
+                        <button type="button" onclick="teacherEndGame()">Kết thúc trò chơi</button>
+                        <button type="button" onclick="teacherPlayAgain()">Chơi lại</button>
+                        <button type="button" class="teacher-action-danger" onclick="resetTeacherRoom()">Kết thúc phòng</button>
                       </div>
-                      <div class="teacher-q-answers" id="teacherQAnswers"></div>
-                      <div class="teacher-q-eq" id="teacherQEq" hidden></div>
                     </div>
                   </div>
                 </div>
-                <div class="teacher-q-timeline" id="teacherTimeline" aria-label="Tiến trình câu hỏi"></div>
               </div>
 
-              <div class="teacher-game-phase" id="teacherFinalPhase" hidden>
-                <div class="teacher-final-banner">🎉 Kết thúc trò chơi</div>
-                <p class="teacher-final-hint">Học sinh đang xem kết quả trên thiết bị của mình.</p>
-                <div class="teacher-final-actions">
-                  <button type="button" class="btn-primary" id="btnExportCsv" onclick="teacherExportCsv()">Tải CSV</button>
-                  <a href="/admin/reports" class="btn-secondary" target="_blank" rel="noopener">Xem báo cáo Admin</a>
+              <div class="teacher-game-body">
+                <div class="teacher-game-phase" id="teacherQuestionPhase">
+                  <div class="teacher-q-card" id="teacherQCard">
+                    <div class="teacher-q-card-fit" id="teacherQCardFit">
+                      <div class="teacher-q-card-inner" id="teacherQCardInner">
+                        <div class="teacher-q-content" id="teacherQContent"></div>
+                        <p class="teacher-q-prompt" id="teacherQPrompt" hidden></p>
+                        <img class="teacher-q-media" id="teacherQImage" alt="" hidden>
+                        <div class="teacher-q-video-wrap" id="teacherQVideoWrap" hidden>
+                          <video id="teacherQVideo" controls playsinline></video>
+                        </div>
+                        <div class="teacher-q-answers" id="teacherQAnswers"></div>
+                        <div class="teacher-q-eq" id="teacherQEq" hidden></div>
+                      </div>
+                    </div>
+                  </div>
+                  <aside class="teacher-q-side" id="teacherQSide">
+                    <div class="teacher-q-barem" id="teacherQBarem" hidden></div>
+                    <div class="teacher-q-timeline" id="teacherTimeline" aria-label="Tiến trình câu hỏi"></div>
+                  </aside>
                 </div>
-                <div class="teacher-final-lb" id="teacherFinalLeaderboard"></div>
+
+                <div class="teacher-game-phase" id="teacherFinalPhase" hidden>
+                  <div class="teacher-final-wrap">
+                    <div class="teacher-final-banner">🎉 Kết thúc trò chơi</div>
+                    <p class="teacher-final-hint">Học sinh đang xem bảng xếp hạng trên thiết bị của mình.</p>
+                    <div class="teacher-final-lb" id="teacherFinalLeaderboard"></div>
+                    <div class="teacher-final-actions">
+                      @if ($session->status === 'ended' && $session->is_active)
+                        <form
+                          method="POST"
+                          action="{{ route('admin.sessions.reset', $session) }}"
+                          class="inline-form"
+                          onsubmit="return confirm('Chơi lại với cùng PIN? Kết quả lần trước vẫn lưu trong báo cáo.');"
+                        >
+                          @csrf
+                          <button type="submit" class="btn-primary">Chơi lại</button>
+                        </form>
+                      @else
+                        <button type="button" class="btn-primary" onclick="teacherPlayAgain()">Chơi lại</button>
+                      @endif
+                      <button type="button" class="btn-primary" id="btnExportCsv" onclick="teacherExportCsv()">Tải CSV kết quả</button>
+                      <a href="{{ route('admin.reports.index') }}" class="btn-secondary" target="_blank" rel="noopener">Xem báo cáo Admin</a>
+                      <a href="{{ route('admin.sessions.index') }}" class="btn-secondary">← Danh sách phòng</a>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -150,7 +185,7 @@
     <div class="teacher-qr-modal-body">
       <h2 class="teacher-qr-modal-title" id="teacherQrModalTitle">Quét QR để tham gia</h2>
       <div class="qr-frame teacher-qr-modal-frame">
-        <img src="{{ asset('htd-admin/assets/qr-login.png') }}" alt="QR Code" class="qr-mock-img">
+        <img src="{{ $qrUrl ?? asset('htd-admin/assets/qr-login.png') }}" alt="QR Code PIN {{ $session->pin }}" class="qr-mock-img">
         <span class="qr-bracket tl"></span>
         <span class="qr-bracket tr"></span>
         <span class="qr-bracket bl"></span>
@@ -159,7 +194,6 @@
       <p class="teacher-qr-modal-hint">Mở camera hoặc ứng dụng quét mã để tham gia phòng.</p>
       <div class="teacher-qr-modal-pin">
         <div class="teacher-pin-digits teacher-pin-digits-large" id="teacherPinDigitsModal"></div>
-        <!-- <p class="teacher-pin-label teacher-pin-label-modal">Mã PIN</p> -->
       </div>
     </div>
   </div>
@@ -189,7 +223,8 @@
       </div>
       <div class="teacher-presentation-question-wrap">
         <p class="teacher-presentation-progress" id="teacherPresentationProgress">Câu 1/1</p>
-        <p class="teacher-presentation-prompt" id="teacherPresentationPrompt"></p>
+        <div class="teacher-presentation-content" id="teacherPresentationContent"></div>
+        <p class="teacher-presentation-prompt" id="teacherPresentationPrompt" hidden></p>
         <img class="teacher-presentation-media" id="teacherPresentationImage" alt="" hidden>
         <div class="teacher-presentation-video-wrap" id="teacherPresentationVideoWrap" hidden>
           <video id="teacherPresentationVideo" playsinline controls></video>

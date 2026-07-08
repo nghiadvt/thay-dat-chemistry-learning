@@ -126,6 +126,7 @@ function initTeacherApp() {
 function joinExistingRoomFromAdmin(pin, params) {
   const gameId = parseInt(params.get('game_id'), 10) || null;
   const sessionId = parseInt(params.get('session_id'), 10) || null;
+  const boot = window.ADMIN_BOOT?.session || {};
 
   HTDBridge.init()
     .then(() => HTDApi.checkPin(pin))
@@ -133,18 +134,23 @@ function joinExistingRoomFromAdmin(pin, params) {
       const roomData = data.data || data;
       HTD.setRoom({
         pin,
-        name: roomData.game_name || 'PHÒNG QUIZ',
-        teacher: 'Giáo viên',
-        status: roomData.status || 'waiting',
+        name: boot.roomName || roomData.quiz_name || roomData.game_name || 'PHÒNG QUIZ',
+        roomName: boot.roomName || null,
+        quizName: boot.quizName || roomData.quiz_name || null,
+        gameName: boot.gameName || roomData.game_name || null,
+        joinUrl: boot.joinUrl || null,
+        qrUrl: boot.qrUrl || null,
+        teacher: boot.hostName || 'Giáo viên',
+        status: boot.status === 'playing' ? 'started' : boot.status === 'ended' ? 'ended' : 'waiting',
         backendMode: true,
         sessionId: sessionId || roomData.session_id,
-        gameId,
+        gameId: gameId || roomData.game_id,
         createdAt: Date.now(),
       });
       HTD.setPlayers([]);
       return HTDBridge.joinRoom({
         pin,
-        name: 'Host',
+        name: boot.hostName || 'Host',
         isHost: true,
       });
     })
@@ -223,29 +229,62 @@ function renderTeacherPinDigits(pin) {
     .join('');
 }
 
+function isTeacherRoomInGame(room) {
+  return room?.status === 'started' || room?.status === 'ended';
+}
+
+function isTeacherRoomEnded(room) {
+  return room?.status === 'ended' || room?.game?.phase === 'final';
+}
+
 function renderDashboard() {
   const room = HTD.getRoom();
   if (!room) return;
 
-  document.getElementById('teacherRoomName').textContent = room.name;
-  const teacherEl = document.getElementById('teacherTeacherName');
-  if (teacherEl) teacherEl.textContent = 'Giáo viên: ' + (room.teacher || 'Thầy Đạt');
-  renderTeacherPinDigits(room.pin);
+  const displayName = room.roomName || room.name || 'Phòng chơi';
+  document.getElementById('teacherRoomName').textContent = displayName;
 
-  const started = room.status === 'started';
-  document.getElementById('teacherRoomCard')?.classList.toggle('game-active', started);
-  document.getElementById('teacherRoomHeader')?.classList.toggle('compact', started);
-  document.getElementById('teacherRoomInfo')?.classList.toggle('compact', started);
+  const quizEl = document.getElementById('teacherQuizName');
+  const gameEl = document.getElementById('teacherGameName');
+  if (quizEl) {
+    const quizName = room.quizName || '';
+    quizEl.textContent = quizName ? `Quiz: ${quizName}` : '';
+    quizEl.hidden = !quizName;
+  }
+  if (gameEl) {
+    const gameName = room.gameName || '';
+    gameEl.textContent = gameName ? `Game: ${gameName}` : '';
+    gameEl.hidden = !gameName;
+  }
+
+  const teacherEl = document.getElementById('teacherTeacherName');
+  if (teacherEl) {
+    teacherEl.textContent = room.teacher ? `Giáo viên: ${room.teacher}` : '';
+    teacherEl.hidden = !room.teacher;
+  }
+
+  renderTeacherPinDigits(room.pin);
+  updateTeacherJoinQr(room);
+  wireTeacherRoomQuickActions(room);
+
+  const inGame = isTeacherRoomInGame(room);
+  const isEnded = isTeacherRoomEnded(room);
+
+  document.getElementById('teacherRoomCard')?.classList.toggle('game-active', inGame);
+  document.getElementById('teacherRoomCard')?.classList.toggle('game-ended', isEnded);
+  document.getElementById('teacherRoomHeader')?.classList.toggle('compact', inGame);
+  document.getElementById('teacherRoomInfo')?.classList.toggle('compact', inGame);
 
   const statusPill = document.getElementById('teacherStatusPill');
-  statusPill.textContent = started
-    ? room.game?.phase === 'final'
-      ? 'Kết thúc'
-      : room.game?.paused
+  statusPill.textContent = isEnded
+    ? 'Kết thúc'
+    : inGame
+      ? room.game?.paused
         ? 'Tạm dừng'
         : 'Đang chơi'
-    : 'Đang chờ';
-  statusPill.classList.toggle('started', started);
+      : 'Đang chờ';
+  statusPill.classList.toggle('started', inGame && !isEnded);
+  statusPill.classList.toggle('ended', isEnded);
 
   const waitingView = document.getElementById('teacherWaitingView');
   const gameView = document.getElementById('teacherGameView');
@@ -255,22 +294,27 @@ function renderDashboard() {
   const panelTitle = document.getElementById('teacherPanelTitle');
   const playerGrid = document.getElementById('teacherList');
   const scoreList = document.getElementById('teacherScoreList');
+  const gameToolbar = document.querySelector('.teacher-game-toolbar');
 
-  if (waitingView) waitingView.hidden = started;
-  if (gameView) gameView.hidden = !started;
-  mainGrid?.classList.toggle('game-active', started);
-  mainGrid?.classList.toggle('scores-collapsed', started && !teacherState.scorePanelOpen);
-  playersPanel?.classList.toggle('game-active', started);
-  document.getElementById('teacherMainResizer')?.classList.toggle('hidden', started && !teacherState.scorePanelOpen);
+  if (waitingView) waitingView.hidden = inGame;
+  if (gameView) gameView.hidden = !inGame;
+  if (gameToolbar) gameToolbar.hidden = isEnded;
+  mainGrid?.classList.toggle('game-active', inGame);
+  mainGrid?.classList.toggle('game-ended', isEnded);
+  mainGrid?.classList.toggle('scores-collapsed', inGame && !isEnded && !teacherState.scorePanelOpen);
+  playersPanel?.classList.toggle('game-active', inGame);
+  document.getElementById('teacherMainResizer')?.classList.toggle('hidden', inGame && !isEnded && !teacherState.scorePanelOpen);
   updateTeacherScorePanelBtn();
   applyTeacherQZoom();
-  if (btnEndRoom) btnEndRoom.hidden = started;
-  if (panelTitle) panelTitle.textContent = started ? 'Bảng điểm' : 'Danh sách học sinh';
-  if (playerGrid) playerGrid.hidden = started;
-  if (scoreList) scoreList.hidden = !started || !teacherState.scorePanelOpen;
-  if (playersPanel) playersPanel.hidden = started && !teacherState.scorePanelOpen;
+  if (btnEndRoom) btnEndRoom.hidden = inGame && !isEnded;
+  if (panelTitle) {
+    panelTitle.textContent = isEnded ? 'Kết quả cuối' : inGame ? 'Bảng điểm' : 'Danh sách học sinh';
+  }
+  if (playerGrid) playerGrid.hidden = inGame;
+  if (scoreList) scoreList.hidden = !inGame || (!isEnded && !teacherState.scorePanelOpen);
+  if (playersPanel) playersPanel.hidden = inGame && !isEnded && !teacherState.scorePanelOpen;
 
-  if (started && room.game) {
+  if (inGame && room.game) {
     renderTeacherGame(room);
   }
 
@@ -303,66 +347,222 @@ function renderTeacherTimeline(game) {
   }).join('');
 }
 
+function teacherOptionLetter(index) {
+  return String.fromCharCode(65 + index);
+}
+
+function escapeTeacherHtml(text) {
+  const el = document.createElement('div');
+  el.textContent = text ?? '';
+  return el.innerHTML;
+}
+
+function renderTeacherQuestionContent(q) {
+  const contentEl = document.getElementById('teacherQContent');
+  const promptEl = document.getElementById('teacherQPrompt');
+  const img = document.getElementById('teacherQImage');
+  const vidWrap = document.getElementById('teacherQVideoWrap');
+  const vid = document.getElementById('teacherQVideo');
+
+  if (contentEl && q.contentHtml) {
+    contentEl.innerHTML = q.contentHtml;
+    contentEl.hidden = false;
+    if (promptEl) {
+      promptEl.hidden = true;
+      promptEl.textContent = '';
+    }
+    if (img) img.hidden = true;
+    if (vidWrap) vidWrap.hidden = true;
+    if (vid) {
+      vid.pause();
+      vid.removeAttribute('src');
+      vid.removeAttribute('poster');
+    }
+    contentEl.querySelectorAll('img').forEach(el => {
+      el.addEventListener('load', () => scheduleFitTeacherQuestionCard(), { once: true });
+    });
+    return;
+  }
+
+  if (contentEl) {
+    contentEl.innerHTML = '';
+    contentEl.hidden = true;
+  }
+  if (promptEl) {
+    promptEl.hidden = false;
+    promptEl.textContent = q.prompt || '';
+  }
+
+  if (img) img.hidden = true;
+  if (vidWrap) vidWrap.hidden = true;
+  if (vid) {
+    vid.pause();
+    vid.removeAttribute('src');
+    vid.removeAttribute('poster');
+  }
+
+  if (q.media === 'image' && q.mediaUrl && img) {
+    img.src = q.mediaUrl;
+    img.hidden = false;
+    img.onload = () => scheduleFitTeacherQuestionCard();
+  } else if (q.media === 'video' && q.mediaUrl && vid && vidWrap) {
+    vid.src = q.mediaUrl;
+    if (q.mediaPoster) vid.poster = q.mediaPoster;
+    vidWrap.hidden = false;
+    vid.onloadedmetadata = () => scheduleFitTeacherQuestionCard();
+  }
+}
+
+function renderTeacherMcOptions(q, containerId) {
+  const answersEl = document.getElementById(containerId);
+  if (!answersEl) return;
+
+  const options = Array.isArray(q.options) ? q.options : [];
+  if (!options.length) {
+    answersEl.innerHTML = '<p class="teacher-q-empty">Chưa có đáp án.</p>';
+    return;
+  }
+
+  const correctIdx = q.correctIndex ?? q.correct ?? null;
+  answersEl.innerHTML = `<div class="teacher-mc-options">${options
+    .map((optText, i) => {
+      const isCorrect = correctIdx === i;
+      return `<div class="teacher-mc-option${isCorrect ? ' correct' : ''}">
+          <span class="teacher-mc-label">${teacherOptionLetter(i)}.</span>
+          <span class="teacher-mc-text">${EquationUI.chemToHtml(optText)}</span>
+          ${isCorrect ? '<span class="teacher-mc-check" aria-label="Đáp án đúng">✓</span>' : ''}
+        </div>`;
+    })
+    .join('')}</div>`;
+}
+
+function renderTeacherStructuredPreview(q, eqElId) {
+  const eqEl = document.getElementById(eqElId);
+  if (!eqEl) return false;
+
+  if (q.type === 'input' && q.inputMode === 'essay') {
+    eqEl.hidden = false;
+    eqEl.innerHTML =
+      '<div class="teacher-essay-preview">' +
+      '<textarea class="teacher-essay-preview-input" readonly placeholder="Học sinh nhập câu trả lời tại đây…"></textarea>' +
+      '</div>';
+    return true;
+  }
+
+  if (q.type === 'input' && q.inputMode === 'formula') {
+    eqEl.hidden = false;
+    eqEl.innerHTML =
+      '<div class="teacher-formula-preview">' +
+      '<p class="teacher-formula-preview-hint">Học sinh nhập công thức bằng bàn phím hóa học</p>' +
+      (q.correctAnswerNormalized
+        ? `<p class="teacher-formula-preview-answer">Đáp án: <strong>${EquationUI.chemToHtml(q.correctAnswerNormalized)}</strong></p>`
+        : '') +
+      '</div>';
+    return true;
+  }
+
+  if (q.template && Array.isArray(q.template) && q.template.length) {
+    eqEl.hidden = false;
+    const values = EquationUI.createInputState(q.template);
+    eqEl.innerHTML = EquationUI.renderEquation(q.template, values, null);
+    return true;
+  }
+
+  eqEl.hidden = true;
+  eqEl.innerHTML = '';
+  return false;
+}
+
+function renderTeacherBarem(q) {
+  const baremEl = document.getElementById('teacherQBarem');
+  if (!baremEl) return;
+
+  const parts = [];
+
+  if (q.type === 'mc' && q.correctIndex != null && Array.isArray(q.options)) {
+    const letter = teacherOptionLetter(q.correctIndex);
+    const text = q.options[q.correctIndex] || '';
+    parts.push(
+      `<div class="teacher-barem-row">
+        <span class="teacher-barem-label">Đáp án đúng</span>
+        <span class="teacher-barem-value">${letter}${text ? ` — ${EquationUI.chemToHtml(text)}` : ''}</span>
+      </div>`
+    );
+  } else if (q.correctAnswerNormalized) {
+    parts.push(
+      `<div class="teacher-barem-row">
+        <span class="teacher-barem-label">Đáp án mẫu</span>
+        <span class="teacher-barem-value">${EquationUI.chemToHtml(q.correctAnswerNormalized)}</span>
+      </div>`
+    );
+  }
+
+  if (q.correctAnswer && typeof q.correctAnswer === 'object') {
+    parts.push(
+      `<div class="teacher-barem-row">
+        <span class="teacher-barem-label">Barem</span>
+        <code class="teacher-barem-code">${escapeTeacherHtml(JSON.stringify(q.correctAnswer))}</code>
+      </div>`
+    );
+  }
+
+  if (q.explanation) {
+    parts.push(`<div class="teacher-barem-explanation">${q.explanation}</div>`);
+  }
+
+  baremEl.innerHTML = parts.join('');
+  baremEl.hidden = parts.length === 0;
+}
+
+function renderTeacherQuestionMeta(room, q) {
+  const progressEl = document.getElementById('teacherQProgress');
+  const typeEl = document.getElementById('teacherQType');
+  const game = room?.game;
+
+  if (progressEl && game) {
+    progressEl.textContent = isBackendMode() && room?.backendMode
+      ? `Câu ${game.questionIndex + 1}`
+      : `Câu ${game.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
+  }
+
+  if (typeEl) {
+    if (q.type === 'mc') {
+      typeEl.textContent = 'Trắc nghiệm';
+    } else {
+      const sub = HTD.INPUT_MODE_LABELS[q.inputMode] || 'Tự luận';
+      typeEl.textContent = `Tự luận · ${sub}`;
+    }
+  }
+}
+
 function renderTeacherQuestion(room) {
-  const game = room.game;
   const q = getTeacherCurrentQuestion();
   if (!q) return;
 
   document.getElementById('teacherQuestionPhase').hidden = false;
   document.getElementById('teacherFinalPhase').hidden = true;
 
-  const typeEl = document.getElementById('teacherQType');
-  if (q.type === 'mc') {
-    typeEl.textContent = 'Trắc nghiệm';
-  } else {
-    const sub = HTD.INPUT_MODE_LABELS[q.inputMode] || 'Tự luận';
-    typeEl.textContent = `Tự luận · ${sub}`;
-  }
-
-  document.getElementById('teacherQPrompt').textContent = q.prompt || '';
-
-  const img = document.getElementById('teacherQImage');
-  const vidWrap = document.getElementById('teacherQVideoWrap');
-  const vid = document.getElementById('teacherQVideo');
-  img.hidden = true;
-  vidWrap.hidden = true;
-  vid.pause();
-  vid.removeAttribute('src');
-
-  if (q.media === 'image' && q.mediaUrl) {
-    img.src = q.mediaUrl;
-    img.hidden = false;
-    img.onload = () => scheduleFitTeacherQuestionCard();
-  } else if (q.media === 'video' && q.mediaUrl) {
-    vid.src = q.mediaUrl;
-    if (q.mediaPoster) vid.poster = q.mediaPoster;
-    vidWrap.hidden = false;
-    vid.onloadedmetadata = () => scheduleFitTeacherQuestionCard();
-  }
+  renderTeacherQuestionMeta(room, q);
+  renderTeacherQuestionContent(q);
 
   const answersEl = document.getElementById('teacherQAnswers');
   const eqEl = document.getElementById('teacherQEq');
-  answersEl.innerHTML = '';
-  eqEl.hidden = true;
-
-  if (q.type === 'mc') {
-    answersEl.innerHTML = `<div class="teacher-mc-options">${['A', 'B', 'C', 'D']
-      .map((label, i) => {
-        const optText = q.options[i] || '';
-        return `<div class="teacher-mc-option">
-          <span class="teacher-mc-label">${label}.</span>
-          <span class="teacher-mc-text">${EquationUI.chemToHtml(optText)}</span>
-        </div>`;
-      })
-      .join('')}</div>`;
-  } else if (q.template) {
-    eqEl.hidden = false;
-    const values = EquationUI.createInputState(q.template);
-    eqEl.innerHTML = EquationUI.renderEquation(q.template, values, null);
+  if (answersEl) answersEl.innerHTML = '';
+  if (eqEl) {
+    eqEl.hidden = true;
+    eqEl.innerHTML = '';
   }
 
+  if (q.type === 'mc') {
+    renderTeacherMcOptions(q, 'teacherQAnswers');
+  } else {
+    renderTeacherStructuredPreview(q, 'teacherQEq');
+  }
+
+  renderTeacherBarem(q);
   updateTeacherTimer(room);
   applyTeacherQZoom();
+  scheduleFitTeacherQuestionCard();
 }
 
 function updateTeacherTimer(room) {
@@ -407,49 +607,72 @@ function renderTeacherPresentationQuestion(room) {
 
   const progressEl = document.getElementById('teacherPresentationProgress');
   const promptEl = document.getElementById('teacherPresentationPrompt');
+  const contentEl = document.getElementById('teacherPresentationContent');
   const answersEl = document.getElementById('teacherPresentationAnswers');
   const eqEl = document.getElementById('teacherPresentationEq');
   const imgEl = document.getElementById('teacherPresentationImage');
   const vidWrap = document.getElementById('teacherPresentationVideoWrap');
   const vid = document.getElementById('teacherPresentationVideo');
-  if (!progressEl || !promptEl || !answersEl || !eqEl || !imgEl || !vidWrap || !vid) return;
+  if (!progressEl || !answersEl || !eqEl) return;
 
   progressEl.textContent = isBackendMode() && room?.backendMode
     ? `Câu ${game.questionIndex + 1}`
     : `Câu ${game.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
-  promptEl.textContent = q.prompt || '';
+
+  if (contentEl && q.contentHtml) {
+    contentEl.innerHTML = q.contentHtml;
+    contentEl.hidden = false;
+    if (promptEl) {
+      promptEl.hidden = true;
+      promptEl.textContent = '';
+    }
+  } else if (promptEl) {
+    promptEl.hidden = false;
+    promptEl.textContent = q.prompt || '';
+    if (contentEl) {
+      contentEl.innerHTML = '';
+      contentEl.hidden = true;
+    }
+  }
+
   answersEl.innerHTML = '';
   eqEl.hidden = true;
+  eqEl.innerHTML = '';
 
-  imgEl.hidden = true;
-  vidWrap.hidden = true;
-  vid.pause();
-  vid.removeAttribute('src');
-  vid.removeAttribute('poster');
+  if (imgEl) imgEl.hidden = true;
+  if (vidWrap) vidWrap.hidden = true;
+  if (vid) {
+    vid.pause();
+    vid.removeAttribute('src');
+    vid.removeAttribute('poster');
+  }
 
-  if (q.media === 'image' && q.mediaUrl) {
-    imgEl.src = q.mediaUrl;
-    imgEl.hidden = false;
-  } else if (q.media === 'video' && q.mediaUrl) {
-    vid.src = q.mediaUrl;
-    if (q.mediaPoster) vid.poster = q.mediaPoster;
-    vidWrap.hidden = false;
+  if (!q.contentHtml) {
+    if (q.media === 'image' && q.mediaUrl && imgEl) {
+      imgEl.src = q.mediaUrl;
+      imgEl.hidden = false;
+    } else if (q.media === 'video' && q.mediaUrl && vid && vidWrap) {
+      vid.src = q.mediaUrl;
+      if (q.mediaPoster) vid.poster = q.mediaPoster;
+      vidWrap.hidden = false;
+    }
   }
 
   if (q.type === 'mc') {
-    answersEl.innerHTML = `<div class="teacher-presentation-mc">${['A', 'B', 'C', 'D']
-      .map((label, i) => {
-        const optText = q.options[i] || '';
-        return `<div class="teacher-presentation-mc-item">
-          <span class="teacher-presentation-mc-label">${label}.</span>
+    const options = Array.isArray(q.options) ? q.options : [];
+    const correctIdx = q.correctIndex ?? q.correct ?? null;
+    answersEl.innerHTML = `<div class="teacher-presentation-mc">${options
+      .map((optText, i) => {
+        const isCorrect = correctIdx === i;
+        return `<div class="teacher-presentation-mc-item${isCorrect ? ' correct' : ''}">
+          <span class="teacher-presentation-mc-label">${teacherOptionLetter(i)}.</span>
           <span>${EquationUI.chemToHtml(optText)}</span>
+          ${isCorrect ? '<span class="teacher-mc-check">✓</span>' : ''}
         </div>`;
       })
       .join('')}</div>`;
-  } else if (q.template) {
-    eqEl.hidden = false;
-    const values = EquationUI.createInputState(q.template);
-    eqEl.innerHTML = EquationUI.renderEquation(q.template, values, null);
+  } else {
+    renderTeacherStructuredPreview(q, 'teacherPresentationEq');
   }
 }
 
@@ -641,29 +864,58 @@ function syncTeacherPresentationFullscreenState() {
 function renderTeacherFinal() {
   document.getElementById('teacherQuestionPhase').hidden = true;
   document.getElementById('teacherFinalPhase').hidden = false;
-  document.getElementById('teacherTimerText').textContent = '—';
+  const timerText = document.getElementById('teacherTimerText');
+  if (timerText) timerText.textContent = '—';
 
-  const lbEl = document.getElementById('teacherFinalLeaderboard');
   const rows = teacherState.finalLeaderboard || [];
+  const lbEl = document.getElementById('teacherFinalLeaderboard');
+  const room = HTD.getRoom();
+
   if (lbEl) {
-    lbEl.innerHTML = rows.length
-      ? `<table class="teacher-final-table">
+    if (!rows.length) {
+      lbEl.innerHTML =
+        '<div class="teacher-final-empty">' +
+        '<p class="teacher-final-empty-title">Trò chơi đã kết thúc</p>' +
+        '<p class="teacher-final-hint">Chưa có học sinh nào ghi điểm trong phòng này.</p>' +
+        '</div>';
+    } else {
+      const top3 = rows.slice(0, 3);
+      const podiumMedals = ['🥇', '🥈', '🥉'];
+      lbEl.innerHTML =
+        '<div class="teacher-final-summary">' +
+        `<p class="teacher-final-stat">${rows.length} học sinh · ${teacherState.serverQuestionIndex || room?.game?.questionIndex + 1 || '—'} câu đã chơi</p>` +
+        (top3.length
+          ? `<div class="teacher-final-podium">${top3
+              .map(
+                (r, i) =>
+                  `<div class="teacher-final-podium-item rank-${i + 1}">
+                    <span class="teacher-final-podium-medal">${podiumMedals[i] || i + 1}</span>
+                    <strong class="teacher-final-podium-name">${escapeTeacherHtml(r.name)}</strong>
+                    <span class="teacher-final-podium-score">${Number(r.score || 0)} đ</span>
+                  </div>`
+              )
+              .join('')}</div>`
+          : '') +
+        `<table class="teacher-final-table">
           <thead><tr><th>Hạng</th><th>Học sinh</th><th>Điểm</th></tr></thead>
           <tbody>${rows
             .map(
               r => `<tr>
                 <td>${r.rank ?? '—'}</td>
-                <td>${r.name}</td>
-                <td>${r.score ?? 0}</td>
+                <td>${escapeTeacherHtml(r.name)}</td>
+                <td><strong>${Number(r.score || 0)}</strong></td>
               </tr>`
             )
             .join('')}</tbody>
-        </table>`
-      : '<p class="teacher-final-hint">Chưa có dữ liệu xếp hạng.</p>';
+        </table>` +
+        '</div>';
+    }
   }
 
   const exportBtn = document.getElementById('btnExportCsv');
-  if (exportBtn) exportBtn.hidden = !HTD.getRoom()?.sessionId;
+  if (exportBtn) exportBtn.hidden = !room?.sessionId;
+
+  renderTeacherScoreList();
 }
 
 function renderTeacherGame(room) {
@@ -749,12 +1001,64 @@ function syncModalPinDigits() {
   dst.innerHTML = src.innerHTML;
 }
 
-function getTeacherDisplayPlayers() {
+function updateTeacherJoinQr(room) {
+  const qrUrl =
+    room?.qrUrl ||
+    window.ADMIN_BOOT?.session?.qrUrl ||
+    (room?.joinUrl
+      ? 'https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=' +
+        encodeURIComponent(room.joinUrl)
+      : null);
+  if (!qrUrl) return;
+  document.querySelectorAll('.teacher-qr-presentation .qr-mock-img, .teacher-qr-modal-frame .qr-mock-img').forEach(img => {
+    img.src = qrUrl;
+    img.alt = 'QR tham gia phòng ' + (room?.pin || '');
+  });
+}
+
+function wireTeacherRoomQuickActions(room) {
+  const copyPinBtn = document.getElementById('teacherCopyPinBtn');
+  const copyLinkBtn = document.getElementById('teacherCopyLinkBtn');
+  if (copyPinBtn && !copyPinBtn.dataset.wired) {
+    copyPinBtn.dataset.wired = '1';
+    copyPinBtn.addEventListener('click', () => {
+      if (room?.pin) navigator.clipboard.writeText(room.pin);
+    });
+  }
+  if (copyLinkBtn && !copyLinkBtn.dataset.wired) {
+    copyLinkBtn.dataset.wired = '1';
+    copyLinkBtn.addEventListener('click', () => {
+      if (room?.joinUrl) navigator.clipboard.writeText(room.joinUrl);
+    });
+  }
+}
+
+function isTeacherBackendRoom() {
+  return isBackendMode() && (HTD.getRoom()?.backendMode || Boolean(window.ADMIN_BOOT?.session));
+}
+
+function getTeacherRealPlayers() {
   const realPlayers = HTD.getPlayers();
+  if (isBackendMode()) {
+    return realPlayers.filter(p => !p.isFake);
+  }
   return HTD.buildDisplayPlayers(realPlayers, null, 50);
 }
 
+function getTeacherWaitingPlayers() {
+  const players = getTeacherRealPlayers();
+  if (isBackendMode()) {
+    return players.filter(p => p.connected !== false);
+  }
+  return players;
+}
+
+function getTeacherDisplayPlayers() {
+  return getTeacherRealPlayers();
+}
+
 function initTeacherFakeScores(players) {
+  if (isBackendMode()) return;
   players.forEach(p => {
     if (p.isFake && teacherState.fakeScores[p.id] === undefined) {
       teacherState.fakeScores[p.id] = Math.floor(Math.random() * 300);
@@ -771,6 +1075,7 @@ function getTeacherPlayerScore(p) {
 }
 
 function bumpTeacherScoresOnLeaderboard() {
+  if (isBackendMode()) return;
   const players = getTeacherDisplayPlayers();
   teacherState.prevRanks = {};
   const sorted = players
@@ -789,6 +1094,29 @@ function bumpTeacherScoresOnLeaderboard() {
 function renderTeacherScoreList() {
   const el = document.getElementById('teacherScoreList');
   if (!el) return;
+
+  const room = HTD.getRoom();
+  const isEnded = isTeacherRoomEnded(room);
+
+  if (isEnded && teacherState.finalLeaderboard?.length) {
+    el.innerHTML = teacherState.finalLeaderboard
+      .map((row, i) => {
+        const rank = row.rank ?? i + 1;
+        const rankCls = rank <= 3 ? ` r${rank}` : '';
+        return `<div class="teacher-score-item">
+          <span class="teacher-score-rank${rankCls}">${rank}</span>
+          <div class="teacher-score-av">😀</div>
+          <div class="teacher-score-info">
+            <div class="teacher-score-name">${escapeTeacherHtml(row.name)}</div>
+          </div>
+          <div class="teacher-score-pts">
+            <span class="teacher-score-value">${Number(row.score || 0)}</span>
+          </div>
+        </div>`;
+      })
+      .join('');
+    return;
+  }
 
   const players = getTeacherDisplayPlayers();
   initTeacherFakeScores(players);
@@ -834,23 +1162,24 @@ function renderTeacherScoreList() {
 
 function renderTeacherList() {
   const room = HTD.getRoom();
-  const players = getTeacherDisplayPlayers();
-  const started = room?.status === 'started';
+  const inGame = isTeacherRoomInGame(room);
+  const isEnded = isTeacherRoomEnded(room);
+  const players = inGame ? getTeacherDisplayPlayers() : getTeacherWaitingPlayers();
 
   document.getElementById('teacherCount').textContent = `${players.length} học sinh`;
 
   const btnStart = document.getElementById('btnStartGame');
-  btnStart.disabled = started;
-  btnStart.textContent = started ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
+  btnStart.disabled = inGame;
+  btnStart.textContent = isEnded ? 'Đã kết thúc' : inGame ? 'Đã bắt đầu' : 'Bắt đầu trò chơi';
 
   const btnNext = document.getElementById('btnNextQuestion');
   if (btnNext) {
-    btnNext.hidden = !(isBackendMode() && started);
+    btnNext.hidden = !(isBackendMode() && inGame && !isEnded);
   }
   const submitEl = document.getElementById('teacherSubmitCount');
-  if (submitEl) submitEl.hidden = !(isBackendMode() && started);
+  if (submitEl) submitEl.hidden = !(isBackendMode() && inGame && !isEnded);
 
-  if (started) {
+  if (inGame) {
     renderTeacherScoreList();
     return;
   }
@@ -861,7 +1190,7 @@ function renderTeacherList() {
       : players
           .map(
             p => `
-      <div class="teacher-player">
+      <div class="teacher-player${p.connected === false ? ' is-offline' : ''}">
         <div class="teacher-player-av">${p.avatarDataUrl ? `<img src="${p.avatarDataUrl}">` : p.avatarEmoji || '😀'}</div>
         <span class="teacher-player-name">${p.name}</span>
       </div>`
@@ -945,10 +1274,48 @@ function teacherEndGame() {
   renderDashboard();
 }
 
-function teacherPlayAgain() {
-  if (!confirm('Chơi lại từ đầu? Học sinh sẽ quay về phòng chờ.')) return;
+function resetTeacherSessionLocalState() {
   const room = HTD.getRoom();
   if (!room) return;
+  room.status = 'waiting';
+  room.game = null;
+  delete room.startedAt;
+  HTD.setRoom(room);
+  HTD.setPlayers([]);
+  teacherState.finalLeaderboard = [];
+  teacherState.currentQuestion = null;
+  teacherState.serverQuestionIndex = 0;
+  teacherState.playerScores = {};
+  teacherState.fakeScores = {};
+  teacherState.prevRanks = {};
+  teacherState.lastRenderedPhase = null;
+  teacherState.lastRenderedIndex = -1;
+  teacherState.presentationOpen = false;
+  teacherState.leaderboardAnimSecond = null;
+  teacherState.scorePanelOpen = true;
+}
+
+function teacherPlayAgain() {
+  if (!confirm('Chơi lại từ đầu với cùng PIN? Kết quả lần trước vẫn lưu trong báo cáo.')) return;
+  const room = HTD.getRoom();
+  if (!room) return;
+
+  if (isBackendMode() && room.sessionId) {
+    HTDApi.resetSession(room.sessionId)
+      .then(() => {
+        resetTeacherSessionLocalState();
+        closeTeacherActionMenu();
+        return HTDBridge.joinRoom({
+          pin: room.pin,
+          name: room.teacher || 'Host',
+          isHost: true,
+        });
+      })
+      .then(() => renderDashboard())
+      .catch(err => alert(err.message || 'Không reset được phòng.'));
+    return;
+  }
+
   HTD.resetGame(room);
   HTD.setRoom(room);
   teacherState.lastRenderedPhase = null;
@@ -1160,12 +1527,14 @@ function initTeacherMainResizer() {
 }
 
 function applyMainSplit(grid, leftRatio) {
-  const started = HTD.getRoom()?.status === 'started';
-  if (started && !teacherState.scorePanelOpen) {
+  const room = HTD.getRoom();
+  const inGame = isTeacherRoomInGame(room);
+  const isEnded = isTeacherRoomEnded(room);
+  if (inGame && !isEnded && !teacherState.scorePanelOpen) {
     grid.style.gridTemplateColumns = '1fr';
     return;
   }
-  if (started) {
+  if (inGame) {
     grid.style.gridTemplateColumns = 'minmax(0, 1fr) 20px minmax(220px, 280px)';
     return;
   }
@@ -1206,9 +1575,12 @@ window.teacherExportCsv = teacherExportCsv;
 window.demoTeacherGo = demoTeacherGo;
 
 const TEACHER_SCREENS = ['setup', 'dashboard'];
-document.getElementById('demoNav').innerHTML = TEACHER_SCREENS.map(
-  s => `<button onclick="demoTeacherGo('${s}')">${s}</button>`
-).join('');
+const demoNav = document.getElementById('demoNav');
+if (demoNav) {
+  demoNav.innerHTML = TEACHER_SCREENS.map(
+    s => `<button onclick="demoTeacherGo('${s}')">${s}</button>`
+  ).join('');
+}
 
 function demoTeacherGo(s) {
   if (s === 'dashboard' && !HTD.getRoom()) createTeacherRoom();
@@ -1291,6 +1663,7 @@ function setupTeacherBackendBridge() {
         id: p.id,
         name: p.name,
         avatarEmoji: p.avatarEmoji,
+        connected: p.connected !== false,
         joinedAt: Date.now(),
       }))
     );
@@ -1326,7 +1699,15 @@ function setupTeacherBackendBridge() {
       teacherState.playerScores[row.name] = Number(row.score || 0);
     });
     HTD.setRoom(room);
+    teacherState.lastRenderedPhase = null;
+    teacherState.lastRenderedIndex = -1;
+    teacherState.scorePanelOpen = true;
     stopPresentationTick();
+    if (teacherState.presentationOpen) {
+      teacherState.presentationOpen = false;
+      const wrap = document.getElementById('teacherPresentation');
+      if (wrap) wrap.hidden = true;
+    }
     renderDashboard();
   });
 }

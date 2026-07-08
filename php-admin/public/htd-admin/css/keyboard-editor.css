@@ -1031,7 +1031,13 @@ body.admin-embedded .kbe-header {
   font-weight: 600;
   color: var(--text-dark);
   word-break: break-all;
+  white-space: pre-wrap;
   font-family: 'STIX Two Text', serif;
+}
+.kbe-test-output sub {
+  font-size: 0.65em;
+  vertical-align: sub;
+  font-weight: 600;
 }
 .kbe-test-clear { margin-top: 10px; color: #fff !important; border-color: rgba(255,255,255,0.3) !important; background: transparent !important; }
 

@@ -17,11 +17,11 @@ Website đố vui hóa học real-time dạng Kahoot. **Học sinh: mobile only.
 | Surface | Platform | URL local |
 |---|---|---|
 | **Admin (GV)** | Web desktop | `http://localhost:38480/admin` |
-| **Học sinh** | Mobile | `http://localhost:38480/join/{PIN}` → `/app/index.html` |
+| **Học sinh** | Mobile | `http://localhost:38480/join/{PIN}` |
 
 **Luồng GV:** Login → Admin → soạn game/quiz/bàn phím → **Phòng chơi** → tạo phòng → **Vào phòng** (điều khiển + link HS).
 
-**Luồng HS:** Mở link `/join/123456` hoặc `/app/` → nhập PIN → chơi.
+**Luồng HS:** Mở link `/join/123456` hoặc `/join` → nhập PIN → chơi. (Cùng port `38480` với admin; WS ở `38581`.)
 
 Login seed: `teacher@hoadat.local` / `password123`
 

@@ -17,12 +17,16 @@ class Quiz extends Model
         'grade',
         'sort_order',
         'is_active',
+        'show_explanation',
+        'shuffle_options',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'show_explanation' => 'boolean',
+            'shuffle_options' => 'boolean',
         ];
     }
 

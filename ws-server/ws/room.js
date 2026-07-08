@@ -50,13 +50,20 @@ async function handleJoinRoom(io, redis, socket, payload) {
     throw new Error('PIN không hợp lệ hoặc phòng đã hết hạn.');
   }
 
+  const session = await getSessionByPin(pin);
+  if (!session) {
+    throw new Error('Không tìm thấy session cho PIN này.');
+  }
+  if (!Number(session.is_active)) {
+    throw new Error('Phòng đã bị tắt.');
+  }
+
   const room = await redis.hgetall(roomKey(pin));
   if (room.status === 'ended') {
     throw new Error('Phòng đã kết thúc.');
   }
 
   if (isHost) {
-    const session = await getSessionByPin(pin);
     if (!session) {
       throw new Error('Không tìm thấy session cho PIN này.');
     }

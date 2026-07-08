@@ -3,7 +3,7 @@
 > Logic ứng dụng: luồng màn hình, state, scoring, bàn phím, WebSocket events.
 > Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
 
-**Cập nhật lần cuối:** 2026-07-06 (Admin native Blade — không iframe prototype)
+**Cập nhật lần cuối:** 2026-07-08 (chơi lại phòng ended từ danh sách / host)
 
 ---
 
@@ -46,9 +46,10 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 | Bước | Path | Hành động |
 |---|---|---|
 | Soạn nội dung | `/admin/keyboards`, `/admin/games`, … | CRUD trong Blade |
-| Tạo phòng | `/admin/sessions/create` | Chọn game → PIN |
+| Tạo phòng | `/admin/sessions/create` | Nhập **tên phòng** + lọc game → chọn quiz → PIN + QR |
+| Danh sách phòng | `/admin/sessions` | Tên, PIN, QR, quiz, GV, bật/tắt, **Chơi thử** (modal xem quiz như HS) |
 | Vào phòng | `/admin/sessions/{id}` | Host native (Blade + `public/htd-admin/js/teacher.js`) |
-| Link HS | `/join/{pin}` | Redirect → `/app/index.html?pin=` |
+| Link HS | `/join/{pin}` | Màn học sinh mobile (Laravel serve `prototype/index.html` + `<base href="/app/">`) |
 
 **Không dùng** `/app/teacher.html` hay `/app/keyboard-editor.html` cho GV — logic đã chuyển vào `php-admin/public/admin/` + views `resources/views/admin/`.
 
@@ -60,9 +61,15 @@ Welcome → Join PIN → Nhập tên → Avatar (skip OK) → Phòng chờ
 
 ### Host phòng
 
-- Blade: `admin/sessions/_host-panel.blade.php` (markup từ prototype, asset trong `public/htd-admin/assets/`)
+- Blade: `admin/sessions/_host-panel.blade.php` (markup host, asset `public/htd-admin/`)
 - Init: `admin-session-init.js` → `joinExistingRoomFromAdmin()`
-- Config: `window.ADMIN_BOOT` (pin, gameId, sessionId, wsUrl)
+- Scripts: **`equation-ui.js` bắt buộc** trước `teacher.js` (render MC/structured)
+- Config: `window.ADMIN_BOOT` (pin, roomName, quizName, gameName, quizId, sessionId, joinUrl, wsUrl)
+- Layout: full viewport (`admin-body--session-host`) — đề bài HTML + đáp án MC (highlight đúng) + barem/giải thích sidebar
+- Kết thúc quiz: WS `game_ended` → màn **Kết thúc trò chơi** (podium top 3 + bảng điểm + Tải CSV); `room.status = ended` vẫn giữ `teacherGameView` hiển thị
+- **Chơi lại:** `POST /admin/sessions/{id}/reset` hoặc nút **Chơi lại** — reset MySQL `waiting` + xóa Redis; cùng PIN; báo cáo lần trước vẫn trong `/admin/reports`
+- WS `new_question` host nhận thêm `correct_index`, `correct_answer_normalized`, `correct_answer`, `explanation`
+- Danh sách HS: chỉ học sinh join thật qua WS `players_update` (không pad fake)
 
 ---
 
@@ -166,8 +173,8 @@ serialize(tokens) → '2H2O'  // plain text, server normalize
 - Highlight nguyên tố vừa nhập: 1 giây rồi mờ
 - Emit event `formula-change` với `{ tokens, serialized }`
 
-> Prototype hiện tại: bàn phím mock tĩnh (HTML/CSS), chưa có token logic.
-> Implement sau khi chốt UI → `keyboard.js` + `keyboard-config.js`.
+> **Keyboard editor Test:** đã có token logic (`formulaAppendToken` trong `keyboard-editor.js`).
+> Runtime học sinh: implement sau → `keyboard.js` + `keyboard-config.js`.
 
 ---
 
@@ -180,7 +187,7 @@ serialize(tokens) → '2H2O'  // plain text, server normalize
 | `game_started` | S→C | `{}` | GV bắt đầu |
 | `new_question` | S→C | xem payload bên dưới | Câu hỏi mới |
 | `submit_answer` | C→S | `{ question_id, answer, hybrid_timestamp }` | Nộp đáp án |
-| `question_result` | S→C | `{ correct, correct_answer, score_earned, rank }` | Kết quả câu |
+| `question_result` | S→C | `{ correct, correct_answer, score_earned, rank, total_score, explanation? }` | Kết quả câu; `explanation` (HTML) chỉ khi quiz bật `show_explanation` |
 | `leaderboard_update` | S→C | `{ top5: [{ name, score, delta }] }` | Top 5 |
 | `game_ended` | S→C | `{ final_leaderboard }` | Kết thúc |
 | `submit_count_update` | S→C (host) | `{ submitted, total }` | Số người đã nộp |
@@ -209,6 +216,10 @@ serialize(tokens) → '2H2O'  // plain text, server normalize
 - `content`: HTML đã sanitize (text + ảnh + video)
 - `options` / `template`: gửi khi `answer_type` tương ứng; null nếu không dùng
 - `keyboard_config`: từ quiz → keyboard; client render bàn phím cho `formula` / `structured`
+- **Xáo trộn đáp án** (`quizzes.shuffle_options = true`): ws-server gửi `new_question` riêng từng HS với `options` đã shuffle; map gốc lưu Redis `room:{PIN}:option_order:{question_id}:{student_name}`; HS submit index theo thứ tự đã hiển thị → server map về `correct_index` gốc trước khi chấm
+- **Giải thích đáp án** (`quizzes.show_explanation = true`): sau submit, `question_result` kèm `explanation` (HTML từ `questions.explanation`) nếu câu có nội dung giải thích
+
+Admin cấu hình hai toggle này tại `/admin/quizzes/{id}` → mục **Thông tin quiz** → **Tùy chọn khi chơi**.
 
 ### NTP sync (production)
 
@@ -291,7 +302,7 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 
 **Mục tiêu:** chạy end-to-end với UI hiện tại; **không** redesign CSS/HTML (Phase 3B polish sau).
 
-**Serve UI:** `http://localhost:38480/app/` (prototype mount vào `php-admin/public/app` qua Docker).
+**Serve UI học sinh:** `http://localhost:38480/join` hoặc `/join/{PIN}` — cùng port với admin/API; static assets (`css/`, `js/`) vẫn tại `/app/` (Docker mount `prototype/`).
 
 **Demo mode (localStorage cũ):** thêm `?demo=1` vào URL.
 
@@ -344,7 +355,7 @@ Screen routing: `showScreen(id)` toggle class `active` trên `<section data-scre
 | **3B** ✅ | UI polish theo mockup | Teacher web · Student mobile |
 | **4** ✅ | Test end-to-end (`phase4-test.js`) | — |
 
-**Quy tắc:** Teacher host + keyboard editor chạy **trong** `/admin` (iframe). Học sinh luôn `/app/index.html`.
+**Quy tắc:** Teacher host + keyboard editor chạy **trong** `/admin` (iframe). Học sinh luôn `/join` hoặc `/join/{pin}` (URL cũ `/app/index.html?pin=` vẫn hoạt động qua query `pin`).
 
 Chi tiết checklist: [`local-deployment-plan.md`](../local-deployment-plan.md).
 

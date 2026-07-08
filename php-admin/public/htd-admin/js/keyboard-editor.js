@@ -143,6 +143,27 @@ function loadKeyboard() {
   return defaultKeyboard();
 }
 
+function ensureUniqueKeyIds(data) {
+  const seen = new Set();
+  (data.rows || []).forEach(row => {
+    (row.keys || []).forEach(k => {
+      if (!k.id || seen.has(k.id)) {
+        k.id = genId('key');
+      }
+      seen.add(k.id);
+    });
+  });
+}
+
+function testKeyInputValue(key) {
+  if (key.type === 'space') return ' ';
+  if (key.type === 'send') return '\n';
+  if (key.type === 'delete' || key.value === '⌫' || key.value === 'BACKSPACE') return null;
+  if (key.value === 'SEND') return '\n';
+  if (key.value !== undefined && key.value !== null && key.value !== '') return key.value;
+  return key.text ?? '';
+}
+
 function editorDataFromKeyboard(keyboard) {
   const cfg = keyboard.config || {};
   const data = defaultKeyboard();
@@ -152,6 +173,7 @@ function editorDataFromKeyboard(keyboard) {
   if (cfg.defaults) data.defaults = { ...data.defaults, ...cfg.defaults };
   if (cfg.rows?.length) data.rows = cloneData(cfg.rows);
   if (cfg.smart_context) data.smart_context = cloneData(cfg.smart_context);
+  ensureUniqueKeyIds(data);
   return data;
 }
 
@@ -1141,6 +1163,99 @@ function bindColorPair(colorId, hexId, setter) {
   hexEl.addEventListener('change', () => commit(() => { setter(hexEl.value); colorEl.value = toColor(hexEl.value); }));
 }
 
+/* ─── Formula input (Test — smart_context) ─── */
+
+const FORMULA_SUBSCRIPT = '₀₁₂₃₄₅₆₇₈₉';
+
+function formulaEsc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formulaSubDisplay(digits) {
+  return [...digits].map(d => {
+    const i = d.charCodeAt(0) - 48;
+    return i >= 0 && i <= 9 ? FORMULA_SUBSCRIPT[i] : d;
+  }).join('');
+}
+
+function formulaIsElement(val) {
+  return /^[A-Z][a-z]?$/.test(val);
+}
+
+function formulaIsDigit(val) {
+  return /^[0-9]$/.test(val);
+}
+
+function formulaSmartContext(tokens, smartContext) {
+  if (!tokens.length) return 'coefficient';
+  const last = tokens[tokens.length - 1];
+  if (last.type === 'element') return smartContext.after_element || 'subscript';
+  if (last.type === 'subscript') return 'subscript';
+  if (last.type === 'coefficient') return 'coefficient';
+  if (last.type === 'symbol') {
+    if (last.value === '+') return smartContext.after_plus || 'coefficient';
+    if (last.value === ')') return 'subscript';
+    return 'coefficient';
+  }
+  return 'coefficient';
+}
+
+function formulaMakeToken(type, value) {
+  return {
+    type,
+    value,
+    display: type === 'subscript' ? formulaSubDisplay(value) : value,
+  };
+}
+
+function formulaAppendToken(tokens, raw, smartContext) {
+  if (formulaIsDigit(raw)) {
+    const ctx = formulaSmartContext(tokens, smartContext);
+    const last = tokens[tokens.length - 1];
+    if (ctx === 'subscript') {
+      if (last?.type === 'subscript') {
+        last.value += raw;
+        last.display = formulaSubDisplay(last.value);
+      } else {
+        tokens.push(formulaMakeToken('subscript', raw));
+      }
+    } else if (last?.type === 'coefficient') {
+      last.value += raw;
+      last.display = last.value;
+    } else {
+      tokens.push(formulaMakeToken('coefficient', raw));
+    }
+    return;
+  }
+  if (formulaIsElement(raw)) {
+    tokens.push(formulaMakeToken('element', raw));
+    return;
+  }
+  tokens.push(formulaMakeToken('symbol', raw));
+}
+
+function formulaSerialize(tokens) {
+  return tokens.map(t => t.value).join('');
+}
+
+function formulaRenderHtml(tokens) {
+  return tokens.map(t => {
+    if (t.type === 'subscript') return `<sub>${formulaEsc(t.value)}</sub>`;
+    if (t.value === '\n') return '<br>';
+    return formulaEsc(t.display);
+  }).join('');
+}
+
+function formulaUpdateOutput(tokens) {
+  const el = document.getElementById('kbeTestOutput');
+  if (!el) return;
+  el.innerHTML = formulaRenderHtml(tokens);
+  el.dataset.serialized = formulaSerialize(tokens);
+}
+
 /* ─── Preview / Test ─── */
 
 function buildOverlayPhone(containerId) {
@@ -1175,15 +1290,20 @@ function closePreview() {
   document.getElementById('kbePreviewOverlay').hidden = true;
 }
 
-let testOutput = '';
+let testTokens = [];
 
 function openTest() {
-  testOutput = '';
+  testTokens = [];
   const overlay = document.getElementById('kbeTestOverlay');
   overlay.hidden = false;
-  document.getElementById('kbeTestOutput').textContent = '';
+  formulaUpdateOutput(testTokens);
   const wrap = buildOverlayPhone('kbeTestPhone');
   wrap.style.transform = `scale(${editor.zoom})`;
+
+  const smartContext = editor.data.smart_context || {
+    after_element: 'subscript',
+    after_plus: 'coefficient',
+  };
 
   const kb = document.getElementById('kbeTestPhoneKb');
   kb.querySelectorAll('.kbe-kb-key').forEach(btn => {
@@ -1192,13 +1312,16 @@ function openTest() {
       const key = findKey(row, btn.dataset.keyId);
       if (!key || key.disabled || key.type === 'empty') return;
       if (key.type === 'delete' || key.value === '⌫') {
-        testOutput = testOutput.slice(0, -1);
+        testTokens.pop();
       } else if (key.type === 'send') {
-        testOutput += '\n';
+        testTokens.push(formulaMakeToken('symbol', '\n'));
+      } else if (key.type === 'space') {
+        testTokens.push(formulaMakeToken('symbol', ' '));
       } else {
-        testOutput += key.value || key.text;
+        const raw = testKeyInputValue(key);
+        if (raw != null) formulaAppendToken(testTokens, raw, smartContext);
       }
-      document.getElementById('kbeTestOutput').textContent = testOutput;
+      formulaUpdateOutput(testTokens);
     });
   });
 }
@@ -1227,6 +1350,7 @@ function importJson(file) {
       if (!parsed?.rows?.length) throw new Error('invalid');
       pushHistory();
       editor.data = parsed;
+      ensureUniqueKeyIds(editor.data);
       saveKeyboard(true);
       renderAll();
       showToast('Đã nhập JSON');
@@ -1303,6 +1427,7 @@ function initEditor() {
 
   const boot = () => {
     editor.data = loadKeyboard() || defaultKeyboard();
+    ensureUniqueKeyIds(editor.data);
     renderAll();
     scheduleKeyboardPreviewCapture(800);
   };
@@ -1352,8 +1477,8 @@ function initEditor() {
   document.getElementById('kbeTestBtn').addEventListener('click', openTest);
   document.getElementById('kbeTestClose').addEventListener('click', closeTest);
   document.getElementById('kbeTestClear').addEventListener('click', () => {
-    testOutput = '';
-    document.getElementById('kbeTestOutput').textContent = '';
+    testTokens = [];
+    formulaUpdateOutput(testTokens);
   });
   document.getElementById('kbeAddRowBtn').addEventListener('click', () => addRow());
 

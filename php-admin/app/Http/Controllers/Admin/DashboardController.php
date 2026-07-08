@@ -22,7 +22,7 @@ class DashboardController extends Controller
                 'questions' => Question::count(),
             ],
             'recentSessions' => GameSession::query()
-                ->with('game:id,name')
+                ->with(['game:id,name', 'quiz:id,name'])
                 ->orderByDesc('created_at')
                 ->limit(5)
                 ->get(),

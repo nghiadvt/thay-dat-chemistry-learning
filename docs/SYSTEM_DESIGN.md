@@ -2,7 +2,7 @@
 
 > Website đố vui hóa học real-time dạng Kahoot. **Học sinh: mobile only.** Admin + Giáo viên: web desktop.
 
-**Cập nhật lần cuối:** 2026-07-06 (Phase 3C — admin UI priority)
+**Cập nhật lần cuối:** 2026-07-08 (màn HS tại `/join/{pin}`, cùng port admin)
 
 ---
 
@@ -16,7 +16,7 @@ Hệ thống cho phép giáo viên tạo phòng quiz hóa học realtime, học 
 |---|---|---|---|
 | **Admin / GV** | CRUD keyboard, game, quiz, câu hỏi; tạo phòng; báo cáo | **Web desktop** (Laravel `/dashboard`) | API xong; **UI chưa có** (Phase 3C) |
 | **Giáo viên (host)** | Host lobby, PIN, điều khiển câu hỏi realtime | **Web desktop** (`/app/teacher.html`) | Integration 3A; polish 3B |
-| **Học sinh** | Join PIN, trả lời, leaderboard | **Mobile only** (`/app/index.html`) | Integration 3A; polish 3B |
+| **Học sinh** | Join PIN, trả lời, leaderboard | **Mobile only** (`/join`, `/join/{pin}`) | Integration 3A; polish 3B |
 
 Admin tạo **source of truth** trong MySQL → teacher/student đọc qua WS/API khi chơi.
 

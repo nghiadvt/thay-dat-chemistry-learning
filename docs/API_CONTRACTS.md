@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-06 (Admin native — Blade + `public/htd-admin/`)
+**Cập nhật lần cuối:** 2026-07-08 (QR phòng lưu PNG `qr_path` khi tạo phòng)
 
 ---
 
@@ -54,19 +54,24 @@ Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/
 | Method | Path | Mô tả |
 |---|---|---|
 | GET/POST | `/admin/keyboards` | Tạo tên bàn phím → redirect editor |
-| GET | `/admin/keyboards/{id}/editor` | Trình chỉnh sửa layout (Blade + `public/htd-admin/js/keyboard-editor.js`) |
+| GET | `/admin/keyboards/{id}/editor` | Trình chỉnh sửa layout (Blade + `public/htd-admin/js/keyboard-editor.js`, `keyboard-editor.css`). Nút **Test** mô phỏng nhập công thức theo `config.smart_context` — xem §3.1 |
 | GET/POST | `/admin/games` | CRUD game |
 | GET/POST | `/admin/quizzes` | CRUD quiz (+ `show` xem câu hỏi) |
 | GET/POST | `/admin/quizzes/{quiz}/questions` | CRUD câu hỏi nested |
 | GET/POST | `/admin/sessions` | Tạo phòng |
 | GET | `/admin/sessions/{id}` | Điều khiển phòng (host Blade + WS) |
+| POST | `/admin/sessions/{id}/reset` | **Chơi lại** phòng `ended` → `waiting`, xóa Redis state, giữ kết quả cũ trong DB |
 | GET | `/admin/reports` | Lịch sử session `ended` |
 | GET | `/admin/reports/{id}` | Chi tiết điểm |
 | GET | `/admin/reports/{id}/export` | Tải CSV UTF-8 |
 
-| GET | `/join/{pin}` | Redirect học sinh → `/app/index.html?pin=` |
+| GET | `/join` | Màn học sinh — nhập PIN / quét QR |
+| GET | `/join/{pin}` | Màn học sinh — PIN điền sẵn (6 chữ số) |
+| GET | `/app/index.html` | Legacy — redirect → `/join` hoặc `/join/{pin}` nếu có `?pin=` |
 
-Học sinh tham gia: `http://localhost:38480/join/123456` (hoặc nhập PIN trên `/app/`).
+Học sinh tham gia: `http://localhost:38480/join/123456` (hoặc `/join` rồi nhập PIN).
+
+**Port:** Học sinh và admin **cùng** `38480` (PHP/Nginx). WebSocket realtime **riêng** `38581`.
 
 Tài khoản seed: `teacher@hoadat.local` / `password123`
 
@@ -123,6 +128,22 @@ Lỗi 404: PIN không tồn tại hoặc đã hết TTL.
 }
 ```
 
+### 3.1 Keyboard editor — Test overlay (`smart_context`)
+
+Admin editor (`keyboard-editor.js`) có overlay **Test** để GV thử bàn phím trước khi gán quiz. Không có endpoint riêng — chỉ client-side.
+
+| Hành vi | Chi tiết |
+|---|---|
+| Nguồn quy tắc | `config.smart_context` (merge default server nếu thiếu) |
+| Phím số `0`–`9` | Tự thành **hệ số** (số to) hoặc **chỉ số dưới** (`<sub>`) theo ngữ cảnh — không cần phím subscript riêng |
+| Ngữ cảnh hệ số | Đầu công thức, sau `+`, nối hệ số đa chữ số |
+| Ngữ cảnh chỉ số | Sau nguyên tố (`H`, `Cl`, …), sau `)`, nối chỉ số đa chữ số |
+| Backspace | Xóa 1 **token** (nguyên tố 2 ký tự `Cl` = 1 token) |
+| Hiển thị | `#kbeTestOutput` — HTML hóa học (font STIX Two Text, `.kbe-test-output sub`) |
+| Serialize | `data-serialized` trên output — plain ASCII (vd. `2CO2`) — **cùng format** `submit_answer` cho `answer_type: formula` |
+
+Token model đầy đủ: [`APP_LOGIC.md`](APP_LOGIC.md) §4.2–4.3, schema: [`KEYBOARD_SCHEMA.md`](KEYBOARD_SCHEMA.md) §`smart_context`.
+
 ---
 
 ## 4. Games
@@ -142,7 +163,7 @@ Lỗi 404: PIN không tồn tại hoặc đã hết TTL.
 | Method | Path | Body / query |
 |---|---|---|
 | GET | `/api/quizzes` | Query: `?game_id=` |
-| POST | `/api/quizzes` | `{ game_id, keyboard_id, name, subject?, grade?, sort_order?, is_active? }` |
+| POST | `/api/quizzes` | `{ game_id, keyboard_id, name, subject?, grade?, sort_order?, is_active?, show_explanation?, shuffle_options? }` |
 | GET | `/api/quizzes/{id}` | Kèm questions |
 | PUT/PATCH | `/api/quizzes/{id}` | Cập nhật |
 | DELETE | `/api/quizzes/{id}` | Cascade questions |
@@ -188,8 +209,12 @@ Lỗi 404: PIN không tồn tại hoặc đã hết TTL.
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/api/game-sessions` | `{ game_id }` | `{ session, pin }` + Redis `room:{pin}` |
-| GET | `/api/game-sessions/{id}` | — | Chi tiết session |
+| POST | `/api/game-sessions` | `{ name?, quiz_id }` hoặc legacy `{ game_id }` | `{ session, pin }` + Redis `room:{pin}` |
+| GET | `/api/game-sessions/{id}` | — | Chi tiết session (kèm quiz) |
+| POST | `/api/game-sessions/{id}/reset` | — | Phòng `ended` + `is_active` → reset `waiting`, xóa Redis `room:{pin}*`, tạo lại phòng chờ; **không** xóa `game_results` / `session_answers` lần trước |
+| PATCH | `/admin/sessions/{id}/active` | — | Bật/tắt phòng; tắt → xóa Redis room |
+
+**QR join:** Khi `POST /admin/sessions` (hoặc API tạo session) thành công, Laravel gọi `SessionQrService` → PNG `storage/app/public/sessions/{pin}.png`, cột `game_sessions.qr_path`. URL public: `/storage/sessions/{pin}.png` (accessor `qr_url`). Phòng cũ thiếu ảnh → tạo lại khi `GET /admin/sessions/{id}`.
 
 **Redis sau POST thành công:**
 
@@ -199,6 +224,8 @@ HGETALL room:482910
 2) "waiting"
 3) "game_id"
 4) "1"
+5) "quiz_id"
+6) "3"
 TTL room:482910   → ~7200
 ```
 
@@ -244,7 +271,7 @@ Guard double-submit: Redis set `submitted:<PIN>:<question_id>` (xem §10).
 | `answer_type` | `answer` mẫu |
 |---|---|
 | `mc` | `0` hoặc `{ "index": 0 }` |
-| `formula` | `"H2O"` hoặc `{ "text": "H2O" }` |
+| `formula` | `"H2O"` hoặc `{ "text": "H2O" }` — plain text ASCII (số thường, không Unicode subscript). Client serialize từ token bàn phím theo `keyboard_config.smart_context` (xem §3.1) |
 | `structured` | `{ "coef": { "c0": "2" }, "blank": { "b0": "O2" } }` |
 
 **Host events** dùng cho Phase 3.4; chưa có trong bảng plan gốc nhưng là contract chính thức từ Phase 2.
@@ -259,7 +286,7 @@ Guard double-submit: Redis set `submitted:<PIN>:<question_id>` (xem §10).
 | `ntp_pong` | `{ t0, t1, t2 }` | Phản hồi NTP |
 | `game_started` | `{}` | GV bấm Start |
 | `new_question` | xem §9.3 | Câu hỏi mới |
-| `question_result` | `{ correct, correct_answer, score_earned, rank, total_score }` | Chỉ client vừa submit |
+| `question_result` | `{ correct, correct_answer, score_earned, rank, total_score, explanation? }` | Chỉ client vừa submit; `explanation` (HTML) khi quiz `show_explanation=true` |
 | `leaderboard_update` | `{ top5: [{ name, score, delta }] }` | Broadcast phòng |
 | `submit_count_update` | `{ submitted, total }` | **Chỉ host** |
 | `game_ended` | `{ final_leaderboard: [{ name, score, rank, player_token? }] }` | Kết thúc game |
@@ -277,20 +304,28 @@ Callback ack (tùy chọn): client truyền function làm tham số cuối → `
   "options": ["A", "B", "C", "D"],
   "template": null,
   "input_mode": null,
-  "keyboard_config": {
-    "schema_version": 1,
-    "defaults": { "keySize": "M", "fontSize": "M", "textColor": "#000000", "background": "#FFFFFF", "border": "#D0D0D0" },
-    "rows": [],
-    "smart_context": { "after_element": "subscript", "after_plus": "coefficient" }
-  },
+  "keyboard_config": { "schema_version": 1, "rows": [] },
   "time_limit": 30,
   "server_time": 1710000000000
 }
 ```
 
+**Chỉ host** (`is_host: true`) nhận thêm barem — học sinh **không** nhận các field sau:
+
+```json
+{
+  "correct_index": 0,
+  "correct_answer_normalized": "CH4",
+  "correct_answer": { "blank": { "b0": "NH4Cl" } },
+  "explanation": "<p>Giải thích...</p>"
+}
+```
+
 - `server_time` = thời điểm server bắt đầu đếm giờ câu này (ms epoch)
-- `options` / `template`: `null` nếu không dùng
+- `options` / `template` / `input_mode`: `null` nếu không dùng
+- `template`: chỉ gửi HS khi `answer_type === structured`
 - `keyboard_config`: từ `quizzes.keyboard_id` → `keyboards.config`
+- **Shuffle** (`quizzes.shuffle_options`): broadcast riêng từng HS — mỗi client nhận `options` thứ tự khác nhau; host nhận thứ tự gốc. Redis key map: `room:{PIN}:option_order:{question_id}:{student_name}` → JSON mảng index gốc theo vị trí hiển thị
 
 ### 9.4 NTP & hybrid timestamp
 
@@ -337,10 +372,11 @@ Sau khi kết thúc, client/teacher có thể đọc `GET /api/reports/sessions/
 
 | Key | Type | TTL | Meaning |
 |---|---|---|---|
-| `room:<PIN>` | Hash | 2h | `status`, `game_id`, `current_quiz_id`, `current_question_id` |
+| `room:<PIN>` | Hash | 2h | `status`, `game_id`, `quiz_id`, `current_quiz_id`, `current_question_id` |
 | `room:<PIN>:players` | Hash | 2h | Students in room |
 | `leaderboard:<PIN>` | ZSET | 2h | Total scores |
 | `submitted:<PIN>:<question_id>` | Set | 2h | Double-submit guard |
+| `room:<PIN>:option_order:<question_id>:<student_name>` | String (JSON) | 2h | Map index hiển thị → index gốc khi `shuffle_options` bật |
 
 | `room:<PIN>:plan` | String (JSON) | 2h | Game plan cache (quizzes + questions) — nội bộ ws-server |
 

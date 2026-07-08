@@ -62,6 +62,8 @@ class QuizController extends Controller
             ...$validated,
             'sort_order' => $validated['sort_order'] ?? 0,
             'is_active' => $request->boolean('is_active'),
+            'show_explanation' => $request->boolean('show_explanation'),
+            'shuffle_options' => $request->boolean('shuffle_options'),
         ]);
 
         $this->quizTagService->syncFromInput($quiz, $request->input('tags_input'));
@@ -94,6 +96,8 @@ class QuizController extends Controller
         $quiz->update([
             ...$validated,
             'sort_order' => $validated['sort_order'] ?? 0,
+            'show_explanation' => $request->boolean('show_explanation'),
+            'shuffle_options' => $request->boolean('shuffle_options'),
         ]);
 
         if ($request->has('is_active')) {
@@ -134,6 +138,8 @@ class QuizController extends Controller
             'grade' => ['nullable', 'string', 'max:32'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable'],
+            'show_explanation' => ['nullable'],
+            'shuffle_options' => ['nullable'],
             'tags_input' => ['nullable', 'string', 'max:1000'],
         ]);
     }
