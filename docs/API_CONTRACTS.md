@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-09 (CSV Quiz + Bộ câu hỏi)
+**Cập nhật lần cuối:** 2026-07-09 (màn kết thúc: bục vinh danh + bảng xếp hạng ảnh)
 
 ---
 
@@ -81,7 +81,7 @@ Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/
 | PUT | `/admin/sessions/{id}` | Cập nhật sau form edit |
 | GET | `/admin/sessions/{id}` | Điều khiển phòng (host Blade + WS) |
 | POST | `/admin/sessions/{id}/reset` | **Chơi lại** phòng `ended` → `waiting`, xóa Redis state, giữ kết quả cũ trong DB |
-| POST | `/admin/sessions/{id}/close` | **Kết thúc phòng** — `is_active=false`, purge Redis; client host gọi thêm `host_close_room` |
+| POST | `/admin/sessions/{id}/close` | **Kết thúc phòng** — `is_active=false`, purge Redis; client host gọi thêm `host_close_room`. JSON (`Accept: application/json`): `{ success, data: { session, message } }` |
 | POST | `/admin/sessions/{id}/regenerate-pin` | **Đổi PIN + QR** (chỉ khi `status≠playing`); migrate Redis sang PIN mới |
 | DELETE | `/admin/sessions/{id}` | **Xóa phòng** — purge Redis + QR; CASCADE kết quả/câu trả lời; chặn khi `status=playing` |
 | POST | `/admin/sessions/bulk-destroy` | `{ ids: number[] }` — xóa nhiều phòng; bỏ qua phòng `playing`, flash cảnh báo nếu có |
@@ -344,13 +344,13 @@ Redis: `room:{PIN}:answer:{question_id}:{student_name}` lưu `{ answer, first_su
 | `ntp_pong` | `{ t0, t1, t2 }` | Phản hồi NTP |
 | `game_started` | `{}` hoặc `{ play_mode, mode_config? }` | GV bấm Start. `duck_race`: kèm config |
 | `new_question` | xem §9.3 | Câu hỏi mới |
-| `answer_feedback` | `{ correct, score_delta, total_score, position, correct_answer?, finish_rank?, target_score? }` | **`duck_race` only** — sau `submit_answer`, gửi riêng HS. `position`: 0–100 từ `max(0, total_score)` |
-| `race_update` | `{ players: [{ name, avatar, duck_sprite?, score, position, finished, finish_rank }], target_score, track_steps }` | **`duck_race`** — broadcast phòng. `duck_sprite`: path tương đối trong `duck-race/` (VD `ducks/duck-blue.gif`). `position`: **0–100** (% đường đua), tính từ `max(0, score) / target_score`; `score` có thể âm. **Host render** (`duck-race-host.js`): map `position` → trục **X** (`left` % trong `mode_config.visual.track_bounds`); trục **Y** cố định/HS trong pond `lane_bounds` (client-only, không có trong payload). Chỉ animate `left` |
-| `player_finished` | `{ name, finish_rank, total_score }` | **`duck_race`** — HS chạm mốc về đích |
+| `answer_feedback` | `{ correct, score_delta, total_score, position, correct_answer?, finish_rank?, finish_elapsed_s?, target_score? }` | **`duck_race` only** — sau `submit_answer`, gửi riêng HS. `position`: 0–100 từ `max(0, total_score)`. `finish_elapsed_s`: giây từ START (4 chữ số thập phân) khi về đích |
+| `race_update` | `{ players: [{ name, avatar, duck_sprite?, score, position, finished, finish_rank, finish_elapsed_s? }], target_score, track_steps }` | **`duck_race`** — broadcast phòng. `duck_sprite`: path tương đối trong `duck-race/` (VD `ducks/duck-blue.gif`). `position`: **0–100** (% đường đua), tính từ `max(0, score) / target_score`; `score` có thể âm. `finish_elapsed_s`: giây về đích (nếu `finished`). **Host render** (`duck-race-host.js`): map `position` → trục **X** (`left` % trong `mode_config.visual.track_bounds`); trục **Y** cố định/HS trong pond `lane_bounds` (client-only, không có trong payload). Chỉ animate `left` |
+| `player_finished` | `{ name, finish_rank, finish_elapsed_s, total_score }` | **`duck_race`** — HS chạm mốc về đích. Cùng `finish_elapsed_s` → cùng `finish_rank` (đồng hạng) |
 | `question_result` | xem §9.3.1 | **Khi hết câu** (finalize); gửi riêng từng HS |
 | `leaderboard_update` | `{ top5: [{ name, score, delta, avatar }] }` | Broadcast phòng; `avatar` từ Redis player |
 | `submit_count_update` | `{ submitted, total }` | **Chỉ host** |
-| `game_ended` | `{ final_leaderboard: [{ name, score, rank, finish_rank?, player_token?, avatar }], play_mode? }` | Kết thúc game |
+| `game_ended` | `{ final_leaderboard: [{ name, score, rank, finish_rank?, finish_elapsed_s?, duck_sprite?, player_token?, avatar }], play_mode? }` | Kết thúc game. UI host/HS: bục `ket-thuc-tro-choi.png` (top 3 + sprite vịt) + header `Leaderboard.png` + danh sách điểm giảm dần |
 | `room_closed` | `{ message }` | Phòng bị GV kết thúc — HS thoát về trang chủ |
 
 Callback ack (tùy chọn): client truyền function làm tham số cuối → `{ success, data?, error? }`.
@@ -468,14 +468,14 @@ Trang host `/admin/sessions/{id}` — `duck-race-host.js` + `duck-race-host.css`
 
 | Key | Type | TTL | Meaning |
 |---|---|---|---|
-| `room:<PIN>` | Hash | 2h | `status`, `game_id`, `quiz_id`, `play_mode_slug`, `mode_config`, `current_quiz_id`, `current_question_id` |
+| `room:<PIN>` | Hash | 2h | `status`, `game_id`, `quiz_id`, `play_mode_slug`, `mode_config`, `race_started_hr`, `race_started_at`, `current_quiz_id`, `current_question_id` |
 | `room:<PIN>:players` | Hash | 2h | Students in room — JSON `{ name, player_token, connected, score fields, avatar? }` |
 | `leaderboard:<PIN>` | ZSET | 2h | Total scores |
 | `submitted:<PIN>:<question_id>` | Set | 2h | Double-submit guard |
 | `room:<PIN>:option_order:<question_id>:<student_name>` | String (JSON) | 2h | Map index hiển thị → index gốc khi `shuffle_options` bật |
 
 | `room:<PIN>:plan` | String (JSON) | 2h | Game plan cache (quizzes + questions) — nội bộ ws-server |
-| `room:<PIN>:race_progress:<student_name>` | String (JSON) | 2h | **`duck_race`:** `{ question_index, finished, finish_rank, finished_at }` |
+| `room:<PIN>:race_progress:<student_name>` | String (JSON) | 2h | **`duck_race`:** `{ question_index, finished, finish_rank, finished_at, finish_elapsed_s }` |
 | `room:<PIN>:finishers` | List | 2h | **`duck_race`:** thứ tự tên HS về đích |
 | `room:<PIN>:duck_pool` | List | 2h | **`duck_race`:** pool sprite còn lại (xáo trộn không trùng; hết thì refill) |
 

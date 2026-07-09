@@ -1565,7 +1565,14 @@ body.teacher-resizing .teacher-main-resizer-grip {
   min-width: 22px;
 }
 .teacher-mc-text { flex: 1; }
-.teacher-mc-text sub { font-size: 0.75em; }
+.teacher-mc-text sub {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.16em;
+  font-weight: 600;
+}
 .teacher-mc-check {
   width: 22px;
   height: 22px;
@@ -1701,9 +1708,350 @@ body.teacher-resizing .teacher-main-resizer-grip {
   overflow: hidden;
 }
 
+/* Podium modal — bục vinh danh toàn màn hình, không khung */
+.teacher-podium-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+}
+.teacher-podium-modal.open {
+  display: flex;
+}
+.teacher-podium-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.78);
+}
+.teacher-podium-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.teacher-podium-modal-close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.teacher-podium-modal-content {
+  position: relative;
+  z-index: 1;
+  width: min(96vw, 1080px);
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.teacher-podium-modal .teacher-final-podium-stage {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+  aspect-ratio: auto;
+  line-height: normal;
+}
+
+.teacher-podium-modal .teacher-final-podium-bg {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  position: relative;
+  z-index: 0;
+}
+
+.teacher-podium-modal .teacher-final-podium-slot {
+  width: 26%;
+  z-index: 2;
+}
+
+.teacher-podium-modal .teacher-final-podium-slot.slot-1 {
+  left: 50%;
+  bottom: 36%;
+}
+
+.teacher-podium-modal .teacher-final-podium-slot.slot-2 {
+  left: 18%;
+  bottom: 26%;
+}
+
+.teacher-podium-modal .teacher-final-podium-slot.slot-3 {
+  left: 82%;
+  bottom: 20%;
+}
+
+.teacher-podium-modal .teacher-final-podium-figure {
+  min-height: min(20vw, 200px);
+  margin-top: 2px;
+  margin-bottom: 0;
+}
+
+.teacher-podium-modal .teacher-final-podium-duck {
+  width: min(18vw, 175px);
+  height: min(18vw, 175px);
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.teacher-podium-modal .teacher-final-podium-card-name {
+  font-size: clamp(14px, 2.2vw, 24px);
+}
+
+.teacher-podium-modal .teacher-final-podium-card-score {
+  font-size: clamp(12px, 1.8vw, 18px);
+}
+
+.teacher-podium-modal .teacher-final-podium-card-time {
+  font-size: clamp(11px, 1.5vw, 16px);
+}
+
 .teacher-final-summary {
   width: 100%;
-  max-width: 560px;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Bục vinh danh — ket-thuc-tro-choi.png */
+.teacher-final-podium-stage {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  line-height: normal;
+  overflow: visible;
+}
+
+.teacher-final-podium-bg {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  position: relative;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.teacher-final-podium-slot {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 28%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* #2 trái · #1 giữa (cao nhất) · #3 phải */
+.teacher-final-podium-slot.slot-1 {
+  left: 50%;
+  bottom: 40%;
+  z-index: 3;
+}
+
+.teacher-final-podium-slot.slot-2 {
+  left: 20%;
+  bottom: 30%;
+  z-index: 2;
+}
+
+.teacher-final-podium-slot.slot-3 {
+  left: 80%;
+  bottom: 24%;
+  z-index: 2;
+}
+
+.teacher-final-podium-figure {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 96px;
+  margin-top: 2px;
+}
+
+.teacher-final-podium-duck {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+}
+
+.teacher-final-podium-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.teacher-final-podium-avatar--emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  background: #fff;
+}
+
+.teacher-final-podium-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: min(100%, 168px);
+  padding: 8px 12px 10px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.94) 100%);
+  border: 2px solid rgba(45, 70, 214, 0.22);
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+}
+
+.teacher-final-podium-slot.slot-1 .teacher-final-podium-card {
+  border-color: rgba(245, 158, 11, 0.75);
+  box-shadow:
+    0 10px 26px rgba(245, 158, 11, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.teacher-final-podium-slot.slot-2 .teacher-final-podium-card {
+  border-color: rgba(148, 163, 184, 0.85);
+}
+
+.teacher-final-podium-slot.slot-3 .teacher-final-podium-card {
+  border-color: rgba(217, 119, 6, 0.7);
+}
+
+.teacher-final-podium-card-name {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  word-break: break-word;
+  text-align: center;
+}
+
+.teacher-final-podium-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.teacher-final-podium-card-score {
+  font-size: 12px;
+  font-weight: 800;
+  color: #2d46d6;
+  background: rgba(45, 70, 214, 0.1);
+  padding: 3px 10px;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
+.teacher-final-podium-card-time {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+/* Bảng xếp hạng — Leaderboard.png header */
+.teacher-final-lb-section {
+  width: 100%;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.teacher-final-lb-header {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center top;
+  aspect-ratio: 2.6 / 1;
+}
+
+.teacher-final-lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 14px 12px 14px;
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+  line-height: normal;
+}
+
+.teacher-final-lb-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.teacher-final-lb-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.teacher-final-lb-row:has(.teacher-final-lb-time) {
+  grid-template-columns: 40px 1fr auto auto;
+}
+
+.teacher-final-lb-rank {
+  font-weight: 800;
+  color: #facc15;
+  text-align: center;
+}
+
+.teacher-final-lb-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-final-lb-score {
+  font-weight: 800;
+  color: #86efac;
+  text-align: right;
+}
+
+.teacher-final-lb-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .teacher-final-stat {
@@ -1712,53 +2060,6 @@ body.teacher-resizing .teacher-main-resizer-grip {
   font-weight: 600;
   color: var(--text-muted);
   margin: 0 0 12px;
-}
-
-.teacher-final-podium {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 12px;
-  margin: 0 0 20px;
-}
-
-.teacher-final-podium-item {
-  flex: 1;
-  max-width: 140px;
-  background: #fff;
-  border: 1px solid #e8ebf2;
-  border-radius: 14px;
-  padding: 14px 10px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.teacher-final-podium-item.rank-1 {
-  order: 2;
-  transform: translateY(-8px);
-  border-color: #fcd34d;
-  background: linear-gradient(180deg, #fffbeb 0%, #fff 100%);
-}
-
-.teacher-final-podium-item.rank-2 { order: 1; }
-.teacher-final-podium-item.rank-3 { order: 3; }
-
-.teacher-final-podium-medal {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.teacher-final-podium-name {
-  font-size: 14px;
-  word-break: break-word;
-}
-
-.teacher-final-podium-score {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--primary);
 }
 
 .teacher-final-empty {

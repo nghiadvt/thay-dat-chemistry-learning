@@ -245,8 +245,13 @@
 
   <!-- Final -->
   <section class="screen" data-screen="final">
-    <div class="screen-header" style="justify-content:center"><h2>🎉 Kết quả</h2></div>
-    <div class="podium" id="podium"></div>
+    <div class="student-final-wrap">
+      <div class="student-final-podium-stage" id="studentFinalPodium" aria-label="Bục vinh danh"></div>
+      <div class="student-final-lb-section">
+        <img class="student-final-lb-header" src="/htd-admin/assets/Leaderboard.png" alt="Cập nhật bảng xếp hạng">
+        <ol class="student-final-lb-list" id="studentFinalList"></ol>
+      </div>
+    </div>
     <div class="btn-group" style="flex-shrink:0">
       <button class="btn-primary" onclick="restartGame()">Chơi lại</button>
       <button class="btn-secondary" onclick="goStudentHome()">Về trang chủ</button>

@@ -57,5 +57,19 @@ const HTDKeyboardRuntime = (function () {
     container.classList.remove('dyn-kb');
   }
 
-  return { render, clear };
+  /** Khớp `testKeyInputValue()` trong keyboard-editor — ưu tiên `value`, fallback `text`. */
+  function resolveKeyInputValue(key) {
+    if (!key) return '';
+    const type = key.type || 'normal';
+    if (type === 'space') return ' ';
+    if (type === 'send') return '\n';
+    if (type === 'delete' || key.value === '⌫' || key.value === 'BACKSPACE') return '⌫';
+    if (key.value === 'SEND') return '\n';
+    if (key.value !== undefined && key.value !== null && String(key.value) !== '') {
+      return String(key.value);
+    }
+    return String(key.text ?? '');
+  }
+
+  return { render, clear, resolveKeyInputValue };
 })();

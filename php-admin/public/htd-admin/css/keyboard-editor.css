@@ -1098,8 +1098,15 @@ body.admin-embedded .kbe-header {
   font-family: 'STIX Two Text', serif;
 }
 .kbe-test-output sub {
-  font-size: 0.65em;
-  vertical-align: sub;
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.16em;
+  font-weight: 600;
+}
+.kbe-test-output .formula-coef {
+  font-size: 1em;
   font-weight: 600;
 }
 .kbe-test-clear { margin-top: 10px; color: #fff !important; border-color: rgba(255,255,255,0.3) !important; background: transparent !important; }

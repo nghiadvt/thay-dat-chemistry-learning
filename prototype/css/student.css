@@ -645,7 +645,14 @@ body.student-app {
   background: var(--success);
 }
 .mc-option-text { flex: 1; }
-.mc-option-text sub { font-size: 0.75em; }
+.mc-option-text sub {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.16em;
+  font-weight: 600;
+}
 .mc-check {
   width: 22px;
   height: 22px;
@@ -720,8 +727,12 @@ body.student-app {
   color: var(--text-dark);
 }
 .formula-display sub {
-  font-size: 0.65em;
-  vertical-align: sub;
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.16em;
+  font-weight: 600;
 }
 .formula-cursor {
   display: inline-block;
@@ -747,7 +758,30 @@ body.student-app {
   line-height: 1.6;
   color: var(--text-dark);
 }
-.eq-chem sub { font-size: 0.65em; vertical-align: sub; }
+.eq-chem sub {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.16em;
+  font-weight: 600;
+}
+.eq-blank-box sub {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.16em;
+  font-weight: 600;
+}
+.eq-blank-box .formula-coef {
+  font-size: 1em;
+  font-weight: 600;
+}
+.formula-display .formula-coef {
+  font-size: 1em;
+  font-weight: 600;
+}
 .eq-txt { white-space: pre; }
 
 .eq-coef-box {
@@ -1075,6 +1109,212 @@ body.student-app {
 .lb-delta.up { color: var(--success); font-size: 12px; }
 .lb-delta.down { color: var(--error); font-size: 12px; }
 .lb-countdown { text-align: center; font-size: 13px; opacity: 0.7; margin-top: 8px; flex-shrink: 0; }
+
+/* Final screen — podium + leaderboard */
+.student-final-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.student-final-podium-stage {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto 12px;
+  line-height: normal;
+  overflow: visible;
+}
+
+.student-final-podium-bg {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  position: relative;
+  z-index: 0;
+}
+
+.student-final-podium-slot {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 30%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.student-final-podium-slot.slot-1 { left: 50%; bottom: 60%; z-index: 3; }
+.student-final-podium-slot.slot-2 { left: 18%; bottom: 26%; z-index: 2; }
+.student-final-podium-slot.slot-3 { left: 82%; bottom: 20%; z-index: 2; }
+
+.student-final-podium-figure {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 88px;
+  margin-top: 2px;
+}
+
+.student-final-podium-duck {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
+}
+
+.student-final-podium-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+}
+
+.student-final-podium-avatar--emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: #fff;
+}
+
+.student-final-podium-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: min(100%, 132px);
+  padding: 7px 10px 8px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.94) 100%);
+  border: 2px solid rgba(45, 70, 214, 0.22);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+}
+
+.student-final-podium-slot.slot-1 .student-final-podium-card {
+  border-color: rgba(245, 158, 11, 0.75);
+}
+
+.student-final-podium-slot.slot-2 .student-final-podium-card {
+  border-color: rgba(148, 163, 184, 0.85);
+}
+
+.student-final-podium-slot.slot-3 .student-final-podium-card {
+  border-color: rgba(217, 119, 6, 0.7);
+}
+
+.student-final-podium-card-name {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  word-break: break-word;
+  text-align: center;
+}
+
+.student-final-podium-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.student-final-podium-card-score {
+  font-size: 10px;
+  font-weight: 800;
+  color: #2d46d6;
+  background: rgba(45, 70, 214, 0.1);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.student-final-podium-card-time {
+  font-size: 9px;
+  font-weight: 700;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.student-final-lb-section {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.student-final-lb-header {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center top;
+  aspect-ratio: 2.6 / 1;
+}
+
+.student-final-lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 12px 10px 12px;
+  max-height: 36vh;
+  overflow-y: auto;
+  line-height: normal;
+}
+
+.student-final-lb-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.student-final-lb-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.student-final-lb-row:has(.student-final-lb-time) {
+  grid-template-columns: 32px 1fr auto auto;
+}
+
+.student-final-lb-rank {
+  font-weight: 800;
+  color: #facc15;
+  text-align: center;
+}
+
+.student-final-lb-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-final-lb-score {
+  font-weight: 800;
+  color: #86efac;
+}
+
+.student-final-lb-time {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
 
 .podium {
   display: flex;

@@ -198,6 +198,25 @@ const DuckRaceHost = (function () {
     return Number.isFinite(n) ? String(n) : '0';
   }
 
+  function formatFinishTime(elapsedS) {
+    if (elapsedS == null || !Number.isFinite(Number(elapsedS))) return '';
+    return `${Number(elapsedS).toFixed(4)}s`;
+  }
+
+  function formatFinishRankLabel(rank, elapsedS, tiedCount) {
+    const time = formatFinishTime(elapsedS);
+    const tieNote = tiedCount > 1 ? ' (đồng hạng)' : '';
+    const rankText = rank ? `🏁 Về đích #${rank}${tieNote}` : '';
+    if (!rankText && !time) return '';
+    if (rankText && time) return `${rankText} · ${time}`;
+    return rankText || time;
+  }
+
+  function countTiedAtRank(rank) {
+    if (!rank) return 0;
+    return lastPlayers.filter((p) => p.finish_rank === rank).length;
+  }
+
   function updateDuckElement(wrap, p) {
     const leftPct = duckLeftPercent(p);
     wrap.classList.toggle('finished', Boolean(p.finished));
@@ -216,7 +235,11 @@ const DuckRaceHost = (function () {
         rankEl.className = 'duck-race-duck-badge__rank';
         wrap.querySelector('.duck-race-duck-badge')?.appendChild(rankEl);
       }
-      rankEl.textContent = `🏁 Về đích #${p.finish_rank}`;
+      rankEl.textContent = formatFinishRankLabel(
+        p.finish_rank,
+        p.finish_elapsed_s,
+        countTiedAtRank(p.finish_rank),
+      );
     } else if (rankEl) {
       rankEl.remove();
     }
@@ -303,16 +326,23 @@ const DuckRaceHost = (function () {
       return;
     }
     const medals = ['🥇', '🥈', '🥉'];
-    el.innerHTML = finished.map((p) => `
+    el.innerHTML = finished.map((p) => {
+      const tied = countTiedAtRank(p.finish_rank);
+      const tieNote = tied > 1 ? ' · đồng hạng' : '';
+      const time = formatFinishTime(p.finish_elapsed_s);
+      return `
       <div class="duck-race-podium-chip">
         <span class="medal">${medals[p.finish_rank - 1] || '🏁'}</span>
-        <span>${escapeHtml(p.name)} — ${p.score} điểm</span>
+        <span>${escapeHtml(p.name)} — ${p.score} điểm${time ? ` · ${time}` : ''}${tieNote}</span>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function applyRaceUpdate(data) {
     if (!data) return;
+    const room = typeof HTD !== 'undefined' ? HTD.getRoom() : null;
+    if (room?.status === 'ended' || room?.game?.phase === 'final') return;
     lastPlayers = Array.isArray(data.players) ? data.players : [];
     targetScore = Number(data.target_score || getModeConfig()?.win?.target_score || 30);
     const targetEl = document.getElementById('duckRaceTargetScore');
@@ -364,6 +394,7 @@ const DuckRaceHost = (function () {
         score: data.total_score ?? lastPlayers[idx].score,
         finished: true,
         finish_rank: data.finish_rank,
+        finish_elapsed_s: data.finish_elapsed_s ?? lastPlayers[idx].finish_elapsed_s,
       };
     }
     renderDucks();

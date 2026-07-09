@@ -1,3 +1,4 @@
+const { hrtime } = require('process');
 const {
   playersKey,
   leaderboardKey,
@@ -73,16 +74,16 @@ async function refillDuckPool(redis, pin, sprites) {
   const pool = shuffleArray(sprites);
   if (!pool.length) return;
   await redis.del(key);
-  await redis.rPush(key, ...pool);
+  await redis.rpush(key, ...pool);
   await redis.expire(key, 7200);
 }
 
 async function drawDuckSprite(redis, pin, sprites) {
   const key = duckPoolKey(pin);
-  let sprite = await redis.lPop(key);
+  let sprite = await redis.lpop(key);
   if (!sprite) {
     await refillDuckPool(redis, pin, sprites);
-    sprite = await redis.lPop(key);
+    sprite = await redis.lpop(key);
   }
   return sprite || sprites[0] || DEFAULT_DUCK_SPRITES[0];
 }
@@ -106,7 +107,23 @@ async function getPlayerProgress(redis, pin, name) {
       /* fall through */
     }
   }
-  return { question_index: 0, finished: false, finish_rank: null, finished_at: null };
+  return { question_index: 0, finished: false, finish_rank: null, finished_at: null, finish_elapsed_s: null };
+}
+
+function captureRaceStartHr() {
+  return hrtime.bigint().toString();
+}
+
+function elapsedSecondsFromStart(raceStartedHr) {
+  if (!raceStartedHr) return null;
+  const elapsedNs = hrtime.bigint() - BigInt(raceStartedHr);
+  const seconds = Number(elapsedNs) / 1e9;
+  return Math.round(seconds * 10000) / 10000;
+}
+
+function formatFinishElapsedS(elapsedS) {
+  if (elapsedS == null || !Number.isFinite(Number(elapsedS))) return null;
+  return `${Number(elapsedS).toFixed(4)}s`;
 }
 
 async function savePlayerProgress(redis, pin, name, progress) {
@@ -117,11 +134,67 @@ async function getFinishersCount(redis, pin) {
   return redis.llen(finishersKey(pin));
 }
 
-async function addFinisher(redis, pin, name) {
-  const count = await getFinishersCount(redis, pin);
-  await redis.rpush(finishersKey(pin), name);
-  await redis.expire(finishersKey(pin), 7200);
-  return count + 1;
+async function getStudentCount(redis, pin) {
+  const all = await redis.hgetall(playersKey(pin));
+  return Object.values(all).filter((raw) => {
+    try {
+      return !JSON.parse(raw).is_host;
+    } catch {
+      return false;
+    }
+  }).length;
+}
+
+/** Số người về đích cần để tự kết thúc — không vượt quá số HS thực tế trong phòng. */
+function getRequiredFinisherCount(podiumSize, studentCount) {
+  const podium = Math.max(1, Number(podiumSize) || 3);
+  const students = Math.max(0, Number(studentCount) || 0);
+  if (students === 0) return podium;
+  return Math.min(podium, students);
+}
+
+async function recalculateFinisherRanks(redis, pin) {
+  const names = await getFinishersList(redis, pin);
+  const rows = [];
+  for (const name of names) {
+    const progress = await getPlayerProgress(redis, pin, name);
+    rows.push({
+      name,
+      elapsed_s: progress.finish_elapsed_s ?? Infinity,
+    });
+  }
+  rows.sort((a, b) => a.elapsed_s - b.elapsed_s || a.name.localeCompare(b.name));
+
+  let rank = 1;
+  for (let i = 0; i < rows.length; i += 1) {
+    if (i > 0 && rows[i].elapsed_s !== rows[i - 1].elapsed_s) {
+      rank = i + 1;
+    }
+    const progress = await getPlayerProgress(redis, pin, rows[i].name);
+    if (progress.finish_rank !== rank) {
+      progress.finish_rank = rank;
+      await savePlayerProgress(redis, pin, rows[i].name, progress);
+    }
+  }
+}
+
+/** Ghi nhận về đích + xếp hạng (đồng hạng nếu cùng `finish_elapsed_s`). */
+async function registerFinisher(redis, pin, name, elapsedS, finishedAtMs) {
+  const progress = await getPlayerProgress(redis, pin, name);
+  progress.finished = true;
+  progress.finish_elapsed_s = elapsedS;
+  progress.finished_at = finishedAtMs;
+  await savePlayerProgress(redis, pin, name, progress);
+
+  const list = await getFinishersList(redis, pin);
+  if (!list.includes(name)) {
+    await redis.rpush(finishersKey(pin), name);
+    await redis.expire(finishersKey(pin), 7200);
+  }
+
+  await recalculateFinisherRanks(redis, pin);
+  const updated = await getPlayerProgress(redis, pin, name);
+  return updated.finish_rank;
 }
 
 async function getFinishersList(redis, pin) {
@@ -165,11 +238,18 @@ async function buildRacePlayers(redis, pin, rules, config) {
       position: positionFromScore(score, rules),
       finished: Boolean(progress.finished),
       finish_rank: progress.finish_rank,
+      finish_elapsed_s: progress.finish_elapsed_s ?? null,
     });
   }
 
   players.sort((a, b) => {
-    if (a.finished && b.finished) return (a.finish_rank || 99) - (b.finish_rank || 99);
+    if (a.finished && b.finished) {
+      const rankDiff = (a.finish_rank || 99) - (b.finish_rank || 99);
+      if (rankDiff !== 0) return rankDiff;
+      const timeDiff = (a.finish_elapsed_s ?? Infinity) - (b.finish_elapsed_s ?? Infinity);
+      if (timeDiff !== 0) return timeDiff;
+      return a.name.localeCompare(b.name);
+    }
     if (a.finished) return -1;
     if (b.finished) return 1;
     return b.score - a.score || a.name.localeCompare(b.name);
@@ -192,8 +272,13 @@ module.exports = {
   getPlayerProgress,
   savePlayerProgress,
   getFinishersCount,
-  addFinisher,
+  getStudentCount,
+  getRequiredFinisherCount,
+  registerFinisher,
   getFinishersList,
+  captureRaceStartHr,
+  elapsedSecondsFromStart,
+  formatFinishElapsedS,
   positionFromScore,
   buildRacePlayers,
 };

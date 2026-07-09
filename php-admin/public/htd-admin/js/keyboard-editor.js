@@ -1311,12 +1311,20 @@ function formulaSubDisplay(digits) {
   }).join('');
 }
 
+function normalizeKeyRaw(raw) {
+  return String(raw ?? '')
+    .replace(/₀/g, '0').replace(/₁/g, '1').replace(/₂/g, '2').replace(/₃/g, '3')
+    .replace(/₄/g, '4').replace(/₅/g, '5').replace(/₆/g, '6').replace(/₇/g, '7')
+    .replace(/₈/g, '8').replace(/₉/g, '9')
+    .trim();
+}
+
 function formulaIsElement(val) {
-  return /^[A-Z][a-z]?$/.test(val);
+  return /^[A-Z][a-z]?$/.test(normalizeKeyRaw(val));
 }
 
 function formulaIsDigit(val) {
-  return /^[0-9]$/.test(val);
+  return /^[0-9]$/.test(normalizeKeyRaw(val));
 }
 
 function formulaSmartContext(tokens, smartContext) {
@@ -1341,30 +1349,63 @@ function formulaMakeToken(type, value) {
   };
 }
 
-function formulaAppendToken(tokens, raw, smartContext) {
-  if (formulaIsDigit(raw)) {
-    const ctx = formulaSmartContext(tokens, smartContext);
-    const last = tokens[tokens.length - 1];
-    if (ctx === 'subscript') {
-      if (last?.type === 'subscript') {
-        last.value += raw;
-        last.display = formulaSubDisplay(last.value);
-      } else {
-        tokens.push(formulaMakeToken('subscript', raw));
-      }
-    } else if (last?.type === 'coefficient') {
-      last.value += raw;
-      last.display = last.value;
+function formulaAppendDigitToken(tokens, digit, smartContext) {
+  const ctx = formulaSmartContext(tokens, smartContext);
+  const last = tokens[tokens.length - 1];
+  if (ctx === 'subscript') {
+    if (last?.type === 'subscript') {
+      last.value += digit;
+      last.display = formulaSubDisplay(last.value);
     } else {
-      tokens.push(formulaMakeToken('coefficient', raw));
+      tokens.push(formulaMakeToken('subscript', digit));
     }
+  } else if (last?.type === 'coefficient') {
+    last.value += digit;
+    last.display = last.value;
+  } else {
+    tokens.push(formulaMakeToken('coefficient', digit));
+  }
+}
+
+function formulaAppendChemString(tokens, raw, smartContext) {
+  const s = normalizeKeyRaw(raw);
+  if (!s) return;
+  let i = 0;
+  while (i < s.length) {
+    if (/[A-Z]/.test(s[i])) {
+      let el = s[i++];
+      if (i < s.length && /[a-z]/.test(s[i])) el += s[i++];
+      tokens.push(formulaMakeToken('element', el));
+      continue;
+    }
+    if (/[0-9]/.test(s[i])) {
+      let digits = '';
+      while (i < s.length && /[0-9]/.test(s[i])) digits += s[i++];
+      formulaAppendDigitToken(tokens, digits, smartContext);
+      continue;
+    }
+    tokens.push(formulaMakeToken('symbol', s[i]));
+    i += 1;
+  }
+}
+
+function formulaAppendToken(tokens, raw, smartContext) {
+  const input = normalizeKeyRaw(raw);
+  if (!input) return;
+
+  if (formulaIsDigit(input)) {
+    formulaAppendDigitToken(tokens, input, smartContext);
     return;
   }
-  if (formulaIsElement(raw)) {
-    tokens.push(formulaMakeToken('element', raw));
+  if (formulaIsElement(input)) {
+    tokens.push(formulaMakeToken('element', input));
     return;
   }
-  tokens.push(formulaMakeToken('symbol', raw));
+  if (input.length > 1) {
+    formulaAppendChemString(tokens, input, smartContext);
+    return;
+  }
+  tokens.push(formulaMakeToken('symbol', input));
 }
 
 function formulaSerialize(tokens) {
@@ -1374,6 +1415,7 @@ function formulaSerialize(tokens) {
 function formulaRenderHtml(tokens) {
   return tokens.map(t => {
     if (t.type === 'subscript') return `<sub>${formulaEsc(t.value)}</sub>`;
+    if (t.type === 'coefficient') return `<span class="formula-coef">${formulaEsc(t.display)}</span>`;
     if (t.value === '\n') return '<br>';
     return formulaEsc(t.display);
   }).join('');

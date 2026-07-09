@@ -948,7 +948,127 @@ function syncTeacherPresentationFullscreenState() {
   }
 }
 
+function isTeacherDuckRaceMode() {
+  const boot = window.ADMIN_BOOT?.session;
+  const room = typeof HTD !== 'undefined' ? HTD.getRoom() : null;
+  return boot?.playModeSlug === 'duck_race' || room?.playModeSlug === 'duck_race';
+}
+
+const TEACHER_FINAL_ASSETS = {
+  podium: '/htd-admin/assets/ket-thuc-tro-choi.png',
+  leaderboard: '/htd-admin/assets/Leaderboard.png',
+};
+
+function teacherDuckImgUrl(sprite) {
+  const base = '/htd-admin/assets/duck-race/';
+  const fallback = `${base}ducks/duck-blue.gif`;
+  if (!sprite) return fallback;
+  const path = String(sprite).replace(/^\//, '');
+  return path.startsWith('htd-admin/') ? `/${path}` : `${base}${path}`;
+}
+
+function formatTeacherFinishTime(elapsedS) {
+  return elapsedS != null && Number.isFinite(Number(elapsedS))
+    ? `${Number(elapsedS).toFixed(4)}s`
+    : '';
+}
+
+
+function getTeacherPodiumBySlot(rows, isDuckRace) {
+  if (isDuckRace) {
+    const byRank = {};
+    rows
+      .filter((r) => r.finish_rank != null)
+      .forEach((r) => {
+        const rank = Number(r.finish_rank);
+        if (rank >= 1 && rank <= 3 && !byRank[rank]) byRank[rank] = r;
+      });
+    return { 1: byRank[1] ?? null, 2: byRank[2] ?? null, 3: byRank[3] ?? null };
+  }
+  const sortedTop = [...rows].sort(
+    (a, b) => Number(b.score || 0) - Number(a.score || 0) || String(a.name).localeCompare(String(b.name)),
+  );
+  return { 1: sortedTop[0] ?? null, 2: sortedTop[1] ?? null, 3: sortedTop[2] ?? null };
+}
+
+function renderTeacherFinalPodiumSlot(player, slotRank, isDuckRace) {
+  if (!player) {
+    return `<div class="teacher-final-podium-slot slot-${slotRank}" aria-hidden="true"></div>`;
+  }
+  const time = formatTeacherFinishTime(player.finish_elapsed_s);
+  const visual = isDuckRace
+    ? `<img class="teacher-final-podium-duck" src="${teacherDuckImgUrl(player.duck_sprite)}" alt="">`
+    : (player.avatar && String(player.avatar).startsWith('data:image')
+      ? `<img class="teacher-final-podium-avatar" src="${player.avatar}" alt="">`
+      : `<span class="teacher-final-podium-avatar teacher-final-podium-avatar--emoji">😀</span>`);
+  return `
+    <div class="teacher-final-podium-slot slot-${slotRank}">
+      <div class="teacher-final-podium-card">
+        <strong class="teacher-final-podium-card-name">${escapeTeacherHtml(player.name)}</strong>
+        <div class="teacher-final-podium-card-row">
+          <span class="teacher-final-podium-card-score">${Number(player.score || 0)} điểm</span>
+          ${time ? `<span class="teacher-final-podium-card-time">${time}</span>` : ''}
+        </div>
+      </div>
+      <div class="teacher-final-podium-figure">${visual}</div>
+    </div>`;
+}
+
+function buildTeacherPodiumStageHtml(podiumBySlot, isDuckRace) {
+  return `<div class="teacher-final-podium-stage" role="presentation">
+    <img class="teacher-final-podium-bg" src="${TEACHER_FINAL_ASSETS.podium}" alt="">
+    ${renderTeacherFinalPodiumSlot(podiumBySlot[2], 2, isDuckRace)}
+    ${renderTeacherFinalPodiumSlot(podiumBySlot[1], 1, isDuckRace)}
+    ${renderTeacherFinalPodiumSlot(podiumBySlot[3], 3, isDuckRace)}
+  </div>`;
+}
+
+function openTeacherPodiumModal(podiumBySlot, isDuckRace) {
+  const modal = document.getElementById('teacherPodiumModal');
+  const content = document.getElementById('teacherPodiumModalContent');
+  if (!modal || !content) return;
+  const hasAny = podiumBySlot[1] || podiumBySlot[2] || podiumBySlot[3];
+  if (!hasAny) {
+    closeTeacherPodiumModal();
+    return;
+  }
+  content.innerHTML = buildTeacherPodiumStageHtml(podiumBySlot, isDuckRace);
+  modal.hidden = false;
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeTeacherPodiumModal() {
+  const modal = document.getElementById('teacherPodiumModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function renderTeacherFinalLeaderboardList(rows, isDuckRace) {
+  const sorted = [...rows].sort(
+    (a, b) => Number(b.score || 0) - Number(a.score || 0) || a.name.localeCompare(b.name),
+  );
+  return sorted
+    .map((row, index) => {
+      const time = formatTeacherFinishTime(row.finish_elapsed_s);
+      const rankLabel = isDuckRace && row.finish_rank ? `#${row.finish_rank}` : String(index + 1);
+      return `
+        <li class="teacher-final-lb-row">
+          <span class="teacher-final-lb-rank">${rankLabel}</span>
+          <span class="teacher-final-lb-name">${escapeTeacherHtml(row.name)}</span>
+          <span class="teacher-final-lb-score">${Number(row.score || 0)}</span>
+          ${time ? `<span class="teacher-final-lb-time">${time}</span>` : ''}
+        </li>`;
+    })
+    .join('');
+}
+
 function renderTeacherFinal() {
+  if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
+  const duckPhase = document.getElementById('teacherDuckRacePhase');
+  if (duckPhase) duckPhase.hidden = true;
   document.getElementById('teacherQuestionPhase').hidden = true;
   document.getElementById('teacherFinalPhase').hidden = false;
   const timerText = document.getElementById('teacherTimerText');
@@ -960,42 +1080,25 @@ function renderTeacherFinal() {
 
   if (lbEl) {
     if (!rows.length) {
+      closeTeacherPodiumModal();
       lbEl.innerHTML =
         '<div class="teacher-final-empty">' +
         '<p class="teacher-final-empty-title">Trò chơi đã kết thúc</p>' +
         '<p class="teacher-final-hint">Chưa có học sinh nào ghi điểm trong phòng này.</p>' +
         '</div>';
     } else {
-      const top3 = rows.slice(0, 3);
-      const podiumMedals = ['🥇', '🥈', '🥉'];
+      const isDuckRace = isTeacherDuckRaceMode();
+      const podiumBySlot = getTeacherPodiumBySlot(rows, isDuckRace);
+
       lbEl.innerHTML =
         '<div class="teacher-final-summary">' +
-        `<p class="teacher-final-stat">${rows.length} học sinh · ${teacherState.serverQuestionIndex || room?.game?.questionIndex + 1 || '—'} câu đã chơi</p>` +
-        (top3.length
-          ? `<div class="teacher-final-podium">${top3
-              .map(
-                (r, i) =>
-                  `<div class="teacher-final-podium-item rank-${i + 1}">
-                    <span class="teacher-final-podium-medal">${podiumMedals[i] || i + 1}</span>
-                    <strong class="teacher-final-podium-name">${escapeTeacherHtml(r.name)}</strong>
-                    <span class="teacher-final-podium-score">${Number(r.score || 0)} đ</span>
-                  </div>`
-              )
-              .join('')}</div>`
-          : '') +
-        `<table class="teacher-final-table">
-          <thead><tr><th>Hạng</th><th>Học sinh</th><th>Điểm</th></tr></thead>
-          <tbody>${rows
-            .map(
-              r => `<tr>
-                <td>${r.rank ?? '—'}</td>
-                <td>${escapeTeacherHtml(r.name)}</td>
-                <td><strong>${Number(r.score || 0)}</strong></td>
-              </tr>`
-            )
-            .join('')}</tbody>
-        </table>` +
+        `<div class="teacher-final-lb-section">
+          <img class="teacher-final-lb-header" src="${TEACHER_FINAL_ASSETS.leaderboard}" alt="Cập nhật bảng xếp hạng">
+          <ol class="teacher-final-lb-list">${renderTeacherFinalLeaderboardList(rows, isDuckRace)}</ol>
+        </div>` +
         '</div>';
+
+      openTeacherPodiumModal(podiumBySlot, isDuckRace);
     }
   }
 
@@ -1033,7 +1136,7 @@ function renderTeacherGame(room) {
     }
   } else if (game.phase === 'final') {
     closeTeacherLbModal();
-    if (needsFullRender) renderTeacherFinal();
+    renderTeacherFinal();
   }
 
   teacherState.lastRenderedPhase = game.phase;
@@ -1226,19 +1329,44 @@ function updateTeacherJoinQr(room) {
   });
 }
 
+function copyTextToClipboard(text) {
+  if (!text) return Promise.resolve(false);
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => fallbackCopyText(text));
+  }
+  return Promise.resolve(fallbackCopyText(text));
+}
+
+function fallbackCopyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(ta);
+  }
+}
+
 function wireTeacherRoomQuickActions(room) {
   const copyPinBtn = document.getElementById('teacherCopyPinBtn');
   const copyLinkBtn = document.getElementById('teacherCopyLinkBtn');
   if (copyPinBtn && !copyPinBtn.dataset.wired) {
     copyPinBtn.dataset.wired = '1';
     copyPinBtn.addEventListener('click', () => {
-      if (room?.pin) navigator.clipboard.writeText(room.pin);
+      if (room?.pin) copyTextToClipboard(String(room.pin));
     });
   }
   if (copyLinkBtn && !copyLinkBtn.dataset.wired) {
     copyLinkBtn.dataset.wired = '1';
     copyLinkBtn.addEventListener('click', () => {
-      if (room?.joinUrl) navigator.clipboard.writeText(room.joinUrl);
+      if (room?.joinUrl) copyTextToClipboard(room.joinUrl);
     });
   }
 }
@@ -1512,6 +1640,7 @@ function resetTeacherSessionLocalState() {
   teacherState.livePhaseEndsAt = null;
   if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
   closeTeacherLbModal();
+  closeTeacherPodiumModal();
 }
 
 function teacherPlayAgain() {
@@ -1781,6 +1910,8 @@ function initTeacherDashboardUi() {
   document.getElementById('teacherQrEnlargeBtn')?.addEventListener('click', openTeacherQrModal);
   document.getElementById('teacherQrModalBackdrop')?.addEventListener('click', closeTeacherQrModal);
   document.getElementById('teacherQrModalClose')?.addEventListener('click', closeTeacherQrModal);
+  document.getElementById('teacherPodiumModalBackdrop')?.addEventListener('click', closeTeacherPodiumModal);
+  document.getElementById('teacherPodiumModalClose')?.addEventListener('click', closeTeacherPodiumModal);
   document.getElementById('teacherActionBtn')?.addEventListener('click', e => {
     e.stopPropagation();
     toggleTeacherActionMenu();
@@ -2031,12 +2162,16 @@ function setupTeacherBackendBridge() {
   });
 
   HTDBridge.on('raceUpdate', data => {
+    const room = HTD.getRoom();
+    if (room?.status === 'ended' || room?.game?.phase === 'final') return;
     if (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode()) {
       DuckRaceHost.applyRaceUpdate(data);
     }
   });
 
   HTDBridge.on('playerFinished', data => {
+    const room = HTD.getRoom();
+    if (room?.status === 'ended' || room?.game?.phase === 'final') return;
     if (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode()) {
       DuckRaceHost.onPlayerFinished(data);
     }
@@ -2068,6 +2203,7 @@ function setupTeacherBackendBridge() {
       if (wrap) wrap.hidden = true;
     }
     renderDashboard();
+    renderTeacherFinal();
   });
 }
 

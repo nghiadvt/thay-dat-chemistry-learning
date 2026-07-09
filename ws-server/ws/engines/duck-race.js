@@ -27,11 +27,15 @@ const {
   finishersKey,
   getPlayerProgress,
   savePlayerProgress,
-  addFinisher,
   getFinishersCount,
+  getStudentCount,
+  getRequiredFinisherCount,
   getFinishersList,
   positionFromScore,
   buildRacePlayers,
+  captureRaceStartHr,
+  elapsedSecondsFromStart,
+  registerFinisher,
 } = require('./duck-race-config');
 
 function isDuckRaceRoom(room) {
@@ -183,6 +187,8 @@ async function startGame(io, redis, socket) {
     quiz_index: '0',
     question_index: '0',
     play_mode_slug: 'duck_race',
+    race_started_hr: captureRaceStartHr(),
+    race_started_at: String(Date.now()),
   });
   await redis.del(finishersKey(pin));
   await refreshRoomTtl(redis, pin);
@@ -194,6 +200,7 @@ async function startGame(io, redis, socket) {
       finished: false,
       finish_rank: null,
       finished_at: null,
+      finish_elapsed_s: null,
     });
   }
 
@@ -227,7 +234,7 @@ async function handleSubmit(io, redis, socket, payload) {
   const quiz = plan[0];
   const questions = quiz.questions;
 
-  const progress = await getPlayerProgress(redis, pin, name);
+  let progress = await getPlayerProgress(redis, pin, name);
   if (progress.finished) {
     throw new Error('Bạn đã về đích.');
   }
@@ -264,16 +271,17 @@ async function handleSubmit(io, redis, socket, payload) {
   }
 
   let finishRank = null;
+  let finishElapsedS = null;
   if (!progress.finished && newScore >= rules.targetScore) {
-    finishRank = await addFinisher(redis, pin, name);
-    progress.finished = true;
-    progress.finish_rank = finishRank;
-    progress.finished_at = Date.now();
-    await savePlayerProgress(redis, pin, name, progress);
+    finishElapsedS = elapsedSecondsFromStart(room.race_started_hr);
+    const finishedAtMs = Date.now();
+    finishRank = await registerFinisher(redis, pin, name, finishElapsedS, finishedAtMs);
+    progress = await getPlayerProgress(redis, pin, name);
 
     io.to(pin).emit('player_finished', {
       name,
       finish_rank: finishRank,
+      finish_elapsed_s: finishElapsedS,
       total_score: newScore,
     });
   }
@@ -287,6 +295,7 @@ async function handleSubmit(io, redis, socket, payload) {
     position,
     correct_answer: correctAnswer,
     finish_rank: finishRank,
+    finish_elapsed_s: finishElapsedS,
     target_score: rules.targetScore,
     ...(quiz.show_explanation && question.explanation && !correct
       ? { explanation: question.explanation }
@@ -303,7 +312,9 @@ async function handleSubmit(io, redis, socket, payload) {
     await emitQuestionForPlayer(io, redis, pin, name, plan, progress.question_index);
   } else if (rules.endWhenPodiumFull) {
     const finisherCount = await getFinishersCount(redis, pin);
-    if (finisherCount >= rules.podiumSize) {
+    const studentCount = await getStudentCount(redis, pin);
+    const requiredFinishers = getRequiredFinisherCount(rules.podiumSize, studentCount);
+    if (finisherCount >= requiredFinishers) {
       await endGame(io, redis, pin);
     }
   }
@@ -314,6 +325,7 @@ async function handleSubmit(io, redis, socket, payload) {
     total_score: newScore,
     position,
     finish_rank: finishRank,
+    finish_elapsed_s: finishElapsedS,
   };
 }
 
@@ -332,11 +344,21 @@ async function buildFinalLeaderboard(redis, pin, rules) {
       name: finisherName,
       score,
       finish_rank: progress.finish_rank,
+      finish_elapsed_s: progress.finish_elapsed_s ?? null,
       finished_at: progress.finished_at,
       player_token: player.player_token || null,
       avatar: player.avatar || null,
+      duck_sprite: player.duck_sprite || null,
     });
   }
+
+  entries.sort((a, b) => {
+    const rankDiff = (a.finish_rank || 99) - (b.finish_rank || 99);
+    if (rankDiff !== 0) return rankDiff;
+    const timeDiff = (a.finish_elapsed_s ?? Infinity) - (b.finish_elapsed_s ?? Infinity);
+    if (timeDiff !== 0) return timeDiff;
+    return a.name.localeCompare(b.name);
+  });
 
   const finisherSet = new Set(finishers);
   const rest = [];
@@ -349,9 +371,11 @@ async function buildFinalLeaderboard(redis, pin, rules) {
       name: player.name,
       score,
       finish_rank: null,
+      finish_elapsed_s: null,
       finished_at: null,
       player_token: player.player_token || null,
       avatar: player.avatar || null,
+      duck_sprite: player.duck_sprite || null,
     });
   }
 
@@ -363,8 +387,10 @@ async function buildFinalLeaderboard(redis, pin, rules) {
     score: entry.score,
     rank: index + 1,
     finish_rank: entry.finish_rank,
+    finish_elapsed_s: entry.finish_elapsed_s ?? null,
     player_token: entry.player_token,
     avatar: entry.avatar,
+    duck_sprite: entry.duck_sprite ?? null,
   }));
 }
 
@@ -423,6 +449,7 @@ async function syncLateJoin(io, redis, socket, pin) {
       finished: false,
       finish_rank: null,
       finished_at: null,
+      finish_elapsed_s: null,
     });
   }
 
@@ -432,7 +459,10 @@ async function syncLateJoin(io, redis, socket, pin) {
 
   if (!progress.finished) {
     const qIdx = progress.question_index || 0;
-    await emitQuestionForPlayer(io, redis, pin, socket.data.name, plan, qIdx);
+    const quiz = plan[0];
+    const questions = quiz.questions;
+    const question = questions[qIdx % questions.length];
+    await emitQuestionToStudent(io, redis, pin, socket, quiz, question);
   }
 
   await emitRaceUpdate(io, redis, pin, rules);
@@ -443,6 +473,7 @@ module.exports = {
   startGame,
   handleSubmit,
   endGame,
+  buildFinalLeaderboard,
   syncLateJoin,
   syncLateJoinHost,
 };

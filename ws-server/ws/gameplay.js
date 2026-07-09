@@ -316,8 +316,19 @@ async function syncLateJoinHost(io, redis, socket, pin) {
   const room = await redis.hgetall(roomKey(pin));
 
   if (room.status === 'ended') {
-    const finalLeaderboard = await buildFinalLeaderboardPayload(redis, pin);
-    socket.emit('game_ended', { final_leaderboard: finalLeaderboard });
+    let finalLeaderboard;
+    if (duckRace.isDuckRaceRoom(room)) {
+      const { parseModeConfig, getRules } = require('./engines/duck-race-config');
+      const config = parseModeConfig(room);
+      const rules = getRules(config);
+      finalLeaderboard = await duckRace.buildFinalLeaderboard(redis, pin, rules);
+    } else {
+      finalLeaderboard = await buildFinalLeaderboardPayload(redis, pin);
+    }
+    socket.emit('game_ended', {
+      play_mode: room.play_mode_slug || null,
+      final_leaderboard: finalLeaderboard,
+    });
     return;
   }
 

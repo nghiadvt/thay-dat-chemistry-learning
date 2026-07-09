@@ -17,12 +17,21 @@ const EquationUI = (() => {
     }).join('');
   }
 
+  function normalizeKeyRaw(raw) {
+    return String(raw ?? '')
+      .replace(/₀/g, '0').replace(/₁/g, '1').replace(/₂/g, '2').replace(/₃/g, '3')
+      .replace(/₄/g, '4').replace(/₅/g, '5').replace(/₆/g, '6').replace(/₇/g, '7')
+      .replace(/₈/g, '8').replace(/₉/g, '9')
+      .trim();
+  }
+
   function formulaIsElement(val) {
-    return /^[A-Z][a-z]?$/.test(val);
+    return /^[A-Z][a-z]?$/.test(normalizeKeyRaw(val));
   }
 
   function formulaIsDigit(val) {
-    return /^[0-9]$/.test(val);
+    const s = normalizeKeyRaw(val);
+    return /^[0-9]$/.test(s);
   }
 
   function formulaSmartContext(tokens, smartContext) {
@@ -48,30 +57,76 @@ const EquationUI = (() => {
     };
   }
 
-  function formulaAppendToken(tokens, raw, smartContext) {
-    if (formulaIsDigit(raw)) {
-      const ctx = formulaSmartContext(tokens, smartContext);
-      const last = tokens[tokens.length - 1];
-      if (ctx === 'subscript') {
-        if (last?.type === 'subscript') {
-          last.value += raw;
-          last.display = formulaSubDisplay(last.value);
-        } else {
-          tokens.push(formulaMakeToken('subscript', raw));
-        }
-      } else if (last?.type === 'coefficient') {
-        last.value += raw;
-        last.display = last.value;
+  function formulaAppendDigitToken(tokens, digit, smartContext) {
+    const ctx = formulaSmartContext(tokens, smartContext);
+    const last = tokens[tokens.length - 1];
+    if (ctx === 'subscript') {
+      if (last?.type === 'subscript') {
+        last.value += digit;
+        last.display = formulaSubDisplay(last.value);
       } else {
-        tokens.push(formulaMakeToken('coefficient', raw));
+        tokens.push(formulaMakeToken('subscript', digit));
       }
+    } else if (last?.type === 'coefficient') {
+      last.value += digit;
+      last.display = last.value;
+    } else {
+      tokens.push(formulaMakeToken('coefficient', digit));
+    }
+  }
+
+  /** Tách chuỗi dạng H₂O / CO₂ (phím ghép) thành token — khớp Test editor. */
+  function formulaAppendChemString(tokens, raw, smartContext) {
+    const s = normalizeKeyRaw(raw);
+    if (!s) return;
+    let i = 0;
+    while (i < s.length) {
+      if (/[A-Z]/.test(s[i])) {
+        let el = s[i++];
+        if (i < s.length && /[a-z]/.test(s[i])) el += s[i++];
+        tokens.push(formulaMakeToken('element', el));
+        continue;
+      }
+      if (/[0-9]/.test(s[i])) {
+        let digits = '';
+        while (i < s.length && /[0-9]/.test(s[i])) digits += s[i++];
+        formulaAppendDigitToken(tokens, digits, smartContext);
+        continue;
+      }
+      tokens.push(formulaMakeToken('symbol', s[i]));
+      i += 1;
+    }
+  }
+
+  function formulaAppendToken(tokens, raw, smartContext) {
+    const input = normalizeKeyRaw(raw);
+    if (!input) return;
+
+    if (formulaIsDigit(input)) {
+      formulaAppendDigitToken(tokens, input, smartContext);
       return;
     }
-    if (formulaIsElement(raw)) {
-      tokens.push(formulaMakeToken('element', raw));
+    if (formulaIsElement(input)) {
+      tokens.push(formulaMakeToken('element', input));
       return;
     }
-    tokens.push(formulaMakeToken('symbol', raw));
+    if (input.length > 1) {
+      formulaAppendChemString(tokens, input, smartContext);
+      return;
+    }
+    tokens.push(formulaMakeToken('symbol', input));
+  }
+
+  function formulaBackspaceTokens(tokens) {
+    if (!tokens.length) return;
+    const last = tokens[tokens.length - 1];
+    if ((last.type === 'subscript' || last.type === 'coefficient') && last.value.length > 1) {
+      last.value = last.value.slice(0, -1);
+      last.display = last.type === 'subscript' ? formulaSubDisplay(last.value) : last.value;
+      if (!last.value) tokens.pop();
+      return;
+    }
+    tokens.pop();
   }
 
   function formulaSerialize(tokens) {
@@ -81,6 +136,7 @@ const EquationUI = (() => {
   function formulaRenderHtml(tokens) {
     return tokens.map(t => {
       if (t.type === 'subscript') return `<sub>${formulaEsc(t.value)}</sub>`;
+      if (t.type === 'coefficient') return `<span class="formula-coef">${formulaEsc(t.display)}</span>`;
       if (t.value === '\n') return '<br>';
       return formulaEsc(t.display);
     }).join('');
@@ -258,7 +314,7 @@ const EquationUI = (() => {
         let id = focusedId || ids[ids.length - 1];
         if (!id) return null;
         if (!values.blankTokens[id]) values.blankTokens[id] = [];
-        values.blankTokens[id].pop();
+        formulaBackspaceTokens(values.blankTokens[id]);
         syncBlank(id);
         onChange();
         return id;
@@ -308,7 +364,7 @@ const EquationUI = (() => {
         return null;
       },
       backspace() {
-        tokens.pop();
+        formulaBackspaceTokens(tokens);
         onChange();
         render();
         return null;
@@ -411,6 +467,9 @@ const EquationUI = (() => {
     normalizeFormula,
     formulaSerialize,
     formulaRenderHtml,
+    formulaAppendToken,
+    formulaBackspaceTokens,
+    normalizeKeyRaw,
     renderEquation,
     createInputState,
     createFormulaState,

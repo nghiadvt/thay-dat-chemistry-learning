@@ -136,8 +136,6 @@
 
                 <div class="teacher-game-phase" id="teacherFinalPhase" hidden>
                   <div class="teacher-final-wrap">
-                    <div class="teacher-final-banner">🎉 Kết thúc trò chơi</div>
-                    <p class="teacher-final-hint">Học sinh đang xem bảng xếp hạng trên thiết bị của mình.</p>
                     <div class="teacher-final-lb" id="teacherFinalLeaderboard"></div>
                     <div class="teacher-final-actions">
                       @if ($session->status === 'ended' && $session->is_active)
@@ -222,6 +220,12 @@
     </div>
     <div class="teacher-lb-modal-list" id="teacherLbModalList"></div>
   </div>
+</div>
+
+<div class="teacher-podium-modal" id="teacherPodiumModal" aria-hidden="true" hidden>
+  <div class="teacher-podium-modal-backdrop" id="teacherPodiumModalBackdrop"></div>
+  <button type="button" class="teacher-podium-modal-close" id="teacherPodiumModalClose" aria-label="Đóng bục vinh danh">×</button>
+  <div class="teacher-podium-modal-content" id="teacherPodiumModalContent" role="img" aria-label="Bục vinh danh top 3"></div>
 </div>
 
 <div class="teacher-presentation" id="teacherPresentation" hidden>

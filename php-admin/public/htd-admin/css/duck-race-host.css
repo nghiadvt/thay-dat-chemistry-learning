@@ -163,6 +163,7 @@
   width: var(--duck-sprite-px, 64px);
   height: var(--duck-sprite-px, 64px);
   object-fit: contain;
+  object-position: center bottom;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
 }
 
@@ -197,6 +198,10 @@
 
 .teacher-main-grid.game-active.duck-race-mode .teacher-duck-race-phase {
   display: flex !important;
+}
+
+.teacher-main-grid.game-ended .teacher-duck-race-phase {
+  display: none !important;
 }
 
 @keyframes duck-race-swim-bob {

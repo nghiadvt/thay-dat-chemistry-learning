@@ -77,7 +77,10 @@ function showDuckRaceFeedback(data) {
   if (finishEl) {
     if (data.finish_rank) {
       finishEl.hidden = false;
-      finishEl.textContent = `🏁 Về đích #${data.finish_rank}!`;
+      const time = data.finish_elapsed_s != null
+        ? ` · ${Number(data.finish_elapsed_s).toFixed(4)}s`
+        : '';
+      finishEl.textContent = `🏁 Về đích #${data.finish_rank}${time}!`;
     } else {
       finishEl.hidden = true;
       finishEl.textContent = '';
@@ -612,7 +615,10 @@ function handleBackendRoomJoined(data) {
       room.startedAt = Date.now();
       HTD.setRoom(room);
     }
-    showScreen('waiting');
+    // Ack resolves before server late-join sync; stay on question if sync already arrived.
+    if (!state.currentQuestion && state.screen !== 'question') {
+      showScreen('waiting');
+    }
     return;
   }
 
@@ -768,7 +774,9 @@ function keyboardHasSendKey(config) {
 }
 
 function getFormulaSmartContext(config) {
-  return config?.smart_context || EquationUI.DEFAULT_SMART_CONTEXT;
+  const defaults = EquationUI.DEFAULT_SMART_CONTEXT;
+  if (!config) return defaults;
+  return { ...defaults, ...(config.smart_context || {}) };
 }
 
 function syncInputSubmitButton(config) {
@@ -818,13 +826,13 @@ function buildChemKeyboard(config) {
 function onDynamicKeyPress(key) {
   if (!key) return;
   const type = key.type || 'normal';
-  const value = key.value ?? key.text ?? '';
+  const value = HTDKeyboardRuntime.resolveKeyInputValue(key);
 
-  if (type === 'send') {
+  if (type === 'send' || value === '\n') {
     submitAnswer();
     return;
   }
-  if (type === 'delete' || value === 'BACKSPACE') {
+  if (type === 'delete' || value === '⌫') {
     onChemKey('⌫');
     return;
   }
@@ -1657,18 +1665,88 @@ function nextQuestion() {
   showScreen('question');
 }
 
+function studentDuckImgUrl(sprite) {
+  const base = '/htd-admin/assets/duck-race/';
+  const fallback = `${base}ducks/duck-blue.gif`;
+  if (!sprite) return fallback;
+  const path = String(sprite).replace(/^\//, '');
+  return path.startsWith('htd-admin/') ? `/${path}` : `${base}${path}`;
+}
+
+function formatStudentFinishTime(elapsedS) {
+  return elapsedS != null && Number.isFinite(Number(elapsedS))
+    ? `${Number(elapsedS).toFixed(4)}s`
+    : '';
+}
+
 function renderFinal() {
-  const top = state.students.slice(0, 3);
-  const order = [top[1], top[0], top[2]].filter(Boolean);
-  document.getElementById('podium').innerHTML = order
-    .map((s, i) => {
-      const cls = ['p2', 'p1', 'p3'][i];
-      return `<div class="podium-item ${cls}"><div class="podium-bar">${
-        s.avatarDataUrl
-          ? `<img src="${s.avatarDataUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover">`
-          : s.avatarEmoji || '😀'
-      }</div>
-      <div class="podium-name">${s.name}</div><div class="podium-score">${s.score}đ</div></div>`;
+  const rows = [...state.students].sort(
+    (a, b) => Number(b.score || 0) - Number(a.score || 0) || a.name.localeCompare(b.name),
+  );
+  const podiumEl = document.getElementById('studentFinalPodium');
+  const listEl = document.getElementById('studentFinalList');
+  if (!podiumEl || !listEl) return;
+
+  const duckRace = isDuckRaceMode();
+  let slot1;
+  let slot2;
+  let slot3;
+  if (duckRace) {
+    const finishers = rows
+      .filter((s) => s.finishElapsedS != null && Number.isFinite(Number(s.finishElapsedS)))
+      .sort(
+        (a, b) =>
+          Number(a.finishElapsedS) - Number(b.finishElapsedS) ||
+          String(a.name).localeCompare(String(b.name)),
+      );
+    slot1 = finishers[0];
+    slot2 = finishers[1];
+    slot3 = finishers[2];
+  } else {
+    slot1 = rows[0];
+    slot2 = rows[1];
+    slot3 = rows[2];
+  }
+
+  function renderSlot(player, slotRank) {
+    if (!player) return `<div class="student-final-podium-slot slot-${slotRank}"></div>`;
+    const time = formatStudentFinishTime(player.finishElapsedS);
+    const visual = duckRace
+      ? `<img class="student-final-podium-duck" src="${studentDuckImgUrl(player.duckSprite)}" alt="">`
+      : (player.avatarDataUrl
+        ? `<img class="student-final-podium-avatar" src="${player.avatarDataUrl}" alt="">`
+        : `<span class="student-final-podium-avatar student-final-podium-avatar--emoji">${player.avatarEmoji || '😀'}</span>`);
+    return `
+      <div class="student-final-podium-slot slot-${slotRank}">
+        <div class="student-final-podium-card">
+          <strong class="student-final-podium-card-name">${player.name}</strong>
+          <div class="student-final-podium-card-row">
+            <span class="student-final-podium-card-score">${player.score} điểm</span>
+            ${time ? `<span class="student-final-podium-card-time">${time}</span>` : ''}
+          </div>
+        </div>
+        <div class="student-final-podium-figure">${visual}</div>
+      </div>`;
+  }
+
+  podiumEl.innerHTML = `
+    <img class="student-final-podium-bg" src="/htd-admin/assets/ket-thuc-tro-choi.png" alt="">
+    ${renderSlot(slot2, 2)}
+    ${renderSlot(slot1, 1)}
+    ${renderSlot(slot3, 3)}
+  `;
+
+  listEl.innerHTML = rows
+    .map((row, index) => {
+      const time = formatStudentFinishTime(row.finishElapsedS);
+      const rankLabel = duckRace && row.finishRank ? `#${row.finishRank}` : String(index + 1);
+      return `
+        <li class="student-final-lb-row">
+          <span class="student-final-lb-rank">${rankLabel}</span>
+          <span class="student-final-lb-name">${row.name}</span>
+          <span class="student-final-lb-score">${row.score}</span>
+          ${time ? `<span class="student-final-lb-time">${time}</span>` : ''}
+        </li>`;
     })
     .join('');
 }
@@ -1841,6 +1919,9 @@ function setupStudentBackendBridge() {
         score: Number(row.score || 0),
         avatarDataUrl: row.avatar || null,
         avatarEmoji: row.avatar ? null : '😀',
+        duckSprite: row.duck_sprite || null,
+        finishRank: row.finish_rank ?? null,
+        finishElapsedS: row.finish_elapsed_s ?? null,
         isMe: row.name === state.studentName,
       }));
     }

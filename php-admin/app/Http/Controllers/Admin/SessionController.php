@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Services\PinGenerator;
 use App\Services\RedisRoomService;
 use App\Services\SessionQrService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -228,14 +229,23 @@ class SessionController extends Controller
         return view('admin.sessions.show', compact('session', 'joinUrl', 'qrUrl'));
     }
 
-    public function close(GameSession $session): RedirectResponse
+    public function close(Request $request, GameSession $session): RedirectResponse|JsonResponse
     {
         $session->update(['is_active' => false]);
         $this->redisRoomService->purgeRoom($session->pin);
 
+        $message = "Đã kết thúc phòng «{$session->name}» — PIN {$session->pin} đã tắt.";
+
+        if ($request->expectsJson()) {
+            return $this->jsonSuccess([
+                'session' => $session->fresh(),
+                'message' => $message,
+            ]);
+        }
+
         return redirect()
             ->route('admin.sessions.index')
-            ->with('success', "Đã kết thúc phòng «{$session->name}» — PIN {$session->pin} đã tắt.");
+            ->with('success', $message);
     }
 
     public function regeneratePin(GameSession $session): RedirectResponse

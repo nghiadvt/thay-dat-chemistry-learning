@@ -31,6 +31,7 @@ function registerRoomHandlers(io, redis) {
       try {
         const result = await handleJoinRoom(io, redis, socket, payload);
         socket.emit('room_joined', result);
+        if (typeof ack === 'function') ack({ success: true, data: result });
         if (payload.is_host && (result.room_status === 'playing' || result.room_status === 'ended')) {
           const { syncLateJoinHost } = require('./gameplay');
           await syncLateJoinHost(io, redis, socket, result.pin);
@@ -38,7 +39,6 @@ function registerRoomHandlers(io, redis) {
           const { syncLateJoinStudent } = require('./gameplay');
           await syncLateJoinStudent(io, redis, socket, result.pin);
         }
-        if (typeof ack === 'function') ack({ success: true, data: result });
       } catch (err) {
         const message = err.message || 'Không thể vào phòng.';
         socket.emit('room_error', { message });
