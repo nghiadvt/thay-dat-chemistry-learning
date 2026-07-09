@@ -1729,6 +1729,8 @@ body.teacher-resizing .teacher-main-resizer-grip {
 }
 
 .teacher-demo-nav {
+  display: none !important;
+}
   max-width: none !important;
   width: auto !important;
   left: auto !important;

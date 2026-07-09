@@ -2,53 +2,85 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\HandlesAdminCsv;
 use App\Http\Controllers\Controller;
 use App\Models\QuestionBankItem;
 use App\Models\Tag;
+use App\Services\AdminListCsvService;
 use App\Services\QuestionBankTagService;
 use App\Services\QuestionValidator;
+use App\Support\AdminListCsvRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class QuestionBankController extends Controller
 {
+    use HandlesAdminCsv;
+
     public function __construct(
         private QuestionValidator $questionValidator,
         private QuestionBankTagService $tagService,
+        private AdminListCsvService $csvService,
     ) {}
 
     public function index(Request $request): View
     {
-        $query = QuestionBankItem::query()
-            ->with('tags')
-            ->orderByDesc('updated_at');
-
-        $this->applyTagFilter($query, $request);
-
-        if ($request->filled('answer_type')) {
-            $query->where('answer_type', $request->string('answer_type'));
-        }
-
-        if ($request->filled('q')) {
-            $term = '%'.$request->string('q').'%';
-            $query->where('content', 'like', $term);
-        }
-
         $filter = $this->resolveTagFilterParams($request);
+        $items = $this->filteredQuery($request)->paginate(20)->withQueryString();
 
         return view('admin.question-bank.index', [
-            'items' => $query->get(),
+            'items' => $items,
             'tags' => Tag::query()->orderBy('name')->get(),
             'filterTagIds' => $filter['tag_ids'],
             'filterTagNone' => $filter['tag_none'],
             'filterTagMatch' => $filter['tag_match'],
             'filterAnswerType' => $request->string('answer_type')->toString() ?: null,
             'filterQuery' => $request->string('q')->toString() ?: null,
+            'csvRegistry' => AdminListCsvRegistry::questionBank(),
         ]);
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $columns = $this->csvService->resolveExportColumns('question_bank', $this->csvColumnKeys($request));
+        $rows = $this->filteredQuery($request)->get();
+
+        return $this->csvService->streamExport(
+            'question_bank',
+            $rows,
+            $columns,
+            'bo-cau-hoi-'.now()->format('Ymd-His').'.csv',
+        );
+    }
+
+    public function importTemplate(Request $request): StreamedResponse
+    {
+        $columns = $this->csvService->resolveTemplateColumns('question_bank', $this->csvColumnKeys($request));
+
+        return $this->csvService->streamTemplate(
+            'question_bank',
+            $columns,
+            'bo-cau-hoi-mau.csv',
+        );
+    }
+
+    public function importCsv(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $result = $this->csvService->importQuestionBank(
+            $request->file('csv_file'),
+            $this->csvService->resolveTemplateColumns('question_bank', $this->csvColumnKeys($request)),
+        );
+
+        return $this->csvImportResponse($result, 'admin.question-bank.index', 'câu hỏi');
     }
 
     public function create(): View
@@ -225,6 +257,26 @@ class QuestionBankController extends Controller
             },
             default => 'Tự luận',
         };
+    }
+
+    private function filteredQuery(Request $request)
+    {
+        $query = QuestionBankItem::query()
+            ->with('tags')
+            ->orderByDesc('updated_at');
+
+        $this->applyTagFilter($query, $request);
+
+        if ($request->filled('answer_type')) {
+            $query->where('answer_type', $request->string('answer_type'));
+        }
+
+        if ($request->filled('q')) {
+            $term = '%'.$request->string('q').'%';
+            $query->where('content', 'like', $term);
+        }
+
+        return $query;
     }
 
     /**

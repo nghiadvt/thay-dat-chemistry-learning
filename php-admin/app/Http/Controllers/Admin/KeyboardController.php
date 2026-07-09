@@ -16,14 +16,34 @@ class KeyboardController extends Controller
         private KeyboardValidator $validator,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $keyboards = Keyboard::query()
+        $query = Keyboard::query()
             ->withCount('quizzes')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return view('admin.keyboards.index', compact('keyboards'));
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('subject', 'like', '%'.$search.'%');
+            });
+        }
+
+        if ($request->filled('subject')) {
+            $query->where('subject', $request->string('subject')->toString());
+        }
+
+        $keyboards = $query->paginate(20)->withQueryString();
+
+        $subjects = Keyboard::query()
+            ->whereNotNull('subject')
+            ->where('subject', '!=', '')
+            ->distinct()
+            ->orderBy('subject')
+            ->pluck('subject');
+
+        return view('admin.keyboards.index', compact('keyboards', 'search', 'subjects'));
     }
 
     public function create(): View

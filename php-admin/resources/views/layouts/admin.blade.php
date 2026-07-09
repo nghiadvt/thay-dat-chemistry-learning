@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin — Hóa Thầy Đạt')</title>
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ file_exists(public_path('css/admin.css')) ? filemtime(public_path('css/admin.css')) : time() }}">
+    <link rel="stylesheet" href="{{ asset('css/admin-list.css') }}?v={{ file_exists(public_path('css/admin-list.css')) ? filemtime(public_path('css/admin-list.css')) : time() }}">
     @php $fbWidgetCss = public_path('css/feedback-widget.css'); @endphp
     <link rel="stylesheet" href="{{ asset('css/feedback-widget.css') }}?v={{ file_exists($fbWidgetCss) ? filemtime($fbWidgetCss) : time() }}">
     @stack('head')
@@ -69,19 +70,21 @@
     </div>
 </div>
 <div id="adminToastHost" class="admin-toast-host" aria-live="polite"></div>
-@if (session('success') || session('error'))
+@if (session('success') || session('error') || session('warning'))
 <script>
 window.__ADMIN_FLASH__ = @json(array_filter([
-    'type' => session('error') ? 'error' : 'success',
-    'message' => session('error') ?? session('success'),
+    'type' => session('error') ? 'error' : (session('warning') ? 'warning' : 'success'),
+    'message' => session('error') ?? session('warning') ?? session('success'),
 ]));
 </script>
 @endif
+<script src="{{ asset('js/admin-list-page.js') }}?v={{ file_exists(public_path('js/admin-list-page.js')) ? filemtime(public_path('js/admin-list-page.js')) : time() }}"></script>
+<script src="{{ asset('js/admin-data-table.js') }}?v={{ file_exists(public_path('js/admin-data-table.js')) ? filemtime(public_path('js/admin-data-table.js')) : time() }}"></script>
 <script src="{{ asset('js/admin-toast.js') }}?v={{ file_exists(public_path('js/admin-toast.js')) ? filemtime(public_path('js/admin-toast.js')) : time() }}"></script>
 <script src="{{ asset('js/admin-sidebar.js') }}?v={{ file_exists(public_path('js/admin-sidebar.js')) ? filemtime(public_path('js/admin-sidebar.js')) : time() }}"></script>
 <script>window.TAG_PRESET_COLORS = @json(\App\Models\Tag::PRESET_COLORS);</script>
 <script src="{{ asset('js/admin-tags.js') }}?v={{ file_exists(public_path('js/admin-tags.js')) ? filemtime(public_path('js/admin-tags.js')) : time() }}"></script>
-@if (session('success') || session('error'))
+@if (session('success') || session('error') || session('warning'))
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__ADMIN_FLASH__ && window.AdminToast) {

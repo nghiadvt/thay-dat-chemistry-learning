@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-09 (đua vịt: lane_bounds, duck_sprites pool)
+**Cập nhật lần cuối:** 2026-07-09 (xóa phòng đơn/lô; đua vịt host layout)
 
 ---
 
@@ -211,12 +211,13 @@ Seed: `kahoot_sync`, `duck_race`.
 | `win.podium_size` | Số HS về đích trước khi có thể kết thúc game |
 | `flow.end_when_podium_full` | `true` → đủ `podium_size` người về đích thì `game_ended` |
 | `visual.track_steps` | Số bước tối đa trên đường đua (thường = `target_score`) |
-| `visual.track_bounds` | Mép đường đua trên ảnh nền (% chiều rộng ảnh): `start_pct` (xuất phát), `end_pct` (đích). Mặc định `20`→`90` |
-| `visual.lane_bounds` | Chiều cao vùng đứng vịt (% chiều cao ảnh nền): `top_pct`, `bottom_pct`. Mặc định `50`→`92`. Admin chỉnh bằng 2 vạch ngang |
+| `visual.track_bounds` | Mép đường đua trên ảnh nền (% chiều rộng ảnh): `start_pct` (xuất phát), `end_pct` (đích). Mặc định `20`→`90`. **Host:** map `position` 0–100 → `left` % trong khoảng này; mọi vịt cùng X khi `position=0` |
+| `visual.lane_bounds` | Chiều cao vùng đứng vịt (% chiều cao ảnh nền): `top_pct`, `bottom_pct`. Mặc định `50`→`92`. Admin chỉnh bằng 2 vạch ngang. **Host:** tạo pond `#duckRaceLanes` khớp khung ảnh; mỗi HS có `bottom` % **cố định** (gán lần đầu trong client, spread trong pond), không đổi khi điểm thay đổi |
 | `visual.duck_sprites` | Danh sách sprite tương đối trong `duck-race/` (quét từ `ducks/` khi lưu game). WS xáo trộn gán `player.duck_sprite` |
-| `visual.duck_sprite_px` | Kích thước cạnh sprite vịt trên host (px, `32`–`128`, mặc định `64`). Admin chỉnh bằng canvas + preview |
-| `visual.duck_swim_ms` | Thời gian bơi mỗi bước (ms, `400`–`3000`, mặc định `1150`). Càng cao = vịt di chuyển càng chậm |
+| `visual.duck_sprite_px` | Kích thước cạnh sprite vịt trên host (px, `32`–`128`, mặc định `64`). Admin chỉnh bằng canvas + preview. CSS var `--duck-sprite-px` |
+| `visual.duck_swim_ms` | Thời gian bơi mỗi bước (ms, `400`–`3000`, mặc định `1150`). Host chỉ animate `left` (trục X); Y không transition |
 | `visual.assets` | Đường dẫn asset host/HS (public) |
+| `visual` (host UI) | **Client-only** — `php-admin/public/htd-admin/js/duck-race-host.js` + `duck-race-host.css`. Trục **X** từ `position` + `track_bounds`; trục **Y** cố định/HS trong `lane_bounds`. Không lệch ngang khi trùng tiến độ |
 
 `games.mode_config` và `game_sessions.mode_config` **override** từng nhánh của `default_config` (merge shallow ở WS). Luồng chi tiết: [`APP_LOGIC.md`](APP_LOGIC.md) §3.2.
 
@@ -366,6 +367,8 @@ Admin: `/admin/question-bank` — CRUD + **lọc nhiều chủ đề** (checkbox
 **Sửa phòng (admin):** đổi `name` mọi lúc; đổi `quiz_id`/`game_id` chỉ khi `status=waiting` (+ đồng bộ Redis nếu `is_active`). PIN + `qr_path` không đổi.
 
 **Chơi lại:** Admin `POST .../reset` hoặc API `POST /api/game-sessions/{id}/reset` — đặt lại `status=waiting`, xóa state Redis (players, leaderboard, plan…), **giữ** bản ghi `game_results` / `session_answers` của lần chơi trước.
+
+**Xóa phòng:** Admin `DELETE /admin/sessions/{id}` hoặc `POST /admin/sessions/bulk-destroy` `{ ids[] }` — purge Redis PIN, xóa file QR, xóa bản ghi session; `game_results` / `session_answers` CASCADE. **Không** xóa khi `status=playing`.
 
 ---
 

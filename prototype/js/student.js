@@ -1702,11 +1702,14 @@ const SCREENS = [
   'final',
 ];
 
-document.getElementById('demoNav').innerHTML =
-  SCREENS.map(s => `<button onclick="demoGo('${s}')">${s}</button>`).join('') +
-  FAKE_QUESTIONS.map((q, i) =>
-    `<button onclick="demoQuestion(${i})" title="${q.id}">q${i + 1}</button>`
-  ).join('');
+const demoNav = document.getElementById('demoNav');
+if (demoNav) {
+  demoNav.innerHTML =
+    SCREENS.map(s => `<button onclick="demoGo('${s}')">${s}</button>`).join('') +
+    FAKE_QUESTIONS.map((q, i) =>
+      `<button onclick="demoQuestion(${i})" title="${q.id}">q${i + 1}</button>`
+    ).join('');
+}
 
 function demoQuestion(i) {
   buildStudentsFromStorage();
@@ -1842,6 +1845,16 @@ function setupStudentBackendBridge() {
       }));
     }
     showScreen('final');
+  });
+
+  HTDBridge.on('roomClosed', (data) => {
+    alert(data?.message || 'Phòng đã được giáo viên kết thúc.');
+    HTD.setRoom(null);
+    HTD.setPlayers([]);
+    if (typeof HTDSocket !== 'undefined' && HTDSocket.getSocket) {
+      HTDSocket.getSocket()?.disconnect();
+    }
+    showScreen('home');
   });
 
   HTDBridge.on('roomError', data => {

@@ -34,11 +34,21 @@ class FeedbackController extends Controller
             }
         }
 
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('body', 'like', '%'.$search.'%')
+                    ->orWhere('page_url', 'like', '%'.$search.'%')
+                    ->orWhere('page_title', 'like', '%'.$search.'%');
+            });
+        }
+
         $feedback = $query->paginate(20)->withQueryString();
 
         return view('admin.feedback.index', [
             'feedback' => $feedback,
             'isAdmin' => $user->isAdmin(),
+            'search' => $search,
         ]);
     }
 

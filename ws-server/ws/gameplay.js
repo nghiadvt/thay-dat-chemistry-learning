@@ -92,6 +92,24 @@ function registerGameplayHandlers(io, redis) {
       }
     });
 
+    socket.on('host_close_room', async (_payload, ack) => {
+      try {
+        await requireHost(socket);
+        const pin = socket.data.pin;
+        io.to(pin).emit('room_closed', { message: 'Phòng đã được giáo viên kết thúc.' });
+        const keys = await redis.keys(`room:${pin}*`);
+        if (keys.length) await redis.del(...keys);
+        await redis.del(leaderboardKey(pin));
+        const submittedKeys = await redis.keys(`submitted:${pin}:*`);
+        if (submittedKeys.length) await redis.del(...submittedKeys);
+        if (typeof ack === 'function') ack({ success: true });
+      } catch (err) {
+        const message = err.message || 'Không thể kết thúc phòng.';
+        socket.emit('room_error', { message });
+        if (typeof ack === 'function') ack({ success: false, error: message });
+      }
+    });
+
     socket.on('submit_answer', async (payload = {}, ack) => {
       try {
         const pin = socket.data?.pin;
@@ -267,6 +285,74 @@ async function emitNewQuestionToStudentSocket(io, redis, pin, socket, quiz, ques
   }
 
   socket.emit('new_question', studentPayload);
+}
+
+async function buildFinalLeaderboardPayload(redis, pin) {
+  const entries = await redis.zrevrange(leaderboardKey(pin), 0, -1, 'WITHSCORES');
+  const finalLeaderboard = [];
+  const allPlayers = await redis.hgetall(playersKey(pin));
+
+  for (let i = 0; i < entries.length; i += 2) {
+    const playerName = entries[i];
+    const score = Number(entries[i + 1]);
+    const playerRaw = allPlayers[playerName];
+    const player = playerRaw ? JSON.parse(playerRaw) : { name: playerName };
+    finalLeaderboard.push({
+      name: playerName,
+      score,
+      rank: finalLeaderboard.length + 1,
+      player_token: player.player_token || null,
+      avatar: player.avatar || null,
+    });
+  }
+
+  return finalLeaderboard;
+}
+
+/** GV quay lại khi game đang chơi / đã kết thúc — đồng bộ UI host. */
+async function syncLateJoinHost(io, redis, socket, pin) {
+  if (!socket.data?.isHost) return;
+
+  const room = await redis.hgetall(roomKey(pin));
+
+  if (room.status === 'ended') {
+    const finalLeaderboard = await buildFinalLeaderboardPayload(redis, pin);
+    socket.emit('game_ended', { final_leaderboard: finalLeaderboard });
+    return;
+  }
+
+  if (room.status !== 'playing') return;
+
+  if (duckRace.isDuckRaceRoom(room)) {
+    await duckRace.syncLateJoinHost(io, redis, socket, pin);
+    return;
+  }
+
+  if (!room.current_question_id) {
+    socket.emit('game_started', {});
+    return;
+  }
+
+  const plan = await getPlan(redis, pin);
+  const quizIndex = Number(room.quiz_index || 0);
+  const questionIndex = Number(room.question_index || 0);
+  const quiz = plan[quizIndex];
+  const question = quiz.questions[questionIndex];
+  const startedAt = Number(room.question_started_at);
+  const finalized = await redis.get(finalizedKey(pin, question.id));
+
+  socket.emit('game_started', {});
+  if (finalized) return;
+
+  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt);
+  socket.emit('new_question', {
+    ...studentPayload,
+    correct_index: question.correct_index,
+    correct_answer_normalized: question.correct_answer_normalized,
+    correct_answer: question.correct_answer,
+    explanation: question.explanation,
+  });
+  await emitSubmitCount(io, redis, pin, question.id);
 }
 
 /** HS join sau khi game đã bắt đầu — đồng bộ câu hiện tại + timer theo question_started_at. */
@@ -644,23 +730,7 @@ async function endGame(io, redis, pin) {
   if (room.status === 'ended') return;
 
   const session = await getSessionByPin(pin);
-  const entries = await redis.zrevrange(leaderboardKey(pin), 0, -1, 'WITHSCORES');
-  const finalLeaderboard = [];
-  const allPlayers = await redis.hgetall(playersKey(pin));
-
-  for (let i = 0; i < entries.length; i += 2) {
-    const playerName = entries[i];
-    const score = Number(entries[i + 1]);
-    const playerRaw = allPlayers[playerName];
-    const player = playerRaw ? JSON.parse(playerRaw) : { name: playerName };
-    finalLeaderboard.push({
-      name: playerName,
-      score,
-      rank: finalLeaderboard.length + 1,
-      player_token: player.player_token || null,
-      avatar: player.avatar || null,
-    });
-  }
+  const finalLeaderboard = await buildFinalLeaderboardPayload(redis, pin);
 
   if (session) {
     await updateSessionStatus(pin, 'ended', { ended_at: new Date() });
@@ -728,4 +798,5 @@ async function mapShuffledAnswer(redis, pin, questionId, studentName, question, 
 module.exports = {
   registerGameplayHandlers,
   syncLateJoinStudent,
+  syncLateJoinHost,
 };

@@ -243,6 +243,7 @@ html, body {
 .result-rank[hidden] { display: none; }
 
 .demo-nav {
+  display: none !important;
   position: fixed;
   bottom: 0;
   left: 50%;

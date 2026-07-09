@@ -15,6 +15,7 @@ const HTDBridge = (function () {
     answerFeedback: [],
     raceUpdate: [],
     playerFinished: [],
+    roomClosed: [],
   };
 
   let roomMeta = null;
@@ -48,6 +49,7 @@ const HTDBridge = (function () {
     HTDSocket.on('answer_feedback', data => emitLocal('answerFeedback', data));
     HTDSocket.on('race_update', data => emitLocal('raceUpdate', data));
     HTDSocket.on('player_finished', data => emitLocal('playerFinished', data));
+    HTDSocket.on('room_closed', data => emitLocal('roomClosed', data));
   }
 
   async function init() {
@@ -83,6 +85,10 @@ const HTDBridge = (function () {
     return HTDSocket.emit('host_end_game', {});
   }
 
+  async function hostCloseRoom() {
+    return HTDSocket.emit('host_close_room', {});
+  }
+
   async function submitAnswer(questionId, answer) {
     return HTDSocket.emit('submit_answer', {
       question_id: questionId,
@@ -107,6 +113,7 @@ const HTDBridge = (function () {
     hostFinalizeQuestion,
     hostNextQuestion,
     hostEndGame,
+    hostCloseRoom,
     submitAnswer,
     getRoomMeta,
     setRoomMeta,

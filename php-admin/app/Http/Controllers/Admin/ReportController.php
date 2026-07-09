@@ -30,9 +30,18 @@ class ReportController extends Controller
             $query->whereDate('ended_at', '<=', $request->string('date_to'));
         }
 
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('pin', 'like', '%'.$search.'%')
+                    ->orWhere('name', 'like', '%'.$search.'%');
+            });
+        }
+
         return view('admin.reports.index', [
             'sessions' => $query->paginate(20)->withQueryString(),
             'games' => Game::orderBy('name')->get(),
+            'search' => $search,
         ]);
     }
 

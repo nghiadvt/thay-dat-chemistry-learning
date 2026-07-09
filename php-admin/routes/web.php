@@ -70,13 +70,20 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/export', [AdminDashboardController::class, 'export'])->name('dashboard.export');
 
         Route::resource('keyboards', AdminKeyboardController::class)->except(['show', 'update']);
         Route::get('keyboards/{keyboard}/editor', [AdminKeyboardController::class, 'editor'])->name('keyboards.editor');
         Route::resource('games', AdminGameController::class)->except(['show']);
+        Route::get('quizzes/export-csv', [AdminQuizController::class, 'exportCsv'])->name('quizzes.export-csv');
+        Route::get('quizzes/import-template', [AdminQuizController::class, 'importTemplate'])->name('quizzes.import-template');
+        Route::post('quizzes/import-csv', [AdminQuizController::class, 'importCsv'])->name('quizzes.import-csv');
         Route::resource('quizzes', AdminQuizController::class);
         Route::patch('quizzes/{quiz}/active', [AdminQuizController::class, 'toggleActive'])->name('quizzes.toggle-active');
 
+        Route::get('question-bank/export-csv', [AdminQuestionBankController::class, 'exportCsv'])->name('question-bank.export-csv');
+        Route::get('question-bank/import-template', [AdminQuestionBankController::class, 'importTemplate'])->name('question-bank.import-template');
+        Route::post('question-bank/import-csv', [AdminQuestionBankController::class, 'importCsv'])->name('question-bank.import-csv');
         Route::get('question-bank/search', [AdminQuestionBankController::class, 'search'])->name('question-bank.search');
         Route::patch('question-bank/bulk-tags', [AdminQuestionBankController::class, 'bulkUpdateTags'])->name('question-bank.bulk-tags');
         Route::patch('question-bank/{question_bank}/tags', [AdminQuestionBankController::class, 'updateTags'])->name('question-bank.update-tags');
@@ -100,10 +107,14 @@ Route::middleware('auth')->group(function () {
         Route::get('sessions', [AdminSessionController::class, 'index'])->name('sessions.index');
         Route::get('sessions/create', [AdminSessionController::class, 'create'])->name('sessions.create');
         Route::post('sessions', [AdminSessionController::class, 'store'])->name('sessions.store');
+        Route::post('sessions/bulk-destroy', [AdminSessionController::class, 'bulkDestroy'])->name('sessions.bulk-destroy');
         Route::get('sessions/{session}/edit', [AdminSessionController::class, 'edit'])->name('sessions.edit');
         Route::put('sessions/{session}', [AdminSessionController::class, 'update'])->name('sessions.update');
+        Route::delete('sessions/{session}', [AdminSessionController::class, 'destroy'])->name('sessions.destroy');
         Route::get('sessions/{session}', [AdminSessionController::class, 'show'])->name('sessions.show');
         Route::post('sessions/{session}/reset', [AdminSessionController::class, 'reset'])->name('sessions.reset');
+        Route::post('sessions/{session}/close', [AdminSessionController::class, 'close'])->name('sessions.close');
+        Route::post('sessions/{session}/regenerate-pin', [AdminSessionController::class, 'regeneratePin'])->name('sessions.regenerate-pin');
         Route::patch('sessions/{session}/active', [AdminSessionController::class, 'toggleActive'])->name('sessions.toggle-active');
 
         Route::get('reports', [AdminReportController::class, 'index'])->name('reports.index');

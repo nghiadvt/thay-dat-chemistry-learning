@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-09 (đua vịt: duck_sprite, lane_bounds, Redis duck pool)
+**Cập nhật lần cuối:** 2026-07-09 (CSV Quiz + Bộ câu hỏi)
 
 ---
 
@@ -45,7 +45,8 @@ Lỗi:
 | POST | `/login` | `{ email, password }` → session |
 | POST | `/logout` | Hủy session (cần auth) |
 | GET | `/dashboard` | Redirect → `/admin` |
-| GET | `/admin` | Dashboard admin (stats, quick links) |
+| GET | `/admin` | **Dashboard** — KPI, biểu đồ (14 ngày, trạng thái phòng, top game), phòng/báo cáo gần đây, thao tác nhanh |
+| GET | `/admin/dashboard/export` | **CSV tổng quan** — chỉ số hệ thống + tối đa 200 phiên kết thúc gần nhất (admin: toàn hệ thống; GV: phòng của mình) |
 
 ### 2.2 Admin web UI (session auth, Blade)
 
@@ -57,12 +58,18 @@ Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/
 | GET | `/admin/keyboards/{id}/editor` | Trình chỉnh sửa layout (Blade + `public/htd-admin/js/keyboard-editor.js`, `keyboard-editor.css`). Thu phóng: `#kbeZoomSelect` (`50%`/`75%`/`100%`/`150%`). Nút **Test** mô phỏng nhập công thức theo `config.smart_context` — xem §3.1 |
 | GET/POST | `/admin/games` | CRUD game |
 | GET/POST | `/admin/quizzes` | CRUD quiz (+ `show` xem câu hỏi) |
+| GET | `/admin/quizzes/export-csv` | **CSV quiz** — query `columns` (comma-separated keys), `q`, `game_id`, `tag_id`; UTF-8 BOM |
+| GET | `/admin/quizzes/import-template` | **File mẫu CSV quiz** — query `columns` tùy chọn |
+| POST | `/admin/quizzes/import-csv` | **Nhập CSV quiz** — multipart `csv_file`; bắt buộc header: Tên, Game, Bàn phím |
 | GET/POST | `/admin/quizzes/{quiz}/questions` | CRUD câu hỏi nested |
 | POST | `/admin/quizzes/{quiz}/questions/from-bank` | JSON `{ bank_ids: [1,2,3] }` — copy từ bộ câu hỏi |
 | PATCH | `/admin/quizzes/{quiz}/questions/reorder` | JSON `{ order: [qid, ...] }` — cập nhật `sort_order` |
 | PATCH | `/admin/quizzes/{quiz}/questions/bulk` | JSON `{ question_ids, time_limit_seconds?, points?, is_active?, tag_ids?, action?: "delete" }` |
 | PATCH | `/admin/quizzes/{quiz}/questions/{question}/tags` | JSON `{ tag_ids: [1,2] }` — đổi chủ đề nhanh (sync qua `source_bank_question_id`) |
 | GET/POST | `/admin/question-bank` | CRUD bộ câu hỏi (tag multi-select) |
+| GET | `/admin/question-bank/export-csv` | **CSV bộ câu hỏi** — query `columns`, `q`, `answer_type`, `tag_ids[]`, `tag_none`, `tag_match` |
+| GET | `/admin/question-bank/import-template` | **File mẫu CSV bộ câu hỏi** |
+| POST | `/admin/question-bank/import-csv` | **Nhập CSV bộ câu hỏi** — bắt buộc header: Loại, Nội dung; MC/essay cần thêm cột tương ứng |
 | PATCH | `/admin/question-bank/bulk-tags` | JSON `{ item_ids: [1,2], tag_ids: [3] }` — đổi chủ đề hàng loạt |
 | PATCH | `/admin/question-bank/{id}/tags` | JSON `{ tag_ids: [1,2] }` — đổi chủ đề nhanh trên danh sách bộ |
 | GET | `/admin/question-bank/search` | JSON lọc câu cho modal; query `tag_ids[]`, `tag_match=and\|or` (mặc định `and`), `tag_none=1`, `answer_type`, `q`, `quiz_id` (tương thích `tag_id` cũ) |
@@ -74,6 +81,10 @@ Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/
 | PUT | `/admin/sessions/{id}` | Cập nhật sau form edit |
 | GET | `/admin/sessions/{id}` | Điều khiển phòng (host Blade + WS) |
 | POST | `/admin/sessions/{id}/reset` | **Chơi lại** phòng `ended` → `waiting`, xóa Redis state, giữ kết quả cũ trong DB |
+| POST | `/admin/sessions/{id}/close` | **Kết thúc phòng** — `is_active=false`, purge Redis; client host gọi thêm `host_close_room` |
+| POST | `/admin/sessions/{id}/regenerate-pin` | **Đổi PIN + QR** (chỉ khi `status≠playing`); migrate Redis sang PIN mới |
+| DELETE | `/admin/sessions/{id}` | **Xóa phòng** — purge Redis + QR; CASCADE kết quả/câu trả lời; chặn khi `status=playing` |
+| POST | `/admin/sessions/bulk-destroy` | `{ ids: number[] }` — xóa nhiều phòng; bỏ qua phòng `playing`, flash cảnh báo nếu có |
 | GET | `/admin/reports` | Lịch sử session `ended` |
 | GET | `/admin/reports/{id}` | Chi tiết điểm |
 | GET | `/admin/reports/{id}/export` | Tải CSV UTF-8 |
@@ -300,6 +311,7 @@ Widget floating trên mọi trang admin (`layouts/admin.blade.php`). Client gử
 | `host_finalize_question` | `{}` | **Host only** — chốt câu, chấm điểm, gửi `question_result` |
 | `host_next_question` | `{}` | **Host only** — câu tiếp theo hoặc kết thúc nếu hết |
 | `host_end_game` | `{}` | **Host only** — kết thúc sớm, lưu `game_results` |
+| `host_close_room` | `{}` | **Host only** — broadcast `room_closed`, xóa Redis phòng (dùng cùng `POST /admin/sessions/{id}/close`) |
 | `submit_answer` | `{ question_id, answer, hybrid_timestamp }` | **Student only** — nộp / đổi đáp án trong lúc câu mở |
 
 **Ack `submit_answer` thành công:** `{ success: true, data: { locked, elapsed_seconds, answer_display, can_change } }` — **không** chấm điểm. `elapsed_seconds` = giây từ `question_started_at` đến `last_submit_at` (cập nhật khi HS đổi đáp án). Chấm điểm khi finalize vẫn dùng `first_submit_at`.
@@ -333,12 +345,13 @@ Redis: `room:{PIN}:answer:{question_id}:{student_name}` lưu `{ answer, first_su
 | `game_started` | `{}` hoặc `{ play_mode, mode_config? }` | GV bấm Start. `duck_race`: kèm config |
 | `new_question` | xem §9.3 | Câu hỏi mới |
 | `answer_feedback` | `{ correct, score_delta, total_score, position, correct_answer?, finish_rank?, target_score? }` | **`duck_race` only** — sau `submit_answer`, gửi riêng HS. `position`: 0–100 từ `max(0, total_score)` |
-| `race_update` | `{ players: [{ name, avatar, duck_sprite?, score, position, finished, finish_rank }], target_score, track_steps }` | **`duck_race`** — broadcast phòng. `duck_sprite`: path tương đối trong `duck-race/` (VD `ducks/duck-blue.gif`). `position`: **0–100** (% đường đua), tính từ `max(0, score) / target_score`; `score` có thể âm |
+| `race_update` | `{ players: [{ name, avatar, duck_sprite?, score, position, finished, finish_rank }], target_score, track_steps }` | **`duck_race`** — broadcast phòng. `duck_sprite`: path tương đối trong `duck-race/` (VD `ducks/duck-blue.gif`). `position`: **0–100** (% đường đua), tính từ `max(0, score) / target_score`; `score` có thể âm. **Host render** (`duck-race-host.js`): map `position` → trục **X** (`left` % trong `mode_config.visual.track_bounds`); trục **Y** cố định/HS trong pond `lane_bounds` (client-only, không có trong payload). Chỉ animate `left` |
 | `player_finished` | `{ name, finish_rank, total_score }` | **`duck_race`** — HS chạm mốc về đích |
 | `question_result` | xem §9.3.1 | **Khi hết câu** (finalize); gửi riêng từng HS |
 | `leaderboard_update` | `{ top5: [{ name, score, delta, avatar }] }` | Broadcast phòng; `avatar` từ Redis player |
 | `submit_count_update` | `{ submitted, total }` | **Chỉ host** |
 | `game_ended` | `{ final_leaderboard: [{ name, score, rank, finish_rank?, player_token?, avatar }], play_mode? }` | Kết thúc game |
+| `room_closed` | `{ message }` | Phòng bị GV kết thúc — HS thoát về trang chủ |
 
 Callback ack (tùy chọn): client truyền function làm tham số cuối → `{ success, data?, error? }`.
 
@@ -437,6 +450,17 @@ POST /api/game-sessions (Laravel) → Redis room:{pin}
    - `rank` = 1-based theo thứ tự điểm giảm dần
 
 Sau khi kết thúc, client/teacher có thể đọc `GET /api/reports/sessions/{id}` (`status: ended`, kèm `results`, `answers`).
+
+### 9.7 Đua vịt — host layout (`duck_race`)
+
+Trang host `/admin/sessions/{id}` — `duck-race-host.js` + `duck-race-host.css` (không qua WS payload).
+
+| Trục | Nguồn | Hành vi |
+|---|---|---|
+| **X** (tiến độ) | `race_update.players[].position` + `mode_config.visual.track_bounds` | `left` % = `start_pct + (position/100) × (end_pct − start_pct)`. Mọi vịt cùng X khi `position=0`. Transition `left` theo `duck_swim_ms` |
+| **Y** (vị trí dọc) | `mode_config.visual.lane_bounds` + gán client | Pond `#duckRaceLanes` căn theo ảnh nền (`object-fit: contain`). Mỗi `name` nhận `bottom` % cố định lần đầu (spread trong pond), **không đổi** khi `race_update`. Không lệch ngang khi trùng tiến độ |
+
+`game_started.mode_config` và `ADMIN_BOOT.session.modeConfig` cung cấp `track_bounds`, `lane_bounds`, `duck_sprite_px`, `duck_swim_ms` cho layout. Chi tiết luồng gameplay: [`APP_LOGIC.md`](APP_LOGIC.md) §3.2.
 
 ---
 

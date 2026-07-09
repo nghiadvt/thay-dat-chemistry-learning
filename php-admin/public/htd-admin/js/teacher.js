@@ -145,6 +145,42 @@ function initTeacherApp() {
   }
 }
 
+function mapRoomStatusFromServer(status) {
+  if (status === 'playing') return 'started';
+  if (status === 'ended') return 'ended';
+  return 'waiting';
+}
+
+function restoreTeacherRoomFromJoin(joinData) {
+  const room = HTD.getRoom();
+  if (!room || !joinData) return;
+
+  const serverStatus = joinData.room_status || 'waiting';
+  room.status = mapRoomStatusFromServer(serverStatus);
+
+  if (serverStatus === 'playing') {
+    const game = ensureTeacherGameState(room);
+    if (room.playModeSlug === 'duck_race' || joinData.play_mode === 'duck_race') {
+      game.phase = 'duck_race';
+      if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.showPhase();
+    } else if (joinData.question_index != null) {
+      teacherState.serverQuestionIndex = Number(joinData.question_index) + 1;
+      game.questionIndex = Number(joinData.question_index);
+      game.phase = 'waiting';
+    }
+    room.startedAt = room.startedAt || Date.now();
+  } else if (serverStatus === 'ended') {
+    const game = ensureTeacherGameState(room);
+    game.phase = 'final';
+    if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
+  } else {
+    room.game = null;
+    if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
+  }
+
+  HTD.setRoom(room);
+}
+
 function joinExistingRoomFromAdmin(pin, params) {
   const gameId = parseInt(params.get('game_id'), 10) || null;
   const sessionId = parseInt(params.get('session_id'), 10) || null;
@@ -165,7 +201,7 @@ function joinExistingRoomFromAdmin(pin, params) {
         joinUrl: boot.joinUrl || null,
         qrUrl: boot.qrUrl || null,
         teacher: boot.hostName || 'Giáo viên',
-        status: boot.status === 'playing' ? 'started' : boot.status === 'ended' ? 'ended' : 'waiting',
+        status: mapRoomStatusFromServer(roomData.status || boot.status),
         backendMode: true,
         sessionId: sessionId || roomData.session_id,
         gameId: gameId || roomData.game_id,
@@ -178,7 +214,10 @@ function joinExistingRoomFromAdmin(pin, params) {
         isHost: true,
       });
     })
-    .then(() => showTeacherScreen('dashboard'))
+    .then((joinData) => {
+      restoreTeacherRoomFromJoin(joinData);
+      showTeacherScreen('dashboard');
+    })
     .catch(err => {
       const msg = err.message || 'Không vào được phòng.';
       if (/Unauthenticated|401|419|đăng nhập/i.test(msg)) {
@@ -1510,8 +1549,23 @@ function teacherPlayAgain() {
 }
 
 function resetTeacherRoom() {
-  if (!confirm('Tạo phòng mới? Danh sách học sinh sẽ bị xóa.')) return;
+  if (!confirm('Kết thúc phòng? Học sinh sẽ bị đưa ra và phòng chuyển sang trạng thái tắt.')) return;
   closeTeacherActionMenu();
+
+  const room = HTD.getRoom();
+  if (isBackendMode() && room?.sessionId) {
+    const closePromise = HTDApi.closeSession(room.sessionId);
+    const wsPromise = HTDBridge.hostCloseRoom().catch(() => {});
+    Promise.all([closePromise, wsPromise])
+      .then(() => {
+        localStorage.removeItem(HTD.LS_ROOM);
+        localStorage.removeItem(HTD.LS_PLAYERS);
+        window.location.href = (window.ADMIN_BOOT?.apiBase || '').replace(/\/$/, '') + '/admin/sessions';
+      })
+      .catch((err) => alert(err.message || 'Không kết thúc được phòng.'));
+    return;
+  }
+
   localStorage.removeItem(HTD.LS_ROOM);
   localStorage.removeItem(HTD.LS_PLAYERS);
   teacherState.fakeScores = {};

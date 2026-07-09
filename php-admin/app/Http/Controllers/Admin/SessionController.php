@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\GameSession;
 use App\Models\Quiz;
+use App\Models\User;
 use App\Services\GamePlayModeResolver;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
 use App\Services\PinGenerator;
 use App\Services\RedisRoomService;
 use App\Services\SessionQrService;
@@ -24,14 +27,55 @@ class SessionController extends Controller
         private SessionQrService $sessionQrService,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $sessions = GameSession::query()
-            ->with(['game:id,name', 'quiz:id,name', 'host:id,name'])
-            ->orderByDesc('created_at')
-            ->paginate(20);
+        $query = GameSession::query()
+            ->with(['game:id,name', 'quiz:id,name', 'host:id,name']);
 
-        return view('admin.sessions.index', compact('sessions'));
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('pin', 'like', '%'.$search.'%');
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status')->toString());
+        }
+
+        if ($request->has('is_active') && $request->input('is_active') !== '') {
+            $query->where('is_active', $request->boolean('is_active'));
+        }
+
+        if ($request->filled('game_id')) {
+            $query->where('game_id', $request->integer('game_id'));
+        }
+
+        if ($request->filled('host_id')) {
+            $query->where('host_id', $request->integer('host_id'));
+        }
+
+        if ($request->filled('created_from')) {
+            $query->whereDate('created_at', '>=', $request->date('created_from'));
+        }
+
+        if ($request->filled('created_to')) {
+            $query->whereDate('created_at', '<=', $request->date('created_to'));
+        }
+
+        $sessions = $query
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $games = Game::query()->orderBy('name')->get(['id', 'name']);
+        $hosts = User::query()
+            ->whereIn('id', GameSession::query()->whereNotNull('host_id')->distinct()->pluck('host_id'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('admin.sessions.index', compact('sessions', 'games', 'hosts', 'search'));
     }
 
     public function create(): View
@@ -174,6 +218,7 @@ class SessionController extends Controller
 
     public function show(GameSession $session): View
     {
+        $session = $this->syncSessionStatusFromRedis($session);
         $session->load(['game.playMode', 'quiz', 'host']);
 
         $joinUrl = $this->sessionQrService->joinUrl($session);
@@ -183,12 +228,104 @@ class SessionController extends Controller
         return view('admin.sessions.show', compact('session', 'joinUrl', 'qrUrl'));
     }
 
+    public function close(GameSession $session): RedirectResponse
+    {
+        $session->update(['is_active' => false]);
+        $this->redisRoomService->purgeRoom($session->pin);
+
+        return redirect()
+            ->route('admin.sessions.index')
+            ->with('success', "Đã kết thúc phòng «{$session->name}» — PIN {$session->pin} đã tắt.");
+    }
+
+    public function regeneratePin(GameSession $session): RedirectResponse
+    {
+        if ($session->status === 'playing') {
+            return back()->with('error', 'Không thể đổi PIN khi game đang chơi. Kết thúc trò chơi hoặc phòng trước.');
+        }
+
+        $oldPin = $session->pin;
+        $newPin = $this->pinGenerator->generateUniquePin($oldPin);
+
+        $session->loadMissing('game.playMode');
+        $playMode = app(GamePlayModeResolver::class)->forGame($session->game);
+        $playModeSlug = $session->play_mode_slug ?: $playMode['play_mode_slug'];
+        $modeConfig = $session->mode_config ?: $playMode['mode_config'];
+
+        $this->redisRoomService->migrateRoomPin(
+            $oldPin,
+            $newPin,
+            (int) $session->game_id,
+            $session->quiz_id ? (int) $session->quiz_id : null,
+            $playModeSlug,
+            $modeConfig,
+        );
+
+        if ($session->status === 'ended') {
+            $session->update([
+                'pin' => $newPin,
+                'status' => 'waiting',
+                'started_at' => null,
+                'ended_at' => null,
+            ]);
+        } else {
+            $session->update(['pin' => $newPin]);
+        }
+
+        Storage::disk('public')->delete([
+            "sessions/{$oldPin}.png",
+            "sessions/{$oldPin}.joinurl",
+        ]);
+
+        try {
+            $this->sessionQrService->ensureQr($session->fresh());
+        } catch (\Throwable) {
+            // QR CDN fallback on next page load
+        }
+
+        return back()->with('success', "Đã đổi PIN phòng «{$session->name}»: {$oldPin} → {$newPin}. QR đã cập nhật.");
+    }
+
+    private function syncSessionStatusFromRedis(GameSession $session): GameSession
+    {
+        $redis = Redis::connection('rooms');
+        $key = "room:{$session->pin}";
+
+        if (! $redis->exists($key)) {
+            if ($session->status === 'playing') {
+                $session->update([
+                    'status' => 'ended',
+                    'ended_at' => $session->ended_at ?? now(),
+                ]);
+            }
+
+            return $session->fresh();
+        }
+
+        $redisStatus = $redis->hGet($key, 'status');
+        if (! $redisStatus || $redisStatus === $session->status) {
+            return $session;
+        }
+
+        $updates = ['status' => $redisStatus];
+        if ($redisStatus === 'ended' && ! $session->ended_at) {
+            $updates['ended_at'] = now();
+        }
+        if ($redisStatus === 'playing' && ! $session->started_at) {
+            $updates['started_at'] = now();
+        }
+
+        $session->update($updates);
+
+        return $session->fresh();
+    }
+
     public function toggleActive(GameSession $session): RedirectResponse
     {
         $session->update(['is_active' => ! $session->is_active]);
 
         if (! $session->is_active) {
-            $this->redisRoomService->destroyRoom($session->pin);
+            $this->redisRoomService->purgeRoom($session->pin);
         } elseif ($session->status === 'waiting') {
             $this->redisRoomService->createWaitingRoom($session->pin, $session->game_id, $session->quiz_id);
         } elseif ($session->status === 'ended') {
@@ -223,5 +360,88 @@ class SessionController extends Controller
         return redirect()
             ->route('admin.sessions.show', $session)
             ->with('success', "Đã reset phòng «{$session->name}» — PIN {$session->pin} sẵn sàng chơi lại.");
+    }
+
+    public function destroy(GameSession $session): RedirectResponse
+    {
+        $label = $session->name ?? $session->pin;
+
+        if ($error = $this->deleteSession($session)) {
+            return back()->with('error', $error);
+        }
+
+        return redirect()
+            ->route('admin.sessions.index')
+            ->with('success', "Đã xóa phòng «{$label}».");
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', Rule::exists('game_sessions', 'id')],
+        ]);
+
+        $sessions = GameSession::query()
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        $deleted = 0;
+        $skipped = [];
+
+        foreach ($sessions as $session) {
+            $label = $session->name ?? $session->pin;
+            if ($error = $this->deleteSession($session)) {
+                $skipped[] = $label;
+
+                continue;
+            }
+            $deleted++;
+        }
+
+        if ($deleted === 0) {
+            return back()->with('error', $skipped
+                ? 'Không xóa được phòng nào. Phòng đang chơi không thể xóa.'
+                : 'Không có phòng nào được xóa.');
+        }
+
+        $message = "Đã xóa {$deleted} phòng.";
+        if ($skipped !== []) {
+            $message .= ' Bỏ qua '.count($skipped).' phòng đang chơi: '.implode(', ', $skipped).'.';
+        }
+
+        return redirect()
+            ->route('admin.sessions.index')
+            ->with($skipped !== [] && $deleted > 0 ? 'warning' : 'success', $message);
+    }
+
+    /**
+     * @return string|null Error message when delete is blocked; null on success.
+     */
+    private function deleteSession(GameSession $session): ?string
+    {
+        if ($session->status === 'playing') {
+            $label = $session->name ?? $session->pin;
+
+            return "Không thể xóa phòng «{$label}» — game đang chơi.";
+        }
+
+        $pin = $session->pin;
+
+        $this->redisRoomService->purgeRoom($pin);
+
+        $paths = array_values(array_filter([
+            "sessions/{$pin}.png",
+            "sessions/{$pin}.joinurl",
+            $session->qr_path,
+        ]));
+
+        if ($paths !== []) {
+            Storage::disk('public')->delete($paths);
+        }
+
+        $session->delete();
+
+        return null;
     }
 }

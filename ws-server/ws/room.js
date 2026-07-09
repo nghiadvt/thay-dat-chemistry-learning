@@ -31,7 +31,10 @@ function registerRoomHandlers(io, redis) {
       try {
         const result = await handleJoinRoom(io, redis, socket, payload);
         socket.emit('room_joined', result);
-        if (!payload.is_host && result.room_status === 'playing') {
+        if (payload.is_host && (result.room_status === 'playing' || result.room_status === 'ended')) {
+          const { syncLateJoinHost } = require('./gameplay');
+          await syncLateJoinHost(io, redis, socket, result.pin);
+        } else if (!payload.is_host && result.room_status === 'playing') {
           const { syncLateJoinStudent } = require('./gameplay');
           await syncLateJoinStudent(io, redis, socket, result.pin);
         }
@@ -79,7 +82,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
   }
 
   const room = await redis.hgetall(roomKey(pin));
-  if (room.status === 'ended') {
+  if (room.status === 'ended' && !isHost) {
     throw new Error('Phòng đã kết thúc.');
   }
 

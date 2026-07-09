@@ -14,15 +14,26 @@ use Illuminate\View\View;
 
 class GameController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $games = Game::query()
+        $query = Game::query()
             ->with('playMode')
             ->withCount('quizzes')
-            ->orderByDesc('updated_at')
-            ->get();
+            ->orderByDesc('updated_at');
 
-        return view('admin.games.index', compact('games'));
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where('name', 'like', '%'.$search.'%');
+        }
+
+        if ($request->filled('play_mode_id')) {
+            $query->where('play_mode_id', $request->integer('play_mode_id'));
+        }
+
+        $games = $query->paginate(12)->withQueryString();
+        $playModes = PlayMode::query()->orderBy('name')->get(['id', 'name']);
+
+        return view('admin.games.index', compact('games', 'search', 'playModes'));
     }
 
     public function create(): View

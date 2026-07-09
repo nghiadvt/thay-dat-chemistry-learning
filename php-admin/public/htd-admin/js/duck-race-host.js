@@ -4,10 +4,11 @@
 const DuckRaceHost = (function () {
   const DUCK_ASSET_BASE = '/htd-admin/assets/duck-race/';
   const DUCK_FALLBACK = `${DUCK_ASSET_BASE}ducks/duck-blue.gif`;
-  const COLLISION_SPREAD_PX = 14;
   let lastPlayers = [];
   let targetScore = 30;
   let trackLayoutObserver = null;
+  /** Y cố định theo từng HS (% chiều cao pond) — chỉ gán lần đầu, không đổi khi điểm thay đổi. */
+  const playerLaneBottomPct = new Map();
 
   function isDuckRaceMode() {
     const boot = window.ADMIN_BOOT?.session;
@@ -128,30 +129,22 @@ const DuckRaceHost = (function () {
     return start + progress * (end - start);
   }
 
-  function getSingleLaneBottomPct() {
-    return 12;
+  function ensureLaneAssignments(playerNames) {
+    const sorted = [...playerNames].sort((a, b) => a.localeCompare(b));
+    const n = sorted.length;
+    for (const name of sorted) {
+      if (playerLaneBottomPct.has(name)) continue;
+      const index = sorted.indexOf(name);
+      const pct = n <= 1 ? 50 : 8 + (index / Math.max(1, n - 1)) * 72;
+      playerLaneBottomPct.set(name, pct);
+    }
+    for (const name of [...playerLaneBottomPct.keys()]) {
+      if (!playerNames.includes(name)) playerLaneBottomPct.delete(name);
+    }
   }
 
-  function computeCollisionOffsets(players) {
-    const offsets = new Map();
-    const groups = new Map();
-    for (const p of players) {
-      const key = Math.round(duckLeftPercent(p) * 2) / 2;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(p);
-    }
-    for (const group of groups.values()) {
-      if (group.length <= 1) {
-        offsets.set(group[0].name, 0);
-        continue;
-      }
-      const sorted = [...group].sort((a, b) => a.name.localeCompare(b.name));
-      sorted.forEach((p, i) => {
-        const center = (sorted.length - 1) / 2;
-        offsets.set(p.name, (i - center) * COLLISION_SPREAD_PX);
-      });
-    }
-    return offsets;
+  function getPlayerLaneBottomPct(name) {
+    return playerLaneBottomPct.get(name) ?? 50;
   }
 
   function escapeHtml(text) {
@@ -183,13 +176,12 @@ const DuckRaceHost = (function () {
     wrap.style.transition = `left ${getDuckSwimMs()}ms ease-in-out`;
   }
 
-  function setDuckPosition(wrap, leftPct, collisionPx) {
+  function setDuckPosition(wrap, leftPct) {
     if (!wrap) return;
     applyDuckSwimStyle(wrap);
     const nextLeft = `${leftPct}%`;
     const prevLeft = wrap.dataset.duckLeft;
     wrap.style.left = nextLeft;
-    wrap.style.setProperty('--duck-collision-x', `${collisionPx || 0}px`);
     if (prevLeft != null && prevLeft !== nextLeft) {
       const ms = getDuckSwimMs();
       wrap.classList.add('is-swimming');
@@ -206,10 +198,10 @@ const DuckRaceHost = (function () {
     return Number.isFinite(n) ? String(n) : '0';
   }
 
-  function updateDuckElement(wrap, p, collisionPx) {
+  function updateDuckElement(wrap, p) {
     const leftPct = duckLeftPercent(p);
     wrap.classList.toggle('finished', Boolean(p.finished));
-    setDuckPosition(wrap, leftPct, collisionPx);
+    setDuckPosition(wrap, leftPct);
     applyDuckSize(wrap);
 
     const nameEl = wrap.querySelector('.duck-race-duck-badge__name');
@@ -249,7 +241,7 @@ const DuckRaceHost = (function () {
     if (spriteEl) spriteEl.src = src;
   }
 
-  function createDuckElement(p, collisionPx) {
+  function createDuckElement(p, bottomPct) {
     const { start } = getTrackBounds();
     const wrap = document.createElement('div');
     wrap.className = `duck-race-duck-wrap${p.finished ? ' finished' : ''}`;
@@ -261,8 +253,8 @@ const DuckRaceHost = (function () {
       </div>
       <img class="duck-race-duck-sprite" src="${duckImgUrl(p.duck_sprite)}" alt="">`;
     wrap.style.left = `${start}%`;
-    wrap.style.bottom = `${getSingleLaneBottomPct()}%`;
-    updateDuckElement(wrap, p, collisionPx);
+    wrap.style.bottom = `${bottomPct}%`;
+    updateDuckElement(wrap, p);
     return wrap;
   }
 
@@ -278,23 +270,22 @@ const DuckRaceHost = (function () {
     const emptyMsg = pond.querySelector('.duck-race-pond-empty');
     if (emptyMsg) emptyMsg.remove();
 
-    const collisionOffsets = computeCollisionOffsets(lastPlayers);
-    const laneBottomPct = getSingleLaneBottomPct();
+    const playerNames = lastPlayers.map((p) => p.name);
+    ensureLaneAssignments(playerNames);
 
     const existing = new Map(
       [...pond.querySelectorAll('.duck-race-duck-wrap')].map((el) => [el.dataset.playerName, el]),
     );
-    const nextNames = new Set(lastPlayers.map((p) => p.name));
+    const nextNames = new Set(playerNames);
 
     for (const p of lastPlayers) {
-      const collisionPx = collisionOffsets.get(p.name) ?? 0;
+      const bottomPct = getPlayerLaneBottomPct(p.name);
       let wrap = existing.get(p.name);
       if (!wrap) {
-        wrap = createDuckElement(p, collisionPx);
+        wrap = createDuckElement(p, bottomPct);
         pond.appendChild(wrap);
       } else {
-        wrap.style.bottom = `${laneBottomPct}%`;
-        updateDuckElement(wrap, p, collisionPx);
+        updateDuckElement(wrap, p);
       }
     }
 

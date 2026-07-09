@@ -1201,9 +1201,12 @@ window.teacherExportCsv = teacherExportCsv;
 window.demoTeacherGo = demoTeacherGo;
 
 const TEACHER_SCREENS = ['setup', 'dashboard'];
-document.getElementById('demoNav').innerHTML = TEACHER_SCREENS.map(
-  s => `<button onclick="demoTeacherGo('${s}')">${s}</button>`
-).join('');
+const demoNav = document.getElementById('demoNav');
+if (demoNav) {
+  demoNav.innerHTML = TEACHER_SCREENS.map(
+    s => `<button onclick="demoTeacherGo('${s}')">${s}</button>`
+  ).join('');
+}
 
 function demoTeacherGo(s) {
   if (s === 'dashboard' && !HTD.getRoom()) createTeacherRoom();

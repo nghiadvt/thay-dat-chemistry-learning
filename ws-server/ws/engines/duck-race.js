@@ -391,6 +391,22 @@ async function endGame(io, redis, pin) {
   });
 }
 
+async function syncLateJoinHost(io, redis, socket, pin) {
+  const room = await redis.hgetall(roomKey(pin));
+  if (room.status !== 'playing' || !isDuckRaceRoom(room)) return;
+
+  const config = parseModeConfig(room);
+  const rules = getRules(config);
+  const players = await buildRacePlayers(redis, pin, rules);
+
+  socket.emit('game_started', { play_mode: 'duck_race', mode_config: config });
+  socket.emit('race_update', {
+    players,
+    target_score: rules.targetScore,
+    track_steps: rules.trackSteps,
+  });
+}
+
 async function syncLateJoin(io, redis, socket, pin) {
   const room = await redis.hgetall(roomKey(pin));
   if (room.status !== 'playing' || !isDuckRaceRoom(room)) return;
@@ -428,4 +444,5 @@ module.exports = {
   handleSubmit,
   endGame,
   syncLateJoin,
+  syncLateJoinHost,
 };

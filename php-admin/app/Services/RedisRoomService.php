@@ -38,7 +38,42 @@ class RedisRoomService
 
     public function destroyRoom(string $pin): void
     {
-        Redis::connection('rooms')->del("room:{$pin}");
+        $this->purgeRoom($pin);
+    }
+
+    /**
+     * Xóa toàn bộ state Redis của PIN (room, players, leaderboard, submitted, …).
+     */
+    public function purgeRoom(string $pin): void
+    {
+        $redis = Redis::connection('rooms');
+
+        $roomKeys = $redis->keys("room:{$pin}*");
+        if (! empty($roomKeys)) {
+            $redis->del(...$roomKeys);
+        }
+
+        $redis->del("leaderboard:{$pin}");
+
+        $submittedKeys = $redis->keys("submitted:{$pin}:*");
+        if (! empty($submittedKeys)) {
+            $redis->del(...$submittedKeys);
+        }
+    }
+
+    /**
+     * Đổi PIN: xóa Redis cũ, tạo phòng chờ mới với PIN mới.
+     */
+    public function migrateRoomPin(
+        string $oldPin,
+        string $newPin,
+        int $gameId,
+        ?int $quizId = null,
+        ?string $playModeSlug = null,
+        ?array $modeConfig = null,
+    ): void {
+        $this->purgeRoom($oldPin);
+        $this->createWaitingRoom($newPin, $gameId, $quizId, $playModeSlug, $modeConfig);
     }
 
     /**

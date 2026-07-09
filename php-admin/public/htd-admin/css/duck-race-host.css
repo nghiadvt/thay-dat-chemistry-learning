@@ -91,10 +91,9 @@
 
 .duck-race-duck-wrap {
   position: absolute;
-  bottom: 12%;
   left: 20%;
   width: max(72px, var(--duck-sprite-px, 64px));
-  transform: translateX(calc(-50% + var(--duck-collision-x, 0px)));
+  transform: translateX(-50%);
   transition: left 1.15s ease-in-out;
   will-change: left;
   z-index: 1;
