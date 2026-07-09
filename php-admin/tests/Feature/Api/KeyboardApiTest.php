@@ -20,7 +20,7 @@ class KeyboardApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::factory()->create(['role' => 'teacher']);
+        $this->user = User::factory()->teacher()->create();
         Storage::fake('public');
     }
 

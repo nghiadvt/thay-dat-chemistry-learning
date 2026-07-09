@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\PlayMode;
+use App\Support\DuckRaceAssets;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -88,12 +89,31 @@ class GameController extends Controller
             'wrong_delta' => ['nullable', 'integer', 'min:-100', 'max:100'],
             'target_score' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'podium_size' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'track_start_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'track_end_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'lane_top_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'lane_bottom_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'duck_sprite_px' => ['nullable', 'integer', 'min:32', 'max:128'],
+            'duck_swim_ms' => ['nullable', 'integer', 'min:400', 'max:3000'],
         ]);
 
         $mode = PlayMode::findOrFail($validated['play_mode_id']);
         $modeConfig = null;
 
         if ($mode->slug === 'duck_race') {
+            $startPct = round((float) ($validated['track_start_pct'] ?? 20), 1);
+            $endPct = round((float) ($validated['track_end_pct'] ?? 90), 1);
+            if ($endPct - $startPct < 2) {
+                $endPct = min(100, $startPct + 2);
+            }
+
+            $laneTopPct = round((float) ($validated['lane_top_pct'] ?? 50), 1);
+            $laneBottomPct = round((float) ($validated['lane_bottom_pct'] ?? 92), 1);
+            if ($laneBottomPct - $laneTopPct < 5) {
+                $laneBottomPct = min(100, $laneTopPct + 5);
+            }
+
+            $targetScore = (int) ($validated['target_score'] ?? 30);
             $modeConfig = [
                 'scoring' => [
                     'correct_delta' => (int) ($validated['correct_delta'] ?? 3),
@@ -101,13 +121,38 @@ class GameController extends Controller
                     'allow_negative' => true,
                 ],
                 'win' => [
-                    'target_score' => (int) ($validated['target_score'] ?? 30),
+                    'target_score' => $targetScore,
                     'podium_size' => (int) ($validated['podium_size'] ?? 3),
+                ],
+                'visual' => [
+                    'track_steps' => $targetScore,
+                    'track_bounds' => [
+                        'start_pct' => $startPct,
+                        'end_pct' => $endPct,
+                    ],
+                    'lane_bounds' => [
+                        'top_pct' => $laneTopPct,
+                        'bottom_pct' => $laneBottomPct,
+                    ],
+                    'duck_sprite_px' => (int) ($validated['duck_sprite_px'] ?? 64),
+                    'duck_swim_ms' => (int) ($validated['duck_swim_ms'] ?? 1150),
+                    'duck_sprites' => DuckRaceAssets::listSpritePaths(),
                 ],
             ];
         }
 
-        unset($validated['correct_delta'], $validated['wrong_delta'], $validated['target_score'], $validated['podium_size']);
+        unset(
+            $validated['correct_delta'],
+            $validated['wrong_delta'],
+            $validated['target_score'],
+            $validated['podium_size'],
+            $validated['track_start_pct'],
+            $validated['track_end_pct'],
+            $validated['lane_top_pct'],
+            $validated['lane_bottom_pct'],
+            $validated['duck_sprite_px'],
+            $validated['duck_swim_ms'],
+        );
 
         if ($modeConfig) {
             $validated['mode_config'] = $modeConfig;

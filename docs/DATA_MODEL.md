@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-09 (play_modes + đua vịt `duck_race`)
+**Cập nhật lần cuối:** 2026-07-09 (đua vịt: lane_bounds, duck_sprites pool)
 
 ---
 
@@ -11,6 +11,9 @@
 
 ```mermaid
 erDiagram
+  ROLES ||--o{ USERS : "assigned"
+  USERS ||--o{ SITE_FEEDBACK : submits
+  SITE_FEEDBACK ||--o{ SITE_FEEDBACK_ATTACHMENTS : has
   PLAY_MODES ||--o{ GAMES : "mechanic"
   USERS ||--o{ GAMES : creates
   USERS ||--o{ GAME_SESSIONS : hosts
@@ -42,19 +45,70 @@ erDiagram
 
 ---
 
-## 3. Bảng `users` (Laravel + mở rộng)
-
-Bảng đã có từ Laravel default migration. **Chỉ thêm cột:**
+## 3. Bảng `roles`
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
-| `role` | `ENUM('admin','teacher') NOT NULL DEFAULT 'teacher'` | Phân quyền admin dashboard |
+| `id` | BIGINT PK | |
+| `name` | VARCHAR(64) | VD: "Giáo viên" |
+| `slug` | VARCHAR(32) UNIQUE | `admin`, `teacher` — dùng cho phân quyền sau |
+| `description` | VARCHAR(255) NULL | |
+| `created_at`, `updated_at` | TIMESTAMP | |
 
-Giữ nguyên: `id`, `name`, `email` UNIQUE, `password`, `remember_token`, `email_verified_at`, `timestamps`.
+Seed mặc định: `admin` (Quản trị viên), `teacher` (Giáo viên). **Học sinh không có account** — chưa có role `student`.
 
 ---
 
-## 4. Bảng `keyboards`
+## 4. Bảng `users` (Laravel + mở rộng)
+
+Bảng đã có từ Laravel default migration. **Thêm cột:**
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `role_id` | BIGINT FK → `roles.id` RESTRICT | Thay `ENUM role` cũ |
+| `avatar_path` | VARCHAR(255) NULL | Ảnh đại diện (`storage/app/public/avatars/`). Null → UI hiển thị initials |
+
+Giữ nguyên: `id`, `name`, `email` UNIQUE, `password`, `remember_token`, `email_verified_at`, `timestamps`.
+
+Accessor model: `avatar_url` (public URL), `initials` (2 chữ cái đầu từ `name`).
+
+---
+
+## 5. Bảng `site_feedback`
+
+Góp ý nội bộ từ GV/admin qua widget floating trên mọi trang admin.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `user_id` | BIGINT FK → `users.id` CASCADE | Người gửi |
+| `page_url` | VARCHAR(512) | URL path lúc submit (client gửi, server validate bắt đầu `/admin`) |
+| `page_title` | VARCHAR(255) NULL | `document.title` lúc submit |
+| `body` | TEXT | Nội dung góp ý |
+| `priority` | ENUM `low`,`medium`,`high` | Mặc định `medium` |
+| `status` | ENUM `new`,`read`,`done` | Mặc định `new`; admin đổi trạng thái |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+**Phân quyền list:** admin xem tất cả; teacher chỉ xem góp ý của mình.
+
+---
+
+## 6. Bảng `site_feedback_attachments`
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `site_feedback_id` | BIGINT FK → `site_feedback.id` CASCADE | |
+| `path` | VARCHAR(255) | `storage/app/public/feedback/` |
+| `mime_type` | VARCHAR(64) | |
+| `size_bytes` | INT UNSIGNED | |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+Tối đa **3 ảnh** / góp ý; mỗi file ≤ 5MB; MIME `jpeg,png,gif,webp`.
+
+---
+
+## 7. Bảng `keyboards`
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
@@ -102,6 +156,70 @@ Prototype hiện lưu localStorage key `htd_chemical_keyboard` (full object). Pr
 
 Seed: `kahoot_sync`, `duck_race`.
 
+### 4.1.1 `default_config` theo mode
+
+**`kahoot_sync`** (mặc định):
+
+```json
+{
+  "scoring": { "type": "kahoot_time" },
+  "flow": { "sync_questions": true, "use_timer": true }
+}
+```
+
+**`duck_race`** (migration `2026_07_09_200000_create_play_modes_and_duck_race`):
+
+```json
+{
+  "scoring": {
+    "correct_delta": 3,
+    "wrong_delta": -5,
+    "allow_negative": true
+  },
+  "win": {
+    "target_score": 30,
+    "podium_size": 3
+  },
+  "flow": {
+    "sync_questions": false,
+    "advance_on": "submit",
+    "use_timer": false,
+    "end_when_podium_full": true
+  },
+  "visual": {
+    "theme": "duck_race",
+    "track_steps": 30,
+    "track_bounds": { "start_pct": 20, "end_pct": 90 },
+    "lane_bounds": { "top_pct": 50, "bottom_pct": 92 },
+    "duck_sprite_px": 64,
+    "duck_swim_ms": 1150,
+    "duck_sprites": ["ducks/duck-blue.gif"],
+    "assets": {
+      "banner": "/app/assets/duck-race/banner.png",
+      "background": "/app/assets/duck-race/background.png",
+      "duck": "/app/assets/duck-race/duck-blue.gif"
+    }
+  }
+}
+```
+
+| Khóa | Ghi chú |
+|---|---|
+| `scoring.correct_delta` / `wrong_delta` | Điểm cộng/trừ mỗi câu (submit ngay) |
+| `scoring.allow_negative` | Cho phép tổng điểm âm (vịt dừng vạch xuất phát) |
+| `win.target_score` | Mốc về đích; đồng bộ với `track_steps` mặc định |
+| `win.podium_size` | Số HS về đích trước khi có thể kết thúc game |
+| `flow.end_when_podium_full` | `true` → đủ `podium_size` người về đích thì `game_ended` |
+| `visual.track_steps` | Số bước tối đa trên đường đua (thường = `target_score`) |
+| `visual.track_bounds` | Mép đường đua trên ảnh nền (% chiều rộng ảnh): `start_pct` (xuất phát), `end_pct` (đích). Mặc định `20`→`90` |
+| `visual.lane_bounds` | Chiều cao vùng đứng vịt (% chiều cao ảnh nền): `top_pct`, `bottom_pct`. Mặc định `50`→`92`. Admin chỉnh bằng 2 vạch ngang |
+| `visual.duck_sprites` | Danh sách sprite tương đối trong `duck-race/` (quét từ `ducks/` khi lưu game). WS xáo trộn gán `player.duck_sprite` |
+| `visual.duck_sprite_px` | Kích thước cạnh sprite vịt trên host (px, `32`–`128`, mặc định `64`). Admin chỉnh bằng canvas + preview |
+| `visual.duck_swim_ms` | Thời gian bơi mỗi bước (ms, `400`–`3000`, mặc định `1150`). Càng cao = vịt di chuyển càng chậm |
+| `visual.assets` | Đường dẫn asset host/HS (public) |
+
+`games.mode_config` và `game_sessions.mode_config` **override** từng nhánh của `default_config` (merge shallow ở WS). Luồng chi tiết: [`APP_LOGIC.md`](APP_LOGIC.md) §3.2.
+
 ---
 
 ## 5. Bảng `games`
@@ -112,7 +230,7 @@ Seed: `kahoot_sync`, `duck_race`.
 | `name` | VARCHAR(255) | |
 | `description` | TEXT NULL | |
 | `play_mode_id` | BIGINT FK → `play_modes.id` NULL | Kiểu chơi; game cũ backfill `kahoot_sync` |
-| `mode_config` | JSON NULL | Override `default_config` (VD đua vịt: +3/-5, mốc 30) |
+| `mode_config` | JSON NULL | Override `default_config` (VD đua vịt: +3/-5, mốc 30, `track_bounds`). Admin form có editor kéo vạch xuất phát/đích trên ảnh nền |
 | `created_by` | BIGINT FK → `users.id` NULL | GV tạo game |
 | `created_at`, `updated_at` | TIMESTAMP | |
 

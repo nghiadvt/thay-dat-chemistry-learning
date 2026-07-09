@@ -113,7 +113,9 @@ async function mapShuffledAnswer(redis, pin, questionId, studentName, question, 
 }
 
 async function emitRaceUpdate(io, redis, pin, rules) {
-  const players = await buildRacePlayers(redis, pin, rules);
+  const room = await redis.hgetall(roomKey(pin));
+  const config = parseModeConfig(room);
+  const players = await buildRacePlayers(redis, pin, rules, config);
   io.to(pin).emit('race_update', {
     players,
     target_score: rules.targetScore,

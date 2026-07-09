@@ -1,0 +1,316 @@
+/* Duck race — admin game form: track editor + preview */
+.drc-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.drc-section h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.drc-bounds-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.drc-bounds-inputs .form-group {
+  margin: 0;
+  min-width: 120px;
+}
+
+.drc-bounds-inputs--frame {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.drc-track-surface {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #7ec8e8;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  user-select: none;
+  touch-action: none;
+}
+
+.drc-track-surface__bg {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.drc-race-frame,
+.drc-preview-race-frame {
+  position: absolute;
+  left: var(--frame-left, 20%);
+  right: calc(100% - var(--frame-right, 90%));
+  top: var(--frame-top, 50%);
+  bottom: calc(100% - var(--frame-bottom, 92%));
+  border-left: 3px solid #16a34a;
+  border-right: 3px solid #dc2626;
+  border-top: 3px solid #7c3aed;
+  border-bottom: 3px solid #ea580c;
+  background: rgba(45, 70, 214, 0.08);
+  pointer-events: none;
+  z-index: 2;
+  box-sizing: border-box;
+}
+
+.drc-frame-edge {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drc-frame-edge__label {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.drc-frame-edge--start {
+  top: 0;
+  bottom: 0;
+  left: var(--frame-left, 20%);
+  width: 22px;
+  transform: translateX(-50%);
+  cursor: ew-resize;
+}
+
+.drc-frame-edge--start .drc-frame-edge__label {
+  color: #15803d;
+}
+
+.drc-frame-edge--end {
+  top: 0;
+  bottom: 0;
+  left: var(--frame-right, 90%);
+  width: 22px;
+  transform: translateX(-50%);
+  cursor: ew-resize;
+}
+
+.drc-frame-edge--end .drc-frame-edge__label {
+  color: #b91c1c;
+}
+
+.drc-frame-edge--top {
+  left: 0;
+  right: 0;
+  top: var(--frame-top, 50%);
+  height: 22px;
+  transform: translateY(-50%);
+  cursor: ns-resize;
+}
+
+.drc-frame-edge--top .drc-frame-edge__label {
+  color: #6d28d9;
+}
+
+.drc-frame-edge--bottom {
+  left: 0;
+  right: 0;
+  top: var(--frame-bottom, 92%);
+  height: 22px;
+  transform: translateY(-50%);
+  cursor: ns-resize;
+}
+
+.drc-frame-edge--bottom .drc-frame-edge__label {
+  color: #c2410c;
+}
+
+.drc-frame-edge.is-dragging {
+  opacity: 0.85;
+}
+
+.drc-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Preview */
+.drc-preview {
+  margin-top: 16px;
+}
+
+.drc-preview__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.drc-preview__score {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  min-width: 120px;
+}
+
+.drc-preview__score.is-negative {
+  color: #dc2626;
+}
+
+.drc-preview__score.is-finished {
+  color: #b45309;
+}
+
+.drc-preview-race-frame {
+  pointer-events: none;
+}
+
+.drc-preview-race-frame .drc-preview-duck {
+  pointer-events: auto;
+}
+
+.drc-preview-duck {
+  position: absolute;
+  bottom: 0;
+  left: 0%;
+  width: var(--duck-sprite-px, 64px);
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.drc-preview-duck.is-swimming img {
+  animation: drc-swim-bob 0.75s ease-in-out infinite;
+}
+
+.drc-preview-duck img {
+  display: block;
+  width: var(--duck-sprite-px, 64px);
+  height: var(--duck-sprite-px, 64px);
+  object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2));
+}
+
+.drc-preview-duck__resize {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #2d46d6;
+  cursor: nwse-resize;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 3;
+}
+
+.drc-preview-duck__resize.is-dragging {
+  background: #1d4ed8;
+  transform: scale(1.15);
+}
+
+.drc-duck-size__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.drc-duck-size__canvas-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.drc-duck-size__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: default;
+}
+
+.drc-duck-size__canvas.is-resizing {
+  cursor: nwse-resize;
+}
+
+.drc-duck-size__canvas-hint {
+  margin: 0;
+  padding: 6px 10px 8px;
+  font-size: 11px;
+}
+
+.drc-duck-size__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 160px;
+}
+
+.drc-duck-size__value {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2d46d6;
+}
+
+.drc-preview-duck.is-finished img {
+  animation: drc-finish-bounce 0.6s ease;
+}
+
+.drc-preview-finish {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 251, 235, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  z-index: 4;
+}
+
+.drc-preview-finish.visible {
+  opacity: 1;
+}
+
+.drc-preview-finish__banner {
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 2px solid #f59e0b;
+  font-size: 18px;
+  font-weight: 800;
+  color: #92400e;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.35);
+  animation: drc-finish-pop 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes drc-finish-bounce {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  40% { transform: translateX(-50%) scale(1.12); }
+}
+
+@keyframes drc-swim-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes drc-finish-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}

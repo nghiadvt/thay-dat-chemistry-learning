@@ -104,8 +104,10 @@
                       <p class="duck-race-host__target">Về đích: <strong id="duckRaceTargetScore">30</strong> điểm</p>
                     </div>
                     <div class="duck-race-track" id="duckRaceTrack">
-                      <img class="duck-race-track__bg" src="{{ asset('htd-admin/assets/duck-race/background.png') }}" alt="">
-                      <div class="duck-race-track__lanes" id="duckRaceLanes"></div>
+                      <div class="duck-race-track__frame">
+                        <img class="duck-race-track__bg" src="{{ asset('htd-admin/assets/duck-race/background.png') }}" alt="">
+                        <div class="duck-race-track__lanes" id="duckRaceLanes"></div>
+                      </div>
                     </div>
                     <div class="duck-race-podium" id="duckRacePodium" aria-live="polite"></div>
                   </div>

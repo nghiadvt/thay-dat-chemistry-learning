@@ -130,6 +130,12 @@ async function handleJoinRoom(io, redis, socket, payload) {
     }
   }
 
+  if (!player.is_host && (room.play_mode_slug || '') === 'duck_race') {
+    const { parseModeConfig, assignDuckSprite } = require('./engines/duck-race-config');
+    const config = parseModeConfig(room);
+    player.duck_sprite = await assignDuckSprite(redis, pin, config, player.duck_sprite);
+  }
+
   await redis.hset(playersKey(pin), name, JSON.stringify(player));
   await refreshRoomTtl(redis, pin);
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\Admin\KeyboardController as AdminKeyboardController;
 use App\Http\Controllers\Admin\QuestionBankController as AdminQuestionBankController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Api\QuestionImageController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\Api\SiteFeedbackController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\StudentJoinController;
 use Illuminate\Support\Facades\Route;
@@ -107,6 +109,10 @@ Route::middleware('auth')->group(function () {
         Route::get('reports', [AdminReportController::class, 'index'])->name('reports.index');
         Route::get('reports/{session}', [AdminReportController::class, 'show'])->name('reports.show');
         Route::get('reports/{session}/export', [AdminReportController::class, 'export'])->name('reports.export');
+
+        Route::get('feedback', [AdminFeedbackController::class, 'index'])->name('feedback.index');
+        Route::get('feedback/{feedback}', [AdminFeedbackController::class, 'show'])->name('feedback.show');
+        Route::patch('feedback/{feedback}/status', [AdminFeedbackController::class, 'updateStatus'])->name('feedback.update-status');
     });
 
     Route::prefix('api')->group(function () {
@@ -116,6 +122,8 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('quizzes', QuizController::class);
 
         Route::post('question-content-images', [QuestionImageController::class, 'store'])->name('question-images.store');
+
+        Route::post('site-feedback', [SiteFeedbackController::class, 'store'])->name('site-feedback.store');
 
         Route::get('quizzes/{quiz}/questions', [QuestionController::class, 'index']);
         Route::post('quizzes/{quiz}/questions', [QuestionController::class, 'store']);

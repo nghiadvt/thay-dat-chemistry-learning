@@ -8,6 +8,7 @@ use App\Models\GameSession;
 use App\Models\Keyboard;
 use App\Models\Question;
 use App\Models\Quiz;
+use App\Models\Role;
 use App\Models\SessionAnswer;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -17,12 +18,14 @@ class SampleDataSeeder extends Seeder
 {
     public function run(): void
     {
+        $teacherRoleId = Role::query()->where('slug', 'teacher')->value('id');
+
         $teacher = User::updateOrCreate(
             ['email' => 'teacher@hoadat.local'],
             [
                 'name' => 'Giáo viên Demo',
                 'password' => Hash::make('password123'),
-                'role' => 'teacher',
+                'role_id' => $teacherRoleId,
             ]
         );
 

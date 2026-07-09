@@ -19,7 +19,7 @@ class KeyboardManagementTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::factory()->create(['role' => 'teacher']);
+        $this->user = User::factory()->teacher()->create();
     }
 
     public function test_guest_is_redirected_from_keyboard_index(): void

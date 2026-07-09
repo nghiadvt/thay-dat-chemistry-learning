@@ -1,13 +1,24 @@
 const {
   playersKey,
   leaderboardKey,
+  roomKey,
 } = require('../redis-keys');
+
+const DEFAULT_DUCK_SPRITES = ['ducks/duck-blue.gif'];
 
 const DEFAULT_CONFIG = {
   scoring: { correct_delta: 3, wrong_delta: -5, allow_negative: true },
   win: { target_score: 30, podium_size: 3 },
   flow: { sync_questions: false, advance_on: 'submit', use_timer: false, end_when_podium_full: true },
-  visual: { theme: 'duck_race', track_steps: 30 },
+  visual: {
+    theme: 'duck_race',
+    track_steps: 30,
+    track_bounds: { start_pct: 20, end_pct: 90 },
+    lane_bounds: { top_pct: 50, bottom_pct: 92 },
+    duck_sprite_px: 64,
+    duck_swim_ms: 1150,
+    duck_sprites: DEFAULT_DUCK_SPRITES,
+  },
 };
 
 function parseModeConfig(room) {
@@ -36,6 +47,52 @@ function finishersKey(pin) {
   return `room:${pin}:finishers`;
 }
 
+function duckPoolKey(pin) {
+  return `room:${pin}:duck_pool`;
+}
+
+function shuffleArray(items) {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function getDuckSprites(config) {
+  const sprites = config?.visual?.duck_sprites;
+  if (Array.isArray(sprites) && sprites.length > 0) {
+    return sprites.map(String);
+  }
+  return [...DEFAULT_DUCK_SPRITES];
+}
+
+async function refillDuckPool(redis, pin, sprites) {
+  const key = duckPoolKey(pin);
+  const pool = shuffleArray(sprites);
+  if (!pool.length) return;
+  await redis.del(key);
+  await redis.rPush(key, ...pool);
+  await redis.expire(key, 7200);
+}
+
+async function drawDuckSprite(redis, pin, sprites) {
+  const key = duckPoolKey(pin);
+  let sprite = await redis.lPop(key);
+  if (!sprite) {
+    await refillDuckPool(redis, pin, sprites);
+    sprite = await redis.lPop(key);
+  }
+  return sprite || sprites[0] || DEFAULT_DUCK_SPRITES[0];
+}
+
+async function assignDuckSprite(redis, pin, config, existingSprite) {
+  if (existingSprite) return existingSprite;
+  const sprites = getDuckSprites(config);
+  return drawDuckSprite(redis, pin, sprites);
+}
+
 function playerProgressKey(pin, name) {
   return `room:${pin}:race_progress:${name}`;
 }
@@ -57,31 +114,45 @@ async function savePlayerProgress(redis, pin, name, progress) {
 }
 
 async function getFinishersCount(redis, pin) {
-  return redis.lLen(finishersKey(pin));
+  return redis.llen(finishersKey(pin));
 }
 
 async function addFinisher(redis, pin, name) {
   const count = await getFinishersCount(redis, pin);
-  await redis.rPush(finishersKey(pin), name);
+  await redis.rpush(finishersKey(pin), name);
   await redis.expire(finishersKey(pin), 7200);
   return count + 1;
 }
 
 async function getFinishersList(redis, pin) {
-  return redis.lRange(finishersKey(pin), 0, -1);
+  return redis.lrange(finishersKey(pin), 0, -1);
 }
 
+/** Vị trí trên đường đua 0–100 (%). Điểm âm không đẩy vịt lùi quá vạch xuất phát. */
 function positionFromScore(score, rules) {
-  return Math.round((Number(score) / rules.trackSteps) * 1000) / 10;
+  const target = rules.targetScore || rules.trackSteps || 30;
+  const forwardSteps = Math.max(0, Number(score));
+  const pct = (forwardSteps / target) * 100;
+  return Math.round(Math.min(100, pct) * 10) / 10;
 }
 
-async function buildRacePlayers(redis, pin, rules) {
+async function buildRacePlayers(redis, pin, rules, config) {
   const allPlayers = await redis.hgetall(playersKey(pin));
+  let modeConfig = config;
+  if (!modeConfig) {
+    const room = await redis.hgetall(roomKey(pin));
+    modeConfig = parseModeConfig(room);
+  }
   const players = [];
 
   for (const raw of Object.values(allPlayers)) {
     const player = JSON.parse(raw);
     if (player.is_host) continue;
+
+    if (!player.duck_sprite) {
+      player.duck_sprite = await assignDuckSprite(redis, pin, modeConfig, null);
+      await redis.hset(playersKey(pin), player.name, JSON.stringify(player));
+    }
 
     const score = Number(await redis.zscore(leaderboardKey(pin), player.name)) || 0;
     const progress = await getPlayerProgress(redis, pin, player.name);
@@ -89,6 +160,7 @@ async function buildRacePlayers(redis, pin, rules) {
     players.push({
       name: player.name,
       avatar: player.avatar || null,
+      duck_sprite: player.duck_sprite || null,
       score,
       position: positionFromScore(score, rules),
       finished: Boolean(progress.finished),
@@ -108,9 +180,14 @@ async function buildRacePlayers(redis, pin, rules) {
 
 module.exports = {
   DEFAULT_CONFIG,
+  DEFAULT_DUCK_SPRITES,
   parseModeConfig,
   getRules,
   finishersKey,
+  duckPoolKey,
+  getDuckSprites,
+  assignDuckSprite,
+  refillDuckPool,
   playerProgressKey,
   getPlayerProgress,
   savePlayerProgress,

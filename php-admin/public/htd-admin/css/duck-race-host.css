@@ -41,17 +41,27 @@
   position: relative;
   flex: 1;
   min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
   background: #7ec8e8;
 }
 
+.duck-race-track__frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  line-height: 0;
+}
+
 .duck-race-track__bg {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center bottom;
   pointer-events: none;
   user-select: none;
@@ -60,29 +70,38 @@
 .duck-race-track__lanes {
   position: absolute;
   left: 0;
-  right: 0;
-  bottom: 8%;
+  top: 0;
+  width: 100%;
   height: 42%;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-  padding: 0 4% 0 6%;
   pointer-events: none;
+  overflow: visible;
 }
 
-.duck-race-lane {
-  position: relative;
-  height: 56px;
+.duck-race-pond-empty {
+  margin: 0;
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 
 .duck-race-duck-wrap {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 72px;
-  transform: translateX(var(--duck-x, 0%));
-  transition: transform 0.55s cubic-bezier(0.34, 1.2, 0.64, 1);
-  will-change: transform;
+  bottom: 12%;
+  left: 20%;
+  width: max(72px, var(--duck-sprite-px, 64px));
+  transform: translateX(calc(-50% + var(--duck-collision-x, 0px)));
+  transition: left 1.15s ease-in-out;
+  will-change: left;
+  z-index: 1;
+}
+
+.duck-race-duck-wrap.is-swimming .duck-race-duck-sprite {
+  animation: duck-race-swim-bob 0.75s ease-in-out infinite;
 }
 
 .duck-race-duck-wrap.finished .duck-race-duck-badge {
@@ -142,8 +161,8 @@
 
 .duck-race-duck-sprite {
   display: block;
-  width: 64px;
-  height: 64px;
+  width: var(--duck-sprite-px, 64px);
+  height: var(--duck-sprite-px, 64px);
   object-fit: contain;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
 }
@@ -179,4 +198,9 @@
 
 .teacher-main-grid.game-active.duck-race-mode .teacher-duck-race-phase {
   display: flex !important;
+}
+
+@keyframes duck-race-swim-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }

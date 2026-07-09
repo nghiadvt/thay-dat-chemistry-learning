@@ -6,6 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin — Hóa Thầy Đạt')</title>
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ file_exists(public_path('css/admin.css')) ? filemtime(public_path('css/admin.css')) : time() }}">
+    @php $fbWidgetCss = public_path('css/feedback-widget.css'); @endphp
+    <link rel="stylesheet" href="{{ asset('css/feedback-widget.css') }}?v={{ file_exists($fbWidgetCss) ? filemtime($fbWidgetCss) : time() }}">
     @stack('head')
 </head>
 <body class="admin-body @yield('body-class')"
@@ -28,6 +30,7 @@
             <a href="{{ route('admin.question-bank.index') }}" class="{{ request()->routeIs('admin.question-bank.*') ? 'active' : '' }}">Bộ câu hỏi</a>
             <a href="{{ route('admin.sessions.index') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Báo cáo</a>
+            <a href="{{ route('admin.feedback.index') }}" class="{{ request()->routeIs('admin.feedback.*') ? 'active' : '' }}">Góp ý</a>
         </nav>
     </aside>
 
@@ -88,5 +91,8 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 @endif
 @stack('scripts')
+@include('admin.partials.feedback-widget')
+@php $fbWidgetJs = public_path('js/feedback-widget.js'); @endphp
+<script src="{{ asset('js/feedback-widget.js') }}?v={{ file_exists($fbWidgetJs) ? filemtime($fbWidgetJs) : time() }}"></script>
 </body>
 </html>

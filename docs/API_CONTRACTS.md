@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-09 (play mode `duck_race`: events + Redis keys)
+**Cập nhật lần cuối:** 2026-07-09 (đua vịt: duck_sprite, lane_bounds, Redis duck pool)
 
 ---
 
@@ -258,6 +258,23 @@ TTL room:482910   → ~7200
 
 ---
 
+## 7.5 Site feedback (góp ý admin)
+
+Widget floating trên mọi trang admin (`layouts/admin.blade.php`). Client gửi `page_url` + `page_title` lúc submit.
+
+| Method | Path | Body / form | Response |
+|---|---|---|---|
+| POST | `/api/site-feedback` | `multipart/form-data`: `body` (required), `priority` (`low`\|`medium`\|`high`), `page_url` (required, regex `^/admin`), `page_title?`, `images[]` (max 3, image ≤5MB) | `{ id, created_at }` |
+| GET | `/admin/feedback` | Query: `priority?`, `status?` | HTML list — admin: tất cả; teacher: của mình |
+| GET | `/admin/feedback/{id}` | — | HTML chi tiết |
+| PATCH | `/admin/feedback/{id}/status` | `{ status: new\|read\|done }` | Redirect — **admin only** |
+
+**Toast sau POST thành công:** `Cảm ơn bạn đã góp ý! Ý kiến của bạn giúp chúng tôi không ngừng cải thiện ứng dụng.`
+
+**Nhãn FAB:** luôn hiển thị `💬 Góp ý về ứng dụng` bên trên icon chatbot (speech bubble + mũi nhọn); ẩn khi panel góp ý đang mở. **Kéo thả:** giữ và kéo icon chatbot để đổi vị trí; lưu `localStorage` key `htd_feedback_widget_pos_{user_id}`. Bấm (không kéo) để mở panel.
+
+---
+
 ## 8. Reports (score management)
 
 | Method | Path | Query |
@@ -315,8 +332,8 @@ Redis: `room:{PIN}:answer:{question_id}:{student_name}` lưu `{ answer, first_su
 | `ntp_pong` | `{ t0, t1, t2 }` | Phản hồi NTP |
 | `game_started` | `{}` hoặc `{ play_mode, mode_config? }` | GV bấm Start. `duck_race`: kèm config |
 | `new_question` | xem §9.3 | Câu hỏi mới |
-| `answer_feedback` | `{ correct, score_delta, total_score, position, correct_answer?, finish_rank?, target_score? }` | **`duck_race` only** — sau `submit_answer`, gửi riêng HS |
-| `race_update` | `{ players: [{ name, avatar, score, position, finished, finish_rank }], target_score, track_steps }` | **`duck_race`** — broadcast phòng |
+| `answer_feedback` | `{ correct, score_delta, total_score, position, correct_answer?, finish_rank?, target_score? }` | **`duck_race` only** — sau `submit_answer`, gửi riêng HS. `position`: 0–100 từ `max(0, total_score)` |
+| `race_update` | `{ players: [{ name, avatar, duck_sprite?, score, position, finished, finish_rank }], target_score, track_steps }` | **`duck_race`** — broadcast phòng. `duck_sprite`: path tương đối trong `duck-race/` (VD `ducks/duck-blue.gif`). `position`: **0–100** (% đường đua), tính từ `max(0, score) / target_score`; `score` có thể âm |
 | `player_finished` | `{ name, finish_rank, total_score }` | **`duck_race`** — HS chạm mốc về đích |
 | `question_result` | xem §9.3.1 | **Khi hết câu** (finalize); gửi riêng từng HS |
 | `leaderboard_update` | `{ top5: [{ name, score, delta, avatar }] }` | Broadcast phòng; `avatar` từ Redis player |
@@ -436,6 +453,7 @@ Sau khi kết thúc, client/teacher có thể đọc `GET /api/reports/sessions/
 | `room:<PIN>:plan` | String (JSON) | 2h | Game plan cache (quizzes + questions) — nội bộ ws-server |
 | `room:<PIN>:race_progress:<student_name>` | String (JSON) | 2h | **`duck_race`:** `{ question_index, finished, finish_rank, finished_at }` |
 | `room:<PIN>:finishers` | List | 2h | **`duck_race`:** thứ tự tên HS về đích |
+| `room:<PIN>:duck_pool` | List | 2h | **`duck_race`:** pool sprite còn lại (xáo trộn không trùng; hết thì refill) |
 
 ---
 

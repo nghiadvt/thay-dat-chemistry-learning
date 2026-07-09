@@ -13,38 +13,37 @@
     @if ($games->isEmpty())
         <div class="empty-state">Chưa có game. <a href="{{ route('admin.games.create') }}">Tạo mới</a></div>
     @else
-    <div class="table-wrap">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Tên</th>
-                    <th>Kiểu chơi</th>
-                    <th>Mô tả</th>
-                    <th>Quiz</th>
-                    <th>Cập nhật</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($games as $game)
-                <tr>
-                    <td><strong>{{ $game->name }}</strong></td>
-                    <td>{{ $game->playMode?->name ?? 'Quiz đồng bộ' }}</td>
-                    <td>{{ Str::limit($game->description, 60) }}</td>
-                    <td>{{ $game->quizzes_count }}</td>
-                    <td>{{ $game->updated_at?->format('d/m/Y H:i') }}</td>
-                    <td class="actions">
-                        <a href="{{ route('admin.quizzes.index', ['game_id' => $game->id]) }}" class="btn btn-secondary btn-sm">Quiz</a>
-                        <a href="{{ route('admin.games.edit', $game) }}" class="btn btn-secondary btn-sm">Sửa</a>
-                        <form method="POST" action="{{ route('admin.games.destroy', $game) }}" onsubmit="return confirm('Xóa game này?')">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
-                        </form>
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
+    <div class="game-card-grid">
+        @foreach ($games as $game)
+        <article class="game-card">
+            @if ($cover = $game->coverImageUrl())
+                <div class="game-card__cover">
+                    <img src="{{ $cover }}" alt="{{ $game->name }}">
+                </div>
+            @else
+                <div class="game-card__cover game-card__cover--kahoot" aria-hidden="true">Quiz</div>
+            @endif
+            <div class="game-card__body">
+                <h3 class="game-card__title">{{ $game->name }}</h3>
+                <p class="game-card__meta">
+                    {{ $game->playMode?->name ?? 'Quiz đồng bộ' }}
+                    · {{ $game->quizzes_count }} quiz
+                    · {{ $game->updated_at?->format('d/m/Y') }}
+                </p>
+                @if ($game->description)
+                    <p class="game-card__desc">{{ Str::limit($game->description, 80) }}</p>
+                @endif
+                <div class="game-card__actions">
+                    <a href="{{ route('admin.quizzes.index', ['game_id' => $game->id]) }}" class="btn btn-secondary btn-sm">Quiz</a>
+                    <a href="{{ route('admin.games.edit', $game) }}" class="btn btn-secondary btn-sm">Sửa</a>
+                    <form method="POST" action="{{ route('admin.games.destroy', $game) }}" onsubmit="return confirm('Xóa game này?')">
+                        @csrf @method('DELETE')
+                        <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </article>
+        @endforeach
     </div>
     @endif
 </div>

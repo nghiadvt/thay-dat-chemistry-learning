@@ -90,6 +90,7 @@ services:
       - ./php-admin/public/htd-admin:/var/www/html/public/htd-admin:ro
       - ./php-admin/public/css:/var/www/html/public/css:ro
       - ./php-admin/public/js:/var/www/html/public/js:ro
+      - ./php-admin/public/images:/var/www/html/public/images:ro
       - ./php-admin/resources/views:/var/www/html/resources/views:ro
       - ./php-admin/routes:/var/www/html/routes:ro
       - ./php-admin/app:/var/www/html/app:ro

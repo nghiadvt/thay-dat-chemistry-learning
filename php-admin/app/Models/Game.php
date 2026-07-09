@@ -56,4 +56,18 @@ class Game extends Model
     {
         return $this->hasMany(GameSession::class);
     }
+
+    public function coverImageUrl(): ?string
+    {
+        if ($this->playMode?->slug === 'duck_race') {
+            return asset('htd-admin/assets/games/dua-vit.png');
+        }
+
+        return $this->playMode?->bannerUrl();
+    }
+
+    public function isDuckRace(): bool
+    {
+        return $this->playMode?->slug === 'duck_race';
+    }
 }

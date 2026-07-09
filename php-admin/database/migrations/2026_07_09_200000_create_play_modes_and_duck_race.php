@@ -65,10 +65,13 @@ return new class extends Migration
             'visual' => [
                 'theme' => 'duck_race',
                 'track_steps' => 30,
+                'track_bounds' => ['start_pct' => 20, 'end_pct' => 90],
+                'duck_sprite_px' => 64,
+                'duck_swim_ms' => 1150,
                 'assets' => [
                     'banner' => '/app/assets/duck-race/banner.png',
                     'background' => '/app/assets/duck-race/background.png',
-                    'duck' => '/app/assets/duck-race/duck-blue.png',
+                    'duck' => '/app/assets/duck-race/duck-blue.gif',
                 ],
             ],
         ], JSON_UNESCAPED_UNICODE);
