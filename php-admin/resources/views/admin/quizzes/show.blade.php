@@ -8,12 +8,12 @@
 <div class="page-header">
     <div>
         <h2>{{ $quiz->name }}</h2>
-        <p style="margin:4px 0 0;color:#6b7280;">
+        <p class="page-subtitle">
             Game: <strong>{{ $quiz->game?->name }}</strong> ·
             Bàn phím: <strong>{{ $quiz->keyboard?->name }}</strong>
         </p>
         @if ($quiz->tags->isNotEmpty())
-            <div class="tag-list" style="margin-top:8px;">
+            <div class="tag-list tag-list--spaced">
                 @foreach ($quiz->tags as $tag)
                     @include('admin.partials.tag-chip', ['tag' => $tag])
                 @endforeach
@@ -89,7 +89,7 @@
 
         <div class="form-group">
             <label for="sort_order">Thứ tự trong game</label>
-            <input type="number" id="sort_order" name="sort_order" min="0" value="{{ old('sort_order', $quiz->sort_order ?? 0) }}" style="max-width:160px;">
+            <input type="number" id="sort_order" name="sort_order" min="0" value="{{ old('sort_order', $quiz->sort_order ?? 0) }}" class="input-narrow">
         </div>
 
         <div class="form-group quiz-play-settings">
@@ -213,7 +213,7 @@
                     </td>
                     <td class="actions">
                         <a href="{{ route('admin.questions.edit', [$quiz, $question]) }}" class="btn btn-secondary btn-sm">Sửa</a>
-                        <form method="POST" action="{{ route('admin.questions.destroy', [$quiz, $question]) }}" onsubmit="return confirm('Xóa câu hỏi này?')">
+                        <form method="POST" action="{{ route('admin.questions.destroy', [$quiz, $question]) }}" data-confirm="Xóa câu hỏi này?" data-confirm-title="Xóa câu hỏi" data-confirm-ok="Xóa" data-confirm-danger="1">
                             @csrf @method('DELETE')
                             <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
                         </form>
@@ -314,14 +314,14 @@
 @php $qpCss = public_path('htd-admin/css/quiz-preview.css'); $qpV = file_exists($qpCss) ? filemtime($qpCss) : time(); @endphp
 <link rel="stylesheet" href="{{ asset('htd-admin/css/quiz-preview.css') }}?v={{ $qpV }}">
 @php $qqCss = public_path('htd-admin/css/quiz-questions.css'); @endphp
-<link rel="stylesheet" href="{{ asset('htd-admin/css/quiz-questions.css') }}?v={{ file_exists($qqCss) ? filemtime($qqCss) : $qpV }}">
+<link rel="stylesheet" href="@vasset('htd-admin/css/quiz-questions.css')">
 @endpush
 @push('scripts')
 @php $qpJs = public_path('htd-admin/js/quiz-preview.js'); @endphp
-<script src="{{ asset('htd-admin/js/quiz-preview.js') }}?v={{ file_exists($qpJs) ? filemtime($qpJs) : $qpV }}"></script>
+<script src="@vasset('htd-admin/js/quiz-preview.js')"></script>
 @php $kbPreviewJs = public_path('htd-admin/js/admin-keyboard-preview.js'); @endphp
-<script src="{{ asset('htd-admin/js/admin-keyboard-preview.js') }}?v={{ file_exists($kbPreviewJs) ? filemtime($kbPreviewJs) : $qpV }}"></script>
+<script src="@vasset('htd-admin/js/admin-keyboard-preview.js')"></script>
 @php $qqJs = public_path('htd-admin/js/quiz-questions.js'); @endphp
-<script src="{{ asset('htd-admin/js/quiz-questions.js') }}?v={{ file_exists($qqJs) ? filemtime($qqJs) : $qpV }}"></script>
-<script src="{{ asset('js/question-tags-cell.js') }}?v={{ file_exists(public_path('js/question-tags-cell.js')) ? filemtime(public_path('js/question-tags-cell.js')) : $qpV }}"></script>
+<script src="@vasset('htd-admin/js/quiz-questions.js')"></script>
+<script src="@vasset('js/question-tags-cell.js')"></script>
 @endpush

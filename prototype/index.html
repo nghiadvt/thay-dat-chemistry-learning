@@ -12,13 +12,36 @@
   <link rel="apple-touch-icon" href="assets/logo.png">
   <title>Hóa Thầy Đạt — Học sinh</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=STIX+Two+Text&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=Baloo+2:wght@600;700;800&family=STIX+Two+Text&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/shared.css">
   <link rel="stylesheet" href="css/student.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/elements.css">
   <link rel="stylesheet" href="css/keyboard-runtime.css">
   <link rel="stylesheet" href="css/duck-race-student.css">
 </head>
 <body class="student-app">
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-gamepad" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h4m-2-2v4"/><path d="M15 11h.01M18 13h.01"/><path d="M17.32 5H6.68a4 4 0 0 0-3.98 3.59c-.01.09-.02.19-.03.29L2 16.5A2.5 2.5 0 0 0 6.74 18l1.5-2h7.52l1.5 2A2.5 2.5 0 0 0 22 16.5l-.67-7.62c-.01-.1-.02-.2-.03-.29A4 4 0 0 0 17.32 5z"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></symbol>
+  <symbol id="i-speaker-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 21h8M5 7h14"/><path d="M7 7 4.5 13a2.8 2.8 0 0 0 5.4 0L7.4 7"/><path d="M17 7l-2.5 6a2.8 2.8 0 0 0 5.4 0L17.4 7"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11.5 11 13.5 15 9.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2.5 7.5l4.5 3.6L12 4l5 7.1 4.5-3.6-1.8 10H4.3L2.5 7.5z"/><rect x="4.5" y="19" width="15" height="2.4" rx="1.2"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 0 12 0V3H6v6z"/><path d="M6 5H3v2a4 4 0 0 0 4 4"/><path d="M18 5h3v2a4 4 0 0 1-4 4"/><path d="M12 15v3"/><path d="M8 21h8"/><path d="M10 18h4v3h-4z"/></symbol>
+  <symbol id="i-medal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l2 6H6l2-6z"/><path d="M12 2l-1.5 6M12 2l1.5 6"/><circle cx="12" cy="14.5" r="5.5"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM21 14v1M14 21h1M18 18h3v3h-3z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 4.5v15a1 1 0 0 0 1.54.84l11.2-7.5a1 1 0 0 0 0-1.68L8.54 3.66A1 1 0 0 0 7 4.5z"/></symbol>
+</svg>
 
 <div id="app">
 
@@ -29,20 +52,20 @@
       <img src="assets/logo.png" alt="Hóa Thầy Đạt" class="home-logo">
       <h1 class="home-title">Hóa Thầy Đạt</h1>
       <nav class="home-menu" aria-label="Chức năng học sinh">
-        <button type="button" class="home-menu-item" onclick="openHomeFeature('play')">
-          <span class="home-menu-icon" aria-hidden="true">🎮</span>
+        <button type="button" class="home-menu-item hm-play" onclick="openHomeFeature('play')">
+          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-gamepad"/></svg></span>
           <span class="home-menu-label">Chơi game</span>
         </button>
-        <button type="button" class="home-menu-item" onclick="openHomeFeature('elements')">
-          <span class="home-menu-icon" aria-hidden="true">🔊</span>
+        <button type="button" class="home-menu-item hm-elements" onclick="openHomeFeature('elements')">
+          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-speaker"/></svg></span>
           <span class="home-menu-label">Đọc nguyên tố</span>
         </button>
-        <button type="button" class="home-menu-item" onclick="openHomeFeature('balance')">
-          <span class="home-menu-icon" aria-hidden="true">⚖️</span>
+        <button type="button" class="home-menu-item hm-balance" onclick="openHomeFeature('balance')">
+          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-scale"/></svg></span>
           <span class="home-menu-label">Cân bằng phương trình</span>
         </button>
-        <button type="button" class="home-menu-item" onclick="openHomeFeature('quiz')">
-          <span class="home-menu-icon" aria-hidden="true">📚</span>
+        <button type="button" class="home-menu-item hm-quiz" onclick="openHomeFeature('quiz')">
+          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-book"/></svg></span>
           <span class="home-menu-label">Ôn trắc nghiệm</span>
         </button>
       </nav>
@@ -99,7 +122,7 @@
     <div class="card" style="flex:1;overflow-y:auto">
       <div class="guide-text">
         <ol>
-          <li>Giáo viên tạo phòng tại <a href="teacher.html">teacher.html</a> và hiển thị mã QR / PIN.</li>
+          <li>Giáo viên tạo phòng trong trang Admin và hiển thị mã QR / PIN.</li>
           <li>Học sinh quét QR hoặc nhập PIN 6 số.</li>
           <li>Nhập tên, chạm avatar để chụp ảnh (tùy chọn).</li>
           <li>Chờ giáo viên bắt đầu — có thể sửa tên/ảnh trong lúc chờ.</li>
@@ -184,6 +207,10 @@
         <img src="assets/duck-race/duck-blue.gif" alt="" width="28" height="28">
         <span id="qDuckScoreText">0</span>
       </div>
+      <div class="streak-badge" id="streakBadge" hidden aria-label="Chuỗi trả lời đúng">
+        <svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg>
+        <span id="streakCount">2</span>
+      </div>
     </div>
 
     <div class="q-body">
@@ -258,12 +285,54 @@
     </div>
   </section>
 
+  <!-- Đọc nguyên tố: lưới + thẻ chi tiết -->
+  <section class="screen elements-screen no-pad" data-screen="elements">
+    <div class="el-header">
+      <button type="button" class="el-back" onclick="goStudentHome()" aria-label="Quay lại">
+        <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
+      </button>
+      <h2 class="el-title">Đọc nguyên tố</h2>
+      <button type="button" class="el-practice-btn" onclick="ElementsModule.startPractice()">
+        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
+        <span>Luyện tập</span>
+      </button>
+    </div>
+    <div class="el-legend" id="elLegend"></div>
+    <div class="el-grid" id="elGrid"></div>
+    <div class="el-detail-overlay" id="elDetailOverlay" hidden>
+      <div class="el-detail-inner" id="elDetailInner"></div>
+    </div>
+  </section>
+
+  <!-- Đọc nguyên tố: chế độ luyện tập nghe-đoán -->
+  <section class="screen practice-screen no-pad" data-screen="element-practice">
+    <div class="el-header">
+      <button type="button" class="el-back" onclick="ElementsModule.exitPractice()" aria-label="Quay lại">
+        <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
+      </button>
+      <h2 class="el-title">Nghe &amp; đoán</h2>
+      <div class="pr-progress" id="prProgress">1/10</div>
+    </div>
+    <div class="pr-body" id="prBody"></div>
+  </section>
+
 </div>
 
 <div class="duck-race-feedback" id="duckRaceFeedback" aria-live="polite">
   <span class="duck-race-feedback__delta" id="duckRaceFeedbackDelta">+3</span>
   <span class="duck-race-feedback__total" id="duckRaceFeedbackTotal">Tổng: 0</span>
   <span class="duck-race-feedback__finish" id="duckRaceFeedbackFinish" hidden></span>
+</div>
+
+<canvas id="fxCanvas" aria-hidden="true"></canvas>
+
+<button type="button" class="sound-toggle" id="soundToggle" aria-label="Bật / tắt âm thanh">
+  <svg class="icon" aria-hidden="true"><use href="#i-speaker" id="soundToggleUse"/></svg>
+</button>
+
+<div class="cartoon-toast" id="cartoonToast" role="status" aria-live="polite" hidden>
+  <span class="cartoon-toast-emoji" id="cartoonToastEmoji">🚀</span>
+  <span id="cartoonToastText"></span>
 </div>
 
 <div class="result-overlay" id="resultOverlay">
@@ -286,8 +355,12 @@
 <script src="js/game-adapter.js"></script>
 <script src="js/backend-bridge.js"></script>
 <script src="js/shared.js"></script>
+<script src="js/elements-data.js"></script>
+<script src="js/elements-module.js"></script>
 <script src="js/equation-ui.js"></script>
 <script src="js/keyboard-runtime.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/fx.js"></script>
 <script src="js/student.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

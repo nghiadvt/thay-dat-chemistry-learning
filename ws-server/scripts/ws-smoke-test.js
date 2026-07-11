@@ -106,29 +106,30 @@ async function main() {
 
   const hybridTs = Date.now();
   const submitCountP = waitForEvent(host, 'submit_count_update');
-  s1.emit('submit_answer', {
+  const firstAck = await emitAck(s1, 'submit_answer', {
     question_id: q.question_id,
     answer: 0,
     hybrid_timestamp: hybridTs,
   });
-  const result = await waitForEvent(s1, 'question_result');
-  console.log('question_result:', result);
+  console.log('first submit ack:', firstAck);
 
   const submitCount = await submitCountP;
   console.log('submit_count_update:', submitCount);
 
-  // Double submit should error
-  let doubleBlocked = false;
+  // Students are allowed to change their answer before the host finalizes
+  // (student.js shows an "Cập nhật đáp án" button) — resubmit must succeed.
+  let resubmitAllowed = false;
   try {
-    await emitAck(s1, 'submit_answer', {
+    const ack = await emitAck(s1, 'submit_answer', {
       question_id: q.question_id,
       answer: 0,
       hybrid_timestamp: Date.now(),
     });
+    resubmitAllowed = Boolean(ack?.data?.can_change);
   } catch (e) {
-    doubleBlocked = e.message.includes('đã nộp');
+    resubmitAllowed = false;
   }
-  console.log('double submit blocked:', doubleBlocked);
+  console.log('resubmit before finalize allowed:', resubmitAllowed);
 
   // Clock skew
   let skewBlocked = false;
@@ -143,9 +144,18 @@ async function main() {
   }
   console.log('clock skew blocked:', skewBlocked);
 
+  // question_result only fires once the host finalizes the question.
+  const resultP = waitForEvent(s1, 'question_result');
+  await emitAck(host, 'host_finalize_question');
+  const result = await resultP;
+  console.log('question_result:', result);
+
   host.close();
   s1.close();
   s2.close();
+
+  if (!resubmitAllowed) throw new Error('Resubmit before finalize should have been allowed');
+  if (!skewBlocked) throw new Error('Clock skew was not blocked');
   console.log('Phase 2 smoke test OK');
 }
 

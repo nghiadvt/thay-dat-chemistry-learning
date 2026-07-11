@@ -384,6 +384,16 @@ window.QuestionTemplateBuilder = (function () {
     return { template: newTemplate, correct_answer: newAnswers };
   }
 
+  function tbConfirm(message) {
+    if (window.AdminConfirm) return AdminConfirm.show({ message, confirmText: 'Thay thế' });
+    return Promise.resolve(window.confirm(message));
+  }
+
+  function tbNotify(message) {
+    if (window.AdminToast) AdminToast.show(message, 'warning', 6000);
+    else window.alert(message);
+  }
+
   function applyQuickEquation() {
     const eqInput = document.getElementById('quickEquationInput');
     const ansInput = document.getElementById('quickAnswerInput');
@@ -391,18 +401,22 @@ window.QuestionTemplateBuilder = (function () {
     const parsed = parseQuickEquation(eqInput?.value, ansInput?.value, mode);
 
     if (!parsed) {
-      window.alert('Không đọc được phương trình. Ví dụ: H2 + O2 → H2O (đáp án: 2,1,2) hoặc Fe + ___ → Fe2O3 (đáp án: O2)');
+      tbNotify('Không đọc được phương trình. Ví dụ: H2 + O2 → H2O (đáp án: 2,1,2) hoặc Fe + ___ → Fe2O3 (đáp án: O2)');
       return;
     }
 
-    if (template.length && !window.confirm('Thay phương trình hiện tại bằng bản nhập nhanh?')) {
+    const apply = () => {
+      template = parsed.template;
+      correctAnswer = parsed.correct_answer;
+      selectedIndex = null;
+      renderPartsList();
+    };
+
+    if (template.length) {
+      tbConfirm('Thay phương trình hiện tại bằng bản nhập nhanh?').then((ok) => { if (ok) apply(); });
       return;
     }
-
-    template = parsed.template;
-    correctAnswer = parsed.correct_answer;
-    selectedIndex = null;
-    renderPartsList();
+    apply();
   }
 
   function bindDragDrop() {
@@ -471,7 +485,9 @@ window.QuestionTemplateBuilder = (function () {
 
     root.querySelector('#btnApplyPreset')?.addEventListener('click', () => {
       const mode = inputModeEl?.value || inputMode;
-      if (template.length && !window.confirm('Thay phương trình hiện tại bằng mẫu «' + (INPUT_MODE_LABELS[mode] || mode) + '»?')) {
+      if (template.length) {
+        tbConfirm('Thay phương trình hiện tại bằng mẫu «' + (INPUT_MODE_LABELS[mode] || mode) + '»?')
+          .then((ok) => { if (ok) applyPreset(mode); });
         return;
       }
       applyPreset(mode);

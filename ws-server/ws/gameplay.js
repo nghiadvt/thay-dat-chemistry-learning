@@ -4,6 +4,7 @@ const {
   leaderboardKey,
   submittedKey,
   answerKey,
+  scanKeys,
 } = require('./redis-keys');
 const {
   getSessionByPin,
@@ -18,6 +19,7 @@ const {
 } = require('./db');
 const { validateHybridTimestamp } = require('./ntp');
 const { checkAnswer, calculateScore } = require('./scoring');
+const { optionOrderKey, shuffleIndices, mapShuffledAnswer } = require('./answer-shuffle');
 const {
   getConnectedStudents,
   getHostSockets,
@@ -97,10 +99,10 @@ function registerGameplayHandlers(io, redis) {
         await requireHost(socket);
         const pin = socket.data.pin;
         io.to(pin).emit('room_closed', { message: 'Phòng đã được giáo viên kết thúc.' });
-        const keys = await redis.keys(`room:${pin}*`);
+        const keys = await scanKeys(redis, `room:${pin}*`);
         if (keys.length) await redis.del(...keys);
         await redis.del(leaderboardKey(pin));
-        const submittedKeys = await redis.keys(`submitted:${pin}:*`);
+        const submittedKeys = await scanKeys(redis, `submitted:${pin}:*`);
         if (submittedKeys.length) await redis.del(...submittedKeys);
         if (typeof ack === 'function') ack({ success: true });
       } catch (err) {
@@ -539,8 +541,15 @@ async function finalizeCurrentQuestion(io, redis, pin) {
   const questionId = room.current_question_id;
   if (!questionId) return;
 
+  // Atomic claim: only the first caller (double-click, finalize+next race) proceeds.
+  const claimed = await redis.set(finalizedKey(pin, questionId), '1', 'EX', 7200, 'NX');
+  if (claimed !== 'OK') return;
+
   const question = await getQuestionById(questionId);
-  if (!question) return;
+  if (!question) {
+    await redis.del(finalizedKey(pin, questionId));
+    return;
+  }
 
   const plan = await getPlan(redis, pin);
   const quizIndex = Number(room.quiz_index || 0);
@@ -651,7 +660,6 @@ async function finalizeCurrentQuestion(io, redis, pin) {
   }
 
   await emitLeaderboard(io, redis, pin);
-  await redis.set(finalizedKey(pin, questionId), '1', 'EX', 7200);
   await redis.del(submittedKey(pin, questionId));
 }
 
@@ -762,48 +770,9 @@ async function getPlan(redis, pin) {
   return JSON.parse(raw);
 }
 
-function optionOrderKey(pin, questionId, studentName) {
-  return `room:${pin}:option_order:${questionId}:${studentName}`;
-}
-
-function shuffleIndices(length) {
-  const indices = Array.from({ length }, (_, index) => index);
-  for (let i = indices.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
-  return indices;
-}
-
 async function getStudentSockets(io, pin) {
   const sockets = await io.in(pin).fetchSockets();
   return sockets.filter((socket) => !socket.data?.isHost);
-}
-
-async function mapShuffledAnswer(redis, pin, questionId, studentName, question, answer) {
-  if (question.answer_type !== 'mc') {
-    return answer;
-  }
-  if (answer == null) {
-    return { index: -1 };
-  }
-
-  const orderRaw = await redis.get(optionOrderKey(pin, questionId, studentName));
-  if (!orderRaw) {
-    return answer;
-  }
-
-  const order = JSON.parse(orderRaw);
-  const submitted = typeof answer === 'object' && answer !== null && 'index' in answer
-    ? answer.index
-    : answer;
-  const originalIndex = order[Number(submitted)];
-
-  if (typeof answer === 'object' && answer !== null) {
-    return { ...answer, index: originalIndex };
-  }
-
-  return originalIndex;
 }
 
 module.exports = {

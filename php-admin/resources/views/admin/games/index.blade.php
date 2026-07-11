@@ -103,7 +103,7 @@
                     <div class="game-card__actions">
                         <a href="{{ route('admin.quizzes.index', ['game_id' => $game->id]) }}" class="btn btn-secondary btn-sm">Quiz</a>
                         <a href="{{ route('admin.games.edit', $game) }}" class="btn btn-secondary btn-sm">Sửa</a>
-                        <form method="POST" action="{{ route('admin.games.destroy', $game) }}" onsubmit="return confirm('Xóa game này?')">
+                        <form method="POST" action="{{ route('admin.games.destroy', $game) }}" data-confirm="Xóa game này?" data-confirm-title="Xóa game" data-confirm-ok="Xóa" data-confirm-danger="1">
                             @csrf @method('DELETE')
                             <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
                         </form>

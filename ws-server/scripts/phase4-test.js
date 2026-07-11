@@ -112,10 +112,20 @@ async function fetchQuestionBank(auth) {
   return bank;
 }
 
-function buildAnswer(q) {
+/**
+ * @param {object} q question bank entry (unshuffled options, has correct_index)
+ * @param {object} [liveQuestion] the new_question payload actually received —
+ *   options may be shuffled per-student, so the correct index must be
+ *   relocated by matching option text rather than reusing q.correct_index.
+ */
+function buildAnswer(q, liveQuestion) {
   switch (q.answer_type) {
-    case 'mc':
-      return { index: q.correct_index };
+    case 'mc': {
+      const correctText = q.options[q.correct_index];
+      const shuffledOptions = liveQuestion?.options || q.options;
+      const idx = shuffledOptions.indexOf(correctText);
+      return { index: idx === -1 ? q.correct_index : idx };
+    }
     case 'essay':
       return { text: q.correct_answer_normalized };
     default:
@@ -145,6 +155,8 @@ async function testPlaythrough(auth) {
   const s1 = await connectClient();
   const s2 = await connectClient();
   const s3 = await connectClient();
+  const students = [s1, s2, s3];
+  const names = ['An', 'Binh', 'Chi'];
 
   await joinRoom(host, { pin, name: 'Host', isHost: true });
   await joinRoom(s1, { pin, name: 'An' });
@@ -153,39 +165,44 @@ async function testPlaythrough(auth) {
   console.log('Host + 3 students joined');
 
   const gameStartedP = waitForEvent(s1, 'game_started');
-  const firstQuestionP = waitForEvent(s1, 'new_question');
+  // Each student gets an independently shuffled options order for MC
+  // questions, so every socket must capture its own new_question payload
+  // (using only s1's would score s2/s3 against the wrong option order).
+  let pendingQuestionPs = students.map((sock) => waitForEvent(sock, 'new_question'));
   await emitAck(host, 'host_start_game');
   await gameStartedP;
 
   let scores = { An: 0, Binh: 0, Chi: 0 };
-  let pendingQuestionP = firstQuestionP;
 
   for (let i = 0; i < bank.length; i += 1) {
     const expected = bank[i];
-    const q = await pendingQuestionP;
-    if (String(q.question_id) !== String(expected.id)) {
-      throw new Error(`Question mismatch at ${i + 1}: got ${q.question_id}, expected ${expected.id}`);
-    }
-    console.log(`  Q${i + 1}/${bank.length} id=${q.question_id} type=${q.answer_type}`);
-
-    const answer = buildAnswer(expected);
-    const students = [s1, s2, s3];
-    const names = ['An', 'Binh', 'Chi'];
+    const liveQuestions = await Promise.all(pendingQuestionPs);
+    liveQuestions.forEach((q, idx) => {
+      if (String(q.question_id) !== String(expected.id)) {
+        throw new Error(`Question mismatch at ${i + 1} for ${names[idx]}: got ${q.question_id}, expected ${expected.id}`);
+      }
+    });
+    console.log(`  Q${i + 1}/${bank.length} id=${expected.id} type=${expected.answer_type}`);
 
     const submitPromises = students.map((sock, idx) => {
       const t0 = Date.now();
+      const answer = buildAnswer(expected, liveQuestions[idx]);
       return new Promise((resolve, reject) => {
         sock.once('question_result', (result) => {
           resolve({ name: names[idx], result, ms: Date.now() - t0 });
         });
         sock.emit('submit_answer', {
-          question_id: q.question_id,
+          question_id: expected.id,
           answer,
           hybrid_timestamp: Date.now(),
         });
       });
     });
 
+    // question_result only fires once the host finalizes — give submits a
+    // beat to land in Redis, then finalize explicitly.
+    await new Promise((r) => setTimeout(r, 150));
+    await emitAck(host, 'host_finalize_question');
     const results = await Promise.all(submitPromises);
     for (const r of results) {
       if (!r.result.correct) {
@@ -199,7 +216,7 @@ async function testPlaythrough(auth) {
       gameEndedP = waitForEvent(s1, 'game_ended', 20000);
     }
     if (i < bank.length - 1) {
-      pendingQuestionP = waitForEvent(s1, 'new_question');
+      pendingQuestionPs = students.map((sock) => waitForEvent(sock, 'new_question'));
     }
 
     const nextAck = await emitAck(host, 'host_next_question');
@@ -240,19 +257,22 @@ async function testReconnect(auth) {
   await emitAck(host, 'host_start_game');
   await gameStartedP;
   const q1 = await firstQuestionP;
-  const ans1 = buildAnswer(bank.find((q) => String(q.id) === String(q1.question_id)));
+  const ans1 = buildAnswer(bank.find((q) => String(q.id) === String(q1.question_id)), q1);
 
-  const result1 = await new Promise((resolve, reject) => {
+  const result1P = new Promise((resolve, reject) => {
     s1.once('question_result', (result) => {
       if (!result.correct) reject(new Error('Reconnect Q1 wrong'));
       else resolve(result);
     });
-    s1.emit('submit_answer', {
-      question_id: q1.question_id,
-      answer: ans1,
-      hybrid_timestamp: Date.now(),
-    });
   });
+  s1.emit('submit_answer', {
+    question_id: q1.question_id,
+    answer: ans1,
+    hybrid_timestamp: Date.now(),
+  });
+  await new Promise((r) => setTimeout(r, 150));
+  await emitAck(host, 'host_finalize_question');
+  const result1 = await result1P;
   const scoreBefore = result1.total_score;
 
   s1.close();
@@ -272,7 +292,7 @@ async function testReconnect(auth) {
 }
 
 async function testGuards(auth) {
-  console.log('\n=== 4.4 Double-submit & clock skew ===');
+  console.log('\n=== 4.4 Resubmit & clock skew ===');
   const bank = await fetchQuestionBank(auth);
   const { pin } = await createSession(auth);
 
@@ -289,24 +309,26 @@ async function testGuards(auth) {
   await gameStartedP;
   const q = await firstQuestionP;
   const expected = bank.find((x) => String(x.id) === String(q.question_id));
-  const answer = buildAnswer(expected);
+  const answer = buildAnswer(expected, q);
 
-  s1.emit('submit_answer', {
+  await emitAck(s1, 'submit_answer', {
     question_id: q.question_id,
     answer,
     hybrid_timestamp: Date.now(),
   });
-  await waitForEvent(s1, 'question_result');
 
-  let doubleBlocked = false;
+  // Students can change their answer before the host finalizes (student.js
+  // shows a "Cập nhật đáp án" button) — resubmit must succeed, not error.
+  let resubmitAllowed = false;
   try {
-    await emitAck(s1, 'submit_answer', {
+    const ack = await emitAck(s1, 'submit_answer', {
       question_id: q.question_id,
       answer,
       hybrid_timestamp: Date.now(),
     });
-  } catch (e) {
-    doubleBlocked = /đã nộp/i.test(e.message);
+    resubmitAllowed = Boolean(ack?.data?.can_change);
+  } catch {
+    resubmitAllowed = false;
   }
 
   let skewBlocked = false;
@@ -320,13 +342,17 @@ async function testGuards(auth) {
     skewBlocked = /lệch/i.test(e.message);
   }
 
-  if (!doubleBlocked) throw new Error('Double submit was not blocked');
+  const resultP = waitForEvent(s1, 'question_result');
+  await emitAck(host, 'host_finalize_question');
+  await resultP;
+
+  if (!resubmitAllowed) throw new Error('Resubmit before finalize should have been allowed');
   if (!skewBlocked) throw new Error('Clock skew was not blocked');
 
   host.close();
   s1.close();
   s2.close();
-  console.log('4.4 PASS — double blocked, skew blocked');
+  console.log('4.4 PASS — resubmit allowed, skew blocked');
   return true;
 }
 
@@ -356,19 +382,22 @@ async function testLoad(auth) {
     const q = await firstQuestionP;
 
     const t0 = Date.now();
-    await Promise.all(
-      students.map(
-        (s) =>
-          new Promise((resolve) => {
-            s.once('question_result', () => resolve());
-            s.emit('submit_answer', {
-              question_id: q.question_id,
-              answer: { index: 0 },
-              hybrid_timestamp: Date.now(),
-            });
-          })
-      )
+    const resultPromises = students.map(
+      (s) =>
+        new Promise((resolve) => {
+          s.once('question_result', () => resolve());
+          s.emit('submit_answer', {
+            question_id: q.question_id,
+            answer: { index: 0 },
+            hybrid_timestamp: Date.now(),
+          });
+        })
     );
+    // question_result only fires once the host finalizes — measured latency
+    // now covers the full submit-burst + finalize + fan-out cycle.
+    await new Promise((r) => setTimeout(r, 200));
+    await emitAck(host, 'host_finalize_question');
+    await Promise.all(resultPromises);
     const elapsed = Date.now() - t0;
     latencies.push(elapsed);
 

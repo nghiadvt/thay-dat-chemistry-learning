@@ -120,7 +120,19 @@ const HTDGameAdapter = (function () {
           : '';
         return { text: serialized };
       }
+
+      if (question.inputMode === 'essay') {
+        const blank = uiState.inputValues?.blank || {};
+        const first = Object.values(blank)[0] || '';
+        return { text: first };
+      }
+
+      const coef = uiState.inputValues?.coef || {};
       const blank = uiState.inputValues?.blank || {};
+      if (Object.keys(coef).length || Object.keys(blank).length) {
+        return { coef, blank };
+      }
+
       const first = Object.values(blank)[0] || '';
       return { text: first };
     }

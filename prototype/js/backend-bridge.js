@@ -59,12 +59,27 @@ const HTDBridge = (function () {
     return true;
   }
 
+  function playerTokenStorageKey(pin, name) {
+    return `htd_player_token:${pin}:${name}`;
+  }
+
+  function getStoredPlayerToken(pin, name) {
+    try { return sessionStorage.getItem(playerTokenStorageKey(pin, name)); } catch { return null; }
+  }
+
+  function storePlayerToken(pin, name, token) {
+    try { sessionStorage.setItem(playerTokenStorageKey(pin, name), token); } catch { /* ignore */ }
+  }
+
   async function joinRoom({ pin, name, isHost = false, avatar = null }) {
     isHost = Boolean(isHost);
     await HTDSocket.syncNtp();
     const payload = { pin, name, is_host: isHost };
     if (!isHost && avatar) payload.avatar = avatar;
+    const storedToken = getStoredPlayerToken(pin, name);
+    if (storedToken) payload.player_token = storedToken;
     const data = await HTDSocket.emit('join_room', payload);
+    if (data.player_token) storePlayerToken(pin, name, data.player_token);
     roomMeta = { pin, name, avatar: avatar || null, ...data };
     return data;
   }

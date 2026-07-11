@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,5 +29,11 @@ class AppServiceProvider extends ServiceProvider
                 URL::forceScheme('https');
             }
         }
+
+        // @vasset('css/admin.css') → URL asset kèm ?v=filemtime (cache-bust tập trung,
+        // thay cho pattern filemtime() lặp trong từng Blade).
+        Blade::directive('vasset', function (string $expression) {
+            return "<?php echo \\App\\Support\\AssetVersion::url({$expression}); ?>";
+        });
     }
 }

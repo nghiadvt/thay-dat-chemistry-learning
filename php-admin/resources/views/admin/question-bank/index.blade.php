@@ -213,11 +213,11 @@
 
 @push('head')
 @php $qbCss = public_path('htd-admin/css/quiz-questions.css'); @endphp
-<link rel="stylesheet" href="{{ asset('htd-admin/css/quiz-questions.css') }}?v={{ file_exists($qbCss) ? filemtime($qbCss) : time() }}">
+<link rel="stylesheet" href="@vasset('htd-admin/css/quiz-questions.css')">
 @endpush
 
 @push('scripts')
-<script src="{{ asset('js/admin-csv-exchange.js') }}?v={{ file_exists(public_path('js/admin-csv-exchange.js')) ? filemtime(public_path('js/admin-csv-exchange.js')) : time() }}"></script>
-<script src="{{ asset('js/question-tags-cell.js') }}?v={{ file_exists(public_path('js/question-tags-cell.js')) ? filemtime(public_path('js/question-tags-cell.js')) : time() }}"></script>
-<script src="{{ asset('js/question-bank-list.js') }}?v={{ file_exists(public_path('js/question-bank-list.js')) ? filemtime(public_path('js/question-bank-list.js')) : time() }}"></script>
+<script src="@vasset('js/admin-csv-exchange.js')"></script>
+<script src="@vasset('js/question-tags-cell.js')"></script>
+<script src="@vasset('js/question-bank-list.js')"></script>
 @endpush

@@ -12,7 +12,7 @@
     $kbeShared = public_path('htd-admin/css/shared.css');
     $kbeV = file_exists($kbeCss) ? filemtime($kbeCss) : time();
 @endphp
-<link rel="stylesheet" href="{{ asset('htd-admin/css/shared.css') }}?v={{ file_exists($kbeShared) ? filemtime($kbeShared) : $kbeV }}">
+<link rel="stylesheet" href="@vasset('htd-admin/css/shared.css')">
 <link rel="stylesheet" href="{{ asset('htd-admin/css/keyboard-editor.css') }}?v={{ $kbeV }}">
 @endpush
 
@@ -38,8 +38,8 @@ window.ADMIN_BOOT = {
     $kbeApi = public_path('htd-admin/js/api.js');
     $kbeInit = public_path('htd-admin/js/admin-keyboard-init.js');
 @endphp
-<script src="{{ asset('htd-admin/js/admin-boot.js') }}?v={{ file_exists($kbeBoot) ? filemtime($kbeBoot) : $kbeV }}"></script>
-<script src="{{ asset('htd-admin/js/api.js') }}?v={{ file_exists($kbeApi) ? filemtime($kbeApi) : $kbeV }}"></script>
+<script src="@vasset('htd-admin/js/admin-boot.js')"></script>
+<script src="@vasset('htd-admin/js/api.js')"></script>
 <script src="{{ asset('htd-admin/js/keyboard-editor.js') }}?v={{ $kbeJsV }}"></script>
-<script src="{{ asset('htd-admin/js/admin-keyboard-init.js') }}?v={{ file_exists($kbeInit) ? filemtime($kbeInit) : $kbeV }}"></script>
+<script src="@vasset('htd-admin/js/admin-keyboard-init.js')"></script>
 @endpush

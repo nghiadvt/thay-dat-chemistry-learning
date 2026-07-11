@@ -4,7 +4,7 @@
 @section('page-title', $game ? 'Sửa game' : 'Tạo game')
 
 @push('head')
-<link rel="stylesheet" href="{{ asset('css/duck-race-game-config.css') }}?v={{ file_exists(public_path('css/duck-race-game-config.css')) ? filemtime(public_path('css/duck-race-game-config.css')) : time() }}">
+<link rel="stylesheet" href="@vasset('css/duck-race-game-config.css')">
 @endpush
 
 @section('content')
@@ -62,27 +62,27 @@
             @error('play_mode_id')<div class="field-error">{{ $message }}</div>@enderror
         </div>
 
-        <div id="duckRaceConfig" class="card" style="margin-top:16px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;@if((int)$selectedModeId !== (int)$duckModeId) display:none @endif" data-duck-src="{{ $duckGifUrl }}">
-            <h3 style="margin:0 0 12px;font-size:16px">Cấu hình Đua vịt</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
-                <div class="form-group" style="margin:0">
+        <div id="duckRaceConfig" class="card drc-config-panel @if((int)$selectedModeId !== (int)$duckModeId) drc-hidden @endif" data-duck-mode-id="{{ $duckModeId }}" data-duck-src="{{ $duckGifUrl }}">
+            <h3 class="drc-config-panel__title">Cấu hình Đua vịt</h3>
+            <div class="drc-scoring-grid">
+                <div class="form-group form-group--flush">
                     <label for="correct_delta">Đúng (+bước)</label>
                     <input type="number" id="correct_delta" name="correct_delta" value="{{ old('correct_delta', $scoring['correct_delta'] ?? 3) }}">
                 </div>
-                <div class="form-group" style="margin:0">
+                <div class="form-group form-group--flush">
                     <label for="wrong_delta">Sai (bước)</label>
                     <input type="number" id="wrong_delta" name="wrong_delta" value="{{ old('wrong_delta', $scoring['wrong_delta'] ?? -5) }}">
                 </div>
-                <div class="form-group" style="margin:0">
+                <div class="form-group form-group--flush">
                     <label for="target_score">Về đích (điểm)</label>
                     <input type="number" id="target_score" name="target_score" value="{{ old('target_score', $win['target_score'] ?? 30) }}">
                 </div>
-                <div class="form-group" style="margin:0">
+                <div class="form-group form-group--flush">
                     <label for="podium_size">Top về đích</label>
                     <input type="number" id="podium_size" name="podium_size" value="{{ old('podium_size', $win['podium_size'] ?? 3) }}">
                 </div>
             </div>
-            <p style="margin:12px 0 0;font-size:13px;color:#64748b">Học sinh trả lời ngay, không đếm giờ. Ai chạm mốc điểm trước được xếp top về đích.</p>
+            <p class="drc-note">Học sinh trả lời ngay, không đếm giờ. Ai chạm mốc điểm trước được xếp top về đích.</p>
 
             <div class="drc-section drc-frame-editor">
                 <h4>Vùng đường đua (khung vịt)</h4>
@@ -141,7 +141,7 @@
                                    min="32" max="128" step="1"
                                    value="{{ $duckSpritePx }}">
                             <input type="range" id="duck_sprite_px_range" min="32" max="128" step="1"
-                                   value="{{ $duckSpritePx }}" aria-labelledby="duck_sprite_px" style="margin-top:8px;width:100%">
+                                   value="{{ $duckSpritePx }}" aria-labelledby="duck_sprite_px" class="drc-range">
                             <p id="duck_sprite_px_label" class="drc-duck-size__value">{{ $duckSpritePx }} px</p>
                         </div>
                         <div class="form-group">
@@ -150,7 +150,7 @@
                                    min="400" max="3000" step="50"
                                    value="{{ $duckSwimMs }}">
                             <input type="range" id="duck_swim_ms_range" min="400" max="3000" step="50"
-                                   value="{{ $duckSwimMs }}" aria-labelledby="duck_swim_ms" style="margin-top:8px;width:100%">
+                                   value="{{ $duckSwimMs }}" aria-labelledby="duck_swim_ms" class="drc-range">
                             <p id="duck_swim_ms_label" class="drc-duck-size__value">{{ number_format($duckSwimMs / 1000, 2) }} giây / bước</p>
                         </div>
                     </div>
@@ -180,25 +180,12 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="margin-top:16px">{{ $game ? 'Cập nhật' : 'Tạo game' }}</button>
+        <button type="submit" class="btn btn-primary drc-submit-btn">{{ $game ? 'Cập nhật' : 'Tạo game' }}</button>
     </form>
 </div>
 
 @push('scripts')
-<script src="{{ asset('js/duck-race-game-config.js') }}?v={{ file_exists(public_path('js/duck-race-game-config.js')) ? filemtime(public_path('js/duck-race-game-config.js')) : time() }}"></script>
-<script>
-(function () {
-  const select = document.getElementById('play_mode_id');
-  const panel = document.getElementById('duckRaceConfig');
-  const duckModeId = @json($duckModeId);
-  function sync() {
-    if (!select || !panel) return;
-    panel.style.display = Number(select.value) === Number(duckModeId) ? '' : 'none';
-  }
-  select?.addEventListener('change', sync);
-  sync();
-  DuckRaceGameConfig.init(document.getElementById('duckRaceConfig'));
-})();
-</script>
+<script src="@vasset('js/duck-race-game-config.js')"></script>
+<script src="@vasset('js/games-form.js')"></script>
 @endpush
 @endsection

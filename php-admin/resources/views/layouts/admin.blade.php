@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin — Hóa Thầy Đạt')</title>
-    <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ file_exists(public_path('css/admin.css')) ? filemtime(public_path('css/admin.css')) : time() }}">
-    <link rel="stylesheet" href="{{ asset('css/admin-list.css') }}?v={{ file_exists(public_path('css/admin-list.css')) ? filemtime(public_path('css/admin-list.css')) : time() }}">
-    @php $fbWidgetCss = public_path('css/feedback-widget.css'); @endphp
-    <link rel="stylesheet" href="{{ asset('css/feedback-widget.css') }}?v={{ file_exists($fbWidgetCss) ? filemtime($fbWidgetCss) : time() }}">
+    <link rel="stylesheet" href="@vasset('css/admin.css')">
+    <link rel="stylesheet" href="@vasset('css/admin-list.css')">
+    <link rel="stylesheet" href="@vasset('css/admin-confirm.css')">
+    <link rel="stylesheet" href="@vasset('css/feedback-widget.css')">
     @stack('head')
 </head>
 <body class="admin-body @yield('body-class')"
@@ -78,12 +78,14 @@ window.__ADMIN_FLASH__ = @json(array_filter([
 ]));
 </script>
 @endif
-<script src="{{ asset('js/admin-list-page.js') }}?v={{ file_exists(public_path('js/admin-list-page.js')) ? filemtime(public_path('js/admin-list-page.js')) : time() }}"></script>
-<script src="{{ asset('js/admin-data-table.js') }}?v={{ file_exists(public_path('js/admin-data-table.js')) ? filemtime(public_path('js/admin-data-table.js')) : time() }}"></script>
-<script src="{{ asset('js/admin-toast.js') }}?v={{ file_exists(public_path('js/admin-toast.js')) ? filemtime(public_path('js/admin-toast.js')) : time() }}"></script>
-<script src="{{ asset('js/admin-sidebar.js') }}?v={{ file_exists(public_path('js/admin-sidebar.js')) ? filemtime(public_path('js/admin-sidebar.js')) : time() }}"></script>
+<script src="@vasset('js/admin-confirm.js')"></script>
+<script src="@vasset('js/admin-loading.js')"></script>
+<script src="@vasset('js/admin-list-page.js')"></script>
+<script src="@vasset('js/admin-data-table.js')"></script>
+<script src="@vasset('js/admin-toast.js')"></script>
+<script src="@vasset('js/admin-sidebar.js')"></script>
 <script>window.TAG_PRESET_COLORS = @json(\App\Models\Tag::PRESET_COLORS);</script>
-<script src="{{ asset('js/admin-tags.js') }}?v={{ file_exists(public_path('js/admin-tags.js')) ? filemtime(public_path('js/admin-tags.js')) : time() }}"></script>
+<script src="@vasset('js/admin-tags.js')"></script>
 @if (session('success') || session('error') || session('warning'))
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -95,7 +97,6 @@ document.addEventListener('DOMContentLoaded', function () {
 @endif
 @stack('scripts')
 @include('admin.partials.feedback-widget')
-@php $fbWidgetJs = public_path('js/feedback-widget.js'); @endphp
-<script src="{{ asset('js/feedback-widget.js') }}?v={{ file_exists($fbWidgetJs) ? filemtime($fbWidgetJs) : time() }}"></script>
+<script src="@vasset('js/feedback-widget.js')"></script>
 </body>
 </html>

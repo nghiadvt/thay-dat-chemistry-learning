@@ -5,6 +5,11 @@
   if (!card) return;
 
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+  function qqNotify(message, type = 'error') {
+    if (window.AdminToast) AdminToast.show(message, type);
+    else alert(message);
+  }
   const quizId = card.dataset.quizId;
   const fromBankUrl = card.dataset.fromBankUrl;
   const reorderUrl = card.dataset.reorderUrl;
@@ -318,7 +323,7 @@
     } catch {
       btnAddFromBank.disabled = false;
       btnAddFromBank.textContent = 'Thêm vào quiz';
-      alert('Không thể thêm câu hỏi. Vui lòng thử lại.');
+      qqNotify('Không thể thêm câu hỏi. Vui lòng thử lại.');
     }
   });
 
@@ -409,7 +414,7 @@
       const raw = document.getElementById('bulkTimeInput')?.value;
       const seconds = parseInt(raw, 10);
       if (!Number.isFinite(seconds) || seconds < 5 || seconds > 300) {
-        alert('Thời gian phải từ 5 đến 300 giây.');
+        qqNotify('Thời gian phải từ 5 đến 300 giây.', 'warning');
         return;
       }
       payload.time_limit_seconds = seconds;
@@ -417,7 +422,7 @@
       const raw = document.getElementById('bulkPointsInput')?.value;
       const pts = parseInt(raw, 10);
       if (!Number.isFinite(pts) || pts < 1 || pts > 100) {
-        alert('Điểm phải từ 1 đến 100.');
+        qqNotify('Điểm phải từ 1 đến 100.', 'warning');
         return;
       }
       payload.points = pts;
@@ -451,7 +456,7 @@
       window.location.reload();
     } catch (err) {
       btnBulkConfirm.disabled = false;
-      alert(err.message || 'Không thể cập nhật. Vui lòng thử lại.');
+      qqNotify(err.message || 'Không thể cập nhật. Vui lòng thử lại.');
     }
   });
 

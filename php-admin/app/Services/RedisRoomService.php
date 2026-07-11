@@ -10,6 +10,25 @@ class RedisRoomService
     private const TTL_SECONDS = 7200;
 
     /**
+     * Non-blocking key lookup (SCAN) — avoids blocking the whole Redis instance
+     * that KEYS causes once the keyspace grows.
+     *
+     * @return list<string>
+     */
+    private function scanKeys($redis, string $pattern): array
+    {
+        $keys = [];
+        $cursor = 0;
+
+        do {
+            [$cursor, $batch] = $redis->scan($cursor, ['match' => $pattern, 'count' => 1000]);
+            $keys = array_merge($keys, $batch);
+        } while ((string) $cursor !== '0');
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
      * @param  array<string, mixed>|null  $modeConfig
      */
     public function createWaitingRoom(
@@ -48,14 +67,14 @@ class RedisRoomService
     {
         $redis = Redis::connection('rooms');
 
-        $roomKeys = $redis->keys("room:{$pin}*");
+        $roomKeys = $this->scanKeys($redis, "room:{$pin}*");
         if (! empty($roomKeys)) {
             $redis->del(...$roomKeys);
         }
 
         $redis->del("leaderboard:{$pin}");
 
-        $submittedKeys = $redis->keys("submitted:{$pin}:*");
+        $submittedKeys = $this->scanKeys($redis, "submitted:{$pin}:*");
         if (! empty($submittedKeys)) {
             $redis->del(...$submittedKeys);
         }
@@ -83,7 +102,7 @@ class RedisRoomService
     public function resetRoomForReplay(string $pin, int $gameId, ?int $quizId = null): void
     {
         $redis = Redis::connection('rooms');
-        $keys = $redis->keys("room:{$pin}*");
+        $keys = $this->scanKeys($redis, "room:{$pin}*");
 
         if (! empty($keys)) {
             $redis->del(...$keys);

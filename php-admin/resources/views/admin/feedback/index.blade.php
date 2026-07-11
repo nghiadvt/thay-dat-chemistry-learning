@@ -17,7 +17,7 @@
     $hasSearch = $searchValue !== '';
     $hasFilters = request()->hasAny(['q', 'priority', 'status']);
     $priorityLabels = ['high' => 'Cao', 'medium' => 'Trung bình', 'low' => 'Thấp'];
-    $statusLabels = ['new' => 'Mới', 'read' => 'Đã xem', 'done' => 'Hoàn thành'];
+    $statusLabels = \App\Support\StatusLabels::FEEDBACK;
     $activeFilterCount = collect([request('priority'), request('status')])->filter(fn ($v) => $v !== null && $v !== '')->count();
     $filterChips = [];
     if (request('priority')) {
@@ -159,5 +159,5 @@
 
 @push('head')
 @php $fbCss = public_path('css/feedback-admin.css'); @endphp
-<link rel="stylesheet" href="{{ asset('css/feedback-admin.css') }}?v={{ file_exists($fbCss) ? filemtime($fbCss) : time() }}">
+<link rel="stylesheet" href="@vasset('css/feedback-admin.css')">
 @endpush

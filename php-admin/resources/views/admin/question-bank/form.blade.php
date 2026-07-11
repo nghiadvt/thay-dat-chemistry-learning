@@ -203,7 +203,7 @@ window.QUESTION_EDITOR_BOOT = {
     $eqJs = public_path('htd-admin/js/equation-ui.js');
     $qtbJs = public_path('htd-admin/js/question-template-builder.js');
 @endphp
-<script src="{{ asset('htd-admin/js/equation-ui.js') }}?v={{ file_exists($eqJs) ? filemtime($eqJs) : $qeCssV }}"></script>
-<script src="{{ asset('htd-admin/js/question-template-builder.js') }}?v={{ file_exists($qtbJs) ? filemtime($qtbJs) : $qeCssV }}"></script>
-<script src="{{ asset('htd-admin/js/question-editor.js') }}?v={{ file_exists($qeJs) ? filemtime($qeJs) : $qeCssV }}"></script>
+<script src="@vasset('htd-admin/js/equation-ui.js')"></script>
+<script src="@vasset('htd-admin/js/question-template-builder.js')"></script>
+<script src="@vasset('htd-admin/js/question-editor.js')"></script>
 @endpush

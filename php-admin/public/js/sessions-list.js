@@ -86,8 +86,13 @@
   }
 
   function submitReplay(url) {
-    if (!confirm('Chơi lại với cùng PIN? Kết quả lần trước vẫn lưu trong báo cáo.')) return;
-    window.AdminListPage?.submitHiddenForm(url, 'POST');
+    const message = 'Chơi lại với cùng PIN? Kết quả lần trước vẫn lưu trong báo cáo.';
+    const doSubmit = () => window.AdminListPage?.submitHiddenForm(url, 'POST');
+    if (window.AdminConfirm) {
+      AdminConfirm.show({ title: 'Chơi lại', message, confirmText: 'Chơi lại' }).then((ok) => { if (ok) doSubmit(); });
+    } else if (confirm(message)) {
+      doSubmit();
+    }
   }
 
   function initBulkSelection() {

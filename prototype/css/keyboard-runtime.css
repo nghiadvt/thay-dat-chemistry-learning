@@ -1,4 +1,7 @@
-/* Dynamic keyboard from keyboards.config — student runtime (full-width, giống numpad PIN) */
+/* Dynamic keyboard from keyboards.config — student runtime (candy theme)
+ * Tên class là contract với keyboard-runtime.js — không đổi.
+ * Màu per-key từ admin config (inline style) vẫn override được base này.
+ */
 .dyn-kb {
   display: flex;
   flex-direction: column;
@@ -25,44 +28,47 @@
   min-width: 0;
   min-height: 44px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 12px;
   background: #fff;
-  color: #111;
+  color: var(--ink, #26235C);
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 700;
   cursor: pointer;
   padding: 0 4px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
-  transition: background 0.08s;
+  box-shadow: 0 3px 0 rgba(38, 35, 92, 0.18);
+  transition: transform 0.06s, box-shadow 0.06s;
   -webkit-tap-highlight-color: transparent;
 }
 
 .dyn-kb-key:active:not(:disabled) {
-  background: #e5e7eb;
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(38, 35, 92, 0.18);
 }
 
 .dyn-kb-key.type-delete {
-  background: #fff;
+  background: #FFD9D9;
   font-size: 20px;
-  color: #374151;
+  color: var(--cherry-deep, #D22F2F);
+  box-shadow: 0 3px 0 #E8A8A8;
 }
 
 .dyn-kb-key.type-space {
   background: #fff;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--ink-soft, #5B57A0);
 }
 
 .dyn-kb-key.type-send {
-  background: linear-gradient(135deg, #1A5C38, #2ECC71);
+  background: var(--lime, #58CC02);
   color: #fff;
-  box-shadow: 0 3px 0 #0D3A22;
+  box-shadow: 0 3px 0 var(--lime-deep, #3E9A00);
+  font-family: var(--font-display, 'Baloo 2', sans-serif);
   font-weight: 800;
 }
 
 .dyn-kb-key.type-send:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: 0 2px 0 #0D3A22;
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--lime-deep, #3E9A00);
 }
 
 .dyn-kb-key:disabled {
@@ -71,7 +77,7 @@
 }
 
 .question-keyboard.has-dyn-kb {
-  background: #d1d5db;
+  background: #D5E4FB;
   padding: 8px 6px max(8px, env(safe-area-inset-bottom));
   border-radius: 0;
 }

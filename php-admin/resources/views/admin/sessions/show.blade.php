@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=STIX+Two+Text&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('htd-admin/css/shared.css') }}">
-<link rel="stylesheet" href="{{ asset('htd-admin/css/session-host.css') }}?v={{ file_exists(public_path('htd-admin/css/session-host.css')) ? filemtime(public_path('htd-admin/css/session-host.css')) : time() }}">
-<link rel="stylesheet" href="{{ asset('htd-admin/css/duck-race-host.css') }}?v={{ file_exists(public_path('htd-admin/css/duck-race-host.css')) ? filemtime(public_path('htd-admin/css/duck-race-host.css')) : time() }}">
+<link rel="stylesheet" href="@vasset('htd-admin/css/session-host.css')">
+<link rel="stylesheet" href="@vasset('htd-admin/css/duck-race-host.css')">
 @endpush
 
 @section('content')

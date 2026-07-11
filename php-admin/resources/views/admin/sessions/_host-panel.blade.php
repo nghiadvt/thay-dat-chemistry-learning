@@ -143,7 +143,9 @@
                           method="POST"
                           action="{{ route('admin.sessions.reset', $session) }}"
                           class="inline-form"
-                          onsubmit="return confirm('Chơi lại với cùng PIN? Kết quả lần trước vẫn lưu trong báo cáo.');"
+                          data-confirm="Chơi lại với cùng PIN? Kết quả lần trước vẫn lưu trong báo cáo."
+                          data-confirm-title="Chơi lại"
+                          data-confirm-ok="Chơi lại"
                         >
                           @csrf
                           <button type="submit" class="btn-primary">Chơi lại</button>

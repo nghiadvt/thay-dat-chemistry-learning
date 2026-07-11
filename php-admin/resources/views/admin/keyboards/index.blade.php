@@ -146,5 +146,5 @@
 
 @push('scripts')
 @php $kbPreviewJs = public_path('htd-admin/js/admin-keyboard-preview.js'); @endphp
-<script src="{{ asset('htd-admin/js/admin-keyboard-preview.js') }}?v={{ file_exists($kbPreviewJs) ? filemtime($kbPreviewJs) : time() }}"></script>
+<script src="@vasset('htd-admin/js/admin-keyboard-preview.js')"></script>
 @endpush

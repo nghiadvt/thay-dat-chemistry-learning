@@ -17,11 +17,7 @@
         ['key' => 'actions', 'label' => 'Hành động'],
     ];
 
-    $statusLabels = [
-        'waiting' => 'Chờ',
-        'playing' => 'Đang chơi',
-        'ended' => 'Kết thúc',
-    ];
+    $statusLabels = \App\Support\StatusLabels::SESSION;
 
     $searchValue = trim((string) ($search ?? request('q', '')));
     $hasSearch = $searchValue !== '';
@@ -36,26 +32,28 @@
         request('created_to'),
     ])->filter(fn ($v) => $v !== null && $v !== '')->count();
 
+    // Chip bộ lọc — cùng contract 'url' với partial list-active-filters (như các trang khác)
+    $chipRemoveUrl = fn (string $key) => route('admin.sessions.index', array_diff_key(request()->query(), [$key => '', 'page' => '']));
     $filterChips = [];
     if (request('status')) {
-        $filterChips[] = ['label' => 'Trạng thái: '.($statusLabels[request('status')] ?? request('status')), 'remove' => array_diff_key(request()->query(), ['status' => ''])];
+        $filterChips[] = ['label' => 'Trạng thái: '.($statusLabels[request('status')] ?? request('status')), 'url' => $chipRemoveUrl('status')];
     }
     if (request()->has('is_active') && request('is_active') !== '') {
-        $filterChips[] = ['label' => request('is_active') === '1' ? 'Đang bật' : 'Đã tắt', 'remove' => array_diff_key(request()->query(), ['is_active' => ''])];
+        $filterChips[] = ['label' => request('is_active') === '1' ? 'Đang bật' : 'Đã tắt', 'url' => $chipRemoveUrl('is_active')];
     }
     if (request('game_id')) {
         $gameName = $games->firstWhere('id', (int) request('game_id'))?->name ?? 'Game #'.request('game_id');
-        $filterChips[] = ['label' => 'Game: '.$gameName, 'remove' => array_diff_key(request()->query(), ['game_id' => ''])];
+        $filterChips[] = ['label' => 'Game: '.$gameName, 'url' => $chipRemoveUrl('game_id')];
     }
     if (request('host_id')) {
         $hostName = $hosts->firstWhere('id', (int) request('host_id'))?->name ?? 'GV #'.request('host_id');
-        $filterChips[] = ['label' => 'Giáo viên: '.$hostName, 'remove' => array_diff_key(request()->query(), ['host_id' => ''])];
+        $filterChips[] = ['label' => 'Giáo viên: '.$hostName, 'url' => $chipRemoveUrl('host_id')];
     }
     if (request('created_from')) {
-        $filterChips[] = ['label' => 'Từ '.request('created_from'), 'remove' => array_diff_key(request()->query(), ['created_from' => ''])];
+        $filterChips[] = ['label' => 'Từ '.request('created_from'), 'url' => $chipRemoveUrl('created_from')];
     }
     if (request('created_to')) {
-        $filterChips[] = ['label' => 'Đến '.request('created_to'), 'remove' => array_diff_key(request()->query(), ['created_to' => ''])];
+        $filterChips[] = ['label' => 'Đến '.request('created_to'), 'url' => $chipRemoveUrl('created_to')];
     }
 @endphp
 
@@ -187,22 +185,12 @@
         </form>
     </div>
 
-    @if ($filterChips || $hasSearch)
-        <div class="list-active-filters" aria-label="Bộ lọc đang áp dụng">
-            @if ($hasSearch)
-                <a class="filter-chip" href="{{ route('admin.sessions.index', request()->except(['q', 'page'])) }}">
-                    Tìm: “{{ Str::limit($searchValue, 32) }}”
-                    <span class="filter-chip__remove" aria-hidden="true">×</span>
-                </a>
-            @endif
-            @foreach ($filterChips as $chip)
-                <a class="filter-chip" href="{{ route('admin.sessions.index', $chip['remove']) }}">
-                    {{ $chip['label'] }}
-                    <span class="filter-chip__remove" aria-hidden="true">×</span>
-                </a>
-            @endforeach
-        </div>
-    @endif
+    @include('admin.partials.list-active-filters', [
+        'chips' => $filterChips,
+        'searchChip' => $hasSearch
+            ? ['label' => $searchValue, 'url' => route('admin.sessions.index', request()->except(['q', 'page']))]
+            : null,
+    ])
 
     @if ($sessions->isEmpty())
         <div class="empty-state">
@@ -385,6 +373,6 @@
 
 @push('scripts')
 @php $qpJs = public_path('htd-admin/js/quiz-preview.js'); $slJs = public_path('js/sessions-list.js'); @endphp
-<script src="{{ asset('htd-admin/js/quiz-preview.js') }}?v={{ file_exists($qpJs) ? filemtime($qpJs) : $qpV }}"></script>
-<script src="{{ asset('js/sessions-list.js') }}?v={{ file_exists($slJs) ? filemtime($slJs) : time() }}"></script>
+<script src="@vasset('htd-admin/js/quiz-preview.js')"></script>
+<script src="@vasset('js/sessions-list.js')"></script>
 @endpush

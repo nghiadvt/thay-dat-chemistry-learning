@@ -106,5 +106,5 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('htd-admin/js/admin-keyboard-preview.js') }}?v={{ file_exists(public_path('htd-admin/js/admin-keyboard-preview.js')) ? filemtime(public_path('htd-admin/js/admin-keyboard-preview.js')) : time() }}"></script>
+<script src="@vasset('htd-admin/js/admin-keyboard-preview.js')"></script>
 @endpush

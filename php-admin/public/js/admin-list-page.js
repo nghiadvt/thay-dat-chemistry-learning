@@ -12,6 +12,12 @@
     });
   }
 
+  // Modal xác nhận dùng chung; fallback confirm() nếu AdminConfirm chưa nạp
+  function confirmAction(opts) {
+    if (window.AdminConfirm) return AdminConfirm.show(opts);
+    return Promise.resolve(confirm(opts.message));
+  }
+
   function submitHiddenForm(url, method) {
     const form = document.createElement('form');
     form.method = method === 'GET' ? 'GET' : 'POST';
@@ -58,7 +64,12 @@
         location.href = url;
         return;
       }
-      if (confirmMsg && !confirm(confirmMsg)) return;
+      if (confirmMsg) {
+        confirmAction({ message: confirmMsg }).then((ok) => {
+          if (ok) submitHiddenForm(url, method);
+        });
+        return;
+      }
       submitHiddenForm(url, method);
       return;
     }
@@ -67,8 +78,10 @@
       const url = btn?.dataset?.href || menu.dataset.deleteUrl;
       const label = menu.dataset.itemLabel || menu.dataset.sessionName || 'mục này';
       const message = btn?.dataset?.confirm || `Xóa «${label}»? Hành động không thể hoàn tác.`;
-      if (!url || !confirm(message)) return;
-      submitHiddenForm(url, btn?.dataset?.method || 'DELETE');
+      if (!url) return;
+      confirmAction({ title: 'Xóa', message, confirmText: 'Xóa', danger: true }).then((ok) => {
+        if (ok) submitHiddenForm(url, btn?.dataset?.method || 'DELETE');
+      });
       return;
     }
 

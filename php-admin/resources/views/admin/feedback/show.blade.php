@@ -82,5 +82,5 @@
 
 @push('head')
 @php $fbCss = public_path('css/feedback-admin.css'); @endphp
-<link rel="stylesheet" href="{{ asset('css/feedback-admin.css') }}?v={{ file_exists($fbCss) ? filemtime($fbCss) : time() }}">
+<link rel="stylesheet" href="@vasset('css/feedback-admin.css')">
 @endpush

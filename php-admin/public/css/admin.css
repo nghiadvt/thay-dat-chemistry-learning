@@ -1706,3 +1706,11 @@ table.data-table tr.row-inactive td {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Subtitle + tiện ích thay inline style (quizzes/show, form) */
+.page-subtitle {
+  margin: 4px 0 0;
+  color: #6b7280;
+}
+.tag-list--spaced { margin-top: 8px; }
+.input-narrow { max-width: 160px; }

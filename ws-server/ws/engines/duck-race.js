@@ -14,6 +14,7 @@ const {
   getSessionByPin,
 } = require('../db');
 const { checkAnswer } = require('../scoring');
+const { optionOrderKey, shuffleIndices, mapShuffledAnswer } = require('../answer-shuffle');
 const {
   getConnectedStudents,
   refreshRoomTtl,
@@ -83,37 +84,6 @@ function buildStudentQuestionPayload(quiz, question) {
     play_mode: 'duck_race',
     server_time: Date.now(),
   };
-}
-
-function optionOrderKey(pin, questionId, studentName) {
-  return `room:${pin}:option_order:${questionId}:${studentName}`;
-}
-
-function shuffleIndices(length) {
-  const indices = Array.from({ length }, (_, index) => index);
-  for (let i = indices.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
-  return indices;
-}
-
-async function mapShuffledAnswer(redis, pin, questionId, studentName, question, answer) {
-  if (question.answer_type !== 'mc' || answer == null) return answer;
-
-  const orderRaw = await redis.get(optionOrderKey(pin, questionId, studentName));
-  if (!orderRaw) return answer;
-
-  const order = JSON.parse(orderRaw);
-  const submitted = typeof answer === 'object' && answer !== null && 'index' in answer
-    ? answer.index
-    : answer;
-  const originalIndex = order[Number(submitted)];
-
-  if (typeof answer === 'object' && answer !== null) {
-    return { ...answer, index: originalIndex };
-  }
-  return originalIndex;
 }
 
 async function emitRaceUpdate(io, redis, pin, rules) {

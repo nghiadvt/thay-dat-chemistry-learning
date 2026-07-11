@@ -1,5 +1,6 @@
+{{-- Contract chung mọi trang: mỗi chip = ['label' => string, 'url' => string (link bỏ điều kiện đó)] --}}
 @php
-    /** @var array<int, array{label: string, remove: array}> $chips */
+    /** @var array<int, array{label: string, url: string}> $chips */
     $chips = $chips ?? [];
     $clearRoute = $clearRoute ?? null;
     $searchChip = $searchChip ?? null;

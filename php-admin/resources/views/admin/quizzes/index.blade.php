@@ -186,8 +186,8 @@
 
 @push('scripts')
 @php $qpJs = public_path('htd-admin/js/quiz-preview.js'); @endphp
-<script src="{{ asset('js/admin-csv-exchange.js') }}?v={{ file_exists(public_path('js/admin-csv-exchange.js')) ? filemtime(public_path('js/admin-csv-exchange.js')) : time() }}"></script>
-<script src="{{ asset('htd-admin/js/quiz-preview.js') }}?v={{ file_exists($qpJs) ? filemtime($qpJs) : $qpV }}"></script>
+<script src="@vasset('js/admin-csv-exchange.js')"></script>
+<script src="@vasset('htd-admin/js/quiz-preview.js')"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   window.AdminListPage.onAction = function (menu, action) {

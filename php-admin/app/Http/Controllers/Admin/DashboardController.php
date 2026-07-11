@@ -44,11 +44,7 @@ class DashboardController extends Controller
             'feedback_new' => $isAdmin ? SiteFeedback::where('status', 'new')->count() : SiteFeedback::where('user_id', $user->id)->where('status', 'new')->count(),
         ];
 
-        $statusLabels = [
-            'waiting' => 'Chờ',
-            'playing' => 'Đang chơi',
-            'ended' => 'Kết thúc',
-        ];
+        $statusLabels = \App\Support\StatusLabels::SESSION;
         $statusCounts = (clone $sessionBase)
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')

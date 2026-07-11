@@ -314,3 +314,39 @@
   0% { transform: scale(0.7); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* ── Panel cấu hình trong games/form (thay inline style) ────── */
+.drc-hidden { display: none !important; }
+
+.drc-config-panel {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.drc-config-panel__title {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.drc-scoring-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.form-group--flush { margin: 0; }
+
+.drc-note {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.drc-range {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.drc-submit-btn { margin-top: 16px; }

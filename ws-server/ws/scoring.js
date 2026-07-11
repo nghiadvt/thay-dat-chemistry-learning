@@ -27,7 +27,12 @@ function checkAnswer(question, answer) {
       const submitted = typeof answer === 'object' && answer !== null && 'index' in answer
         ? answer.index
         : answer;
-      const correct = Number(submitted) === Number(question.correct_index);
+      const submittedIndex = Number(submitted);
+      // Guard against missing/null/-1 submissions being coerced to 0 and
+      // matching a correct_index of 0 (an unanswered question must never score).
+      const correct = Number.isInteger(submittedIndex)
+        && submittedIndex >= 0
+        && submittedIndex === Number(question.correct_index);
       return {
         correct,
         correctAnswer: question.options?.[question.correct_index] ?? question.correct_index,

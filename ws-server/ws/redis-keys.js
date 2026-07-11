@@ -24,6 +24,18 @@ function answersPattern(pin, questionId) {
   return `room:${pin}:answer:${questionId}:*`;
 }
 
+/** Non-blocking key lookup (SCAN) — avoids the whole-instance stall KEYS causes at scale. */
+async function scanKeys(redis, pattern) {
+  const keys = [];
+  let cursor = '0';
+  do {
+    const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 1000);
+    cursor = nextCursor;
+    keys.push(...batch);
+  } while (cursor !== '0');
+  return [...new Set(keys)];
+}
+
 module.exports = {
   ROOM_TTL,
   roomKey,
@@ -32,4 +44,5 @@ module.exports = {
   submittedKey,
   answerKey,
   answersPattern,
+  scanKeys,
 };

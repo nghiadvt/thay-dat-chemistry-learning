@@ -4,7 +4,7 @@
 @section('page-title', 'Tổng quan')
 
 @php
-    $statusLabels = ['waiting' => 'Chờ', 'playing' => 'Đang chơi', 'ended' => 'Kết thúc'];
+    $statusLabels = \App\Support\StatusLabels::SESSION;
     $hasDailyData = collect($chartSessionsDaily['values'] ?? [])->sum() > 0;
     $hasStatusData = collect($chartStatus['values'] ?? [])->sum() > 0;
     $hasTopGames = $topGames->isNotEmpty();
@@ -253,8 +253,7 @@
 @endsection
 
 @push('head')
-@php $dashCss = public_path('css/admin-dashboard.css'); @endphp
-<link rel="stylesheet" href="{{ asset('css/admin-dashboard.css') }}?v={{ file_exists($dashCss) ? filemtime($dashCss) : time() }}">
+<link rel="stylesheet" href="@vasset('css/admin-dashboard.css')">
 @endpush
 
 @push('scripts')
@@ -268,7 +267,6 @@
 <script>
 window.__ADMIN_DASHBOARD__ = @json($dashboardPayload);
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-@php $dashJs = public_path('js/admin-dashboard.js'); @endphp
-<script src="{{ asset('js/admin-dashboard.js') }}?v={{ file_exists($dashJs) ? filemtime($dashJs) : time() }}"></script>
+<script src="@vasset('vendor/chart-4.4.7.umd.min.js')"></script>
+<script src="@vasset('js/admin-dashboard.js')"></script>
 @endpush

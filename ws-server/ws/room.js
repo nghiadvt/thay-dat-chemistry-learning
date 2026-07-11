@@ -5,6 +5,7 @@ const {
   playersKey,
   leaderboardKey,
   submittedKey,
+  scanKeys,
 } = require('./redis-keys');
 const { getSessionByPin } = require('./db');
 
@@ -92,12 +93,23 @@ async function handleJoinRoom(io, redis, socket, payload) {
     }
   }
 
+  const providedToken = payload.player_token ? String(payload.player_token).trim() : null;
   const existingRaw = await redis.hget(playersKey(pin), name);
   let player;
   let reconnected = false;
 
   if (existingRaw) {
     player = JSON.parse(existingRaw);
+    // Reconnect must prove ownership with the token issued on first join.
+    // Fallback (no token supplied) is only allowed while the previous socket
+    // is already gone — an actively-connected name can't be hijacked either way.
+    if (providedToken) {
+      if (providedToken !== player.player_token) {
+        throw new Error('Tên đã được sử dụng trong phòng này.');
+      }
+    } else if (player.connected) {
+      throw new Error('Tên đã được sử dụng trong phòng này.');
+    }
     reconnected = true;
     player.connected = true;
     player.disconnected_at = null;
@@ -223,15 +235,17 @@ async function getPlayerAvatar(redis, pin, name) {
   return player?.avatar || null;
 }
 
+/**
+ * Refresh TTL on every key belonging to this room, not just the 3 primary
+ * ones — auxiliary per-question keys (plan, finalized:*, option_order:*,
+ * answer:*, prev_scores, submitted:*) were previously stamped once at
+ * creation and could expire mid-session while the primary keys lived on.
+ */
 async function refreshRoomTtl(redis, pin) {
-  const keys = [
-    roomKey(pin),
-    playersKey(pin),
-    leaderboardKey(pin),
-  ];
-  for (const key of keys) {
-    await redis.expire(key, ROOM_TTL);
-  }
+  const roomKeys = await scanKeys(redis, `room:${pin}*`);
+  const submittedKeys = await scanKeys(redis, `submitted:${pin}:*`);
+  const keys = [...roomKeys, leaderboardKey(pin), ...submittedKeys];
+  await Promise.all(keys.map((key) => redis.expire(key, ROOM_TTL)));
 }
 
 async function getPlayer(redis, pin, name) {

@@ -41,7 +41,64 @@ const state = {
   qrScanner: null,
   playMode: null,
   submitting: false,
+  streak: 0,
+  lastTickSec: null,
+  lastDuckScore: null,
+  lastWaitingCount: 0,
+  finalTimers: [],
 };
+
+/* ── Game-feel helpers (âm thanh + hiệu ứng, an toàn khi thiếu engine) ── */
+function sfx(name) {
+  if (window.HTDSound) HTDSound.play(name);
+}
+
+function replayAnim(el, cls) {
+  if (!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth; // restart animation
+  el.classList.add(cls);
+}
+
+let cartoonToastTimer = null;
+function showCartoonToast(text, emoji) {
+  const toast = document.getElementById('cartoonToast');
+  const textEl = document.getElementById('cartoonToastText');
+  const emojiEl = document.getElementById('cartoonToastEmoji');
+  if (!toast || !textEl) {
+    alert(text);
+    return;
+  }
+  textEl.textContent = text;
+  if (emojiEl) emojiEl.textContent = emoji || '🚀';
+  toast.hidden = false;
+  replayAnim(toast, 'toast-boing');
+  sfx('pop');
+  clearTimeout(cartoonToastTimer);
+  cartoonToastTimer = setTimeout(() => { toast.hidden = true; }, 2400);
+}
+
+function updateStreakBadge() {
+  const badge = document.getElementById('streakBadge');
+  const count = document.getElementById('streakCount');
+  if (!badge || !count) return;
+  if (state.streak >= 2) {
+    count.textContent = String(state.streak);
+    badge.hidden = false;
+    replayAnim(badge, 'pill-bounce');
+  } else {
+    badge.hidden = true;
+  }
+}
+
+/* tick/urgent khi còn ≤5s — gọi từ cả timer demo lẫn timer backend */
+function timerTickFx(sec) {
+  if (sec == null || sec === state.lastTickSec) return;
+  state.lastTickSec = sec;
+  if (sec <= 0 || state.awaitingResult) return;
+  if (sec <= 3) sfx('urgent');
+  else if (sec <= 5) sfx('tick');
+}
 
 const FAKE_QUESTIONS = HTD.FAKE_QUESTIONS;
 
@@ -58,7 +115,13 @@ function updateDuckScoreDisplay(score) {
   const text = document.getElementById('qDuckScoreText');
   const val = score ?? state.myScore ?? 0;
   if (text) text.textContent = String(val);
-  if (pill) pill.hidden = !isDuckRaceMode();
+  if (pill) {
+    pill.hidden = !isDuckRaceMode();
+    if (!pill.hidden && state.lastDuckScore !== null && val !== state.lastDuckScore) {
+      replayAnim(pill, 'pill-bounce');
+    }
+  }
+  state.lastDuckScore = val;
 }
 
 function showDuckRaceFeedback(data) {
@@ -87,6 +150,17 @@ function showDuckRaceFeedback(data) {
     }
   }
   requestAnimationFrame(() => el.classList.add('visible'));
+  // Âm thanh + hiệu ứng game
+  if (data.finish_rank) {
+    sfx('fanfare');
+    if (window.HTDFx) HTDFx.sparkleRain({ count: 36 });
+  } else if (correct) {
+    sfx('correct');
+    if (window.HTDFx) HTDFx.burstAtElement(el, { count: 14 });
+  } else {
+    sfx('wrong');
+    if (window.HTDFx) HTDFx.shake();
+  }
   clearTimeout(state.duckFeedbackTimer);
   state.duckFeedbackTimer = setTimeout(() => {
     el.classList.remove('visible');
@@ -121,7 +195,22 @@ function showScreen(id) {
     document.getElementById('qVideo')?.pause();
   }
   HTD.showScreen(id);
+  const changed = state.screen && state.screen !== id;
   state.screen = id;
+
+  // Hiệu ứng chuyển màn: pop-in + whoosh
+  if (changed) sfx('whoosh');
+  const sectionEl = document.querySelector(`.screen[data-screen="${id}"]`);
+  if (sectionEl) {
+    replayAnim(sectionEl, 'screen-pop-in');
+    sectionEl.addEventListener('animationend', () => sectionEl.classList.remove('screen-pop-in'), { once: true });
+  }
+
+  // Nhạc nền chỉ chạy trong phòng chờ
+  if (window.HTDSound) {
+    if (id === 'waiting') HTDSound.startMusic();
+    else HTDSound.stopMusic();
+  }
 
   if (id === 'join') initJoin();
   if (id === 'profile') initProfile();
@@ -134,6 +223,7 @@ function showScreen(id) {
   if (id === 'question') startQuestion();
   if (id === 'leaderboard') renderLeaderboard();
   if (id === 'final') renderFinal();
+  if (id === 'elements' && window.ElementsModule) ElementsModule.enterGrid();
   syncGamePoll();
 }
 
@@ -150,12 +240,17 @@ function goStudentHome() {
 }
 
 function openHomeFeature(feature) {
+  sfx('tap');
   if (feature === 'play') {
     window.location.href = '/join';
     return;
   }
+  if (feature === 'elements' && window.ElementsModule) {
+    showScreen('elements');
+    return;
+  }
   const label = HOME_FEATURE_LABELS[feature] || 'Tính năng';
-  alert(`${label} — sắp ra mắt!`);
+  showCartoonToast(`${label} — sắp ra mắt!`, '🧪');
 }
 
 // ─── Join PIN / QR ───
@@ -186,6 +281,9 @@ function renderPinDisplay() {
     else if (isCursor) cls += ' cursor';
     return `<div class="${cls}">${state.pinDigits[i] || ''}</div>`;
   }).join('');
+  // ô vừa nhập nảy nhẹ
+  const dots = el.querySelectorAll('.pin-dot.filled');
+  if (dots.length) replayAnim(dots[dots.length - 1], 'pin-pop');
   const btn = document.getElementById('btnJoinSubmit');
   if (btn) btn.disabled = state.pinDigits.length !== 6;
 }
@@ -206,6 +304,7 @@ function buildNumpad() {
   }).join('');
   pad.querySelectorAll('.numpad-key').forEach(btn => {
     btn.onclick = () => {
+      sfx('tap');
       const key = btn.dataset.key;
       if (key === '⌫') state.pinDigits = state.pinDigits.slice(0, -1);
       else if (state.pinDigits.length < 6) state.pinDigits += key;
@@ -591,6 +690,7 @@ function submitProfile() {
         state.playerId = state.studentName;
         state.waitingJoinedAt = Date.now();
         state.backendMode = true;
+        sfx('join');
         handleBackendRoomJoined(data);
       })
       .catch(err => alert(err.message || 'Không vào được phòng.'));
@@ -600,6 +700,7 @@ function submitProfile() {
   state.playerId = HTD.genId();
   state.waitingJoinedAt = Date.now();
   saveMyPlayer();
+  sfx('join');
   showScreen('waiting');
 }
 
@@ -700,18 +801,27 @@ function renderWaitingGrid() {
     document.getElementById('waitingPinDisplay').textContent = room.pin;
   }
   const players = getPlayersForWaiting();
+  const prevCount = state.lastWaitingCount || 0;
   document.getElementById('playersGrid').innerHTML = players
-    .map(p => {
+    .map((p, idx) => {
       const isMe = Boolean(p.isMe) || p.id === state.playerId || p.name === state.studentName;
       const av = p.avatarDataUrl
         ? `<img src="${p.avatarDataUrl}" alt="">`
         : p.avatarEmoji || '😀';
-      return `<div class="player-card${isMe ? ' me' : ''}">
+      const isNew = idx >= prevCount; // chỉ card mới xuất hiện mới pop
+      return `<div class="player-card${isMe ? ' me' : ''}${isNew ? ' pop-in' : ''}">
       <div class="player-av">${av}</div>
       <div class="player-name">${p.name}${isMe ? ' (bạn)' : ''}</div>
     </div>`;
     })
     .join('');
+  if (players.length > prevCount && prevCount > 0 && state.screen === 'waiting') {
+    sfx('join');
+    const cards = document.querySelectorAll('#playersGrid .player-card');
+    const newest = cards[cards.length - 1];
+    if (newest && window.HTDFx) HTDFx.burstAtElement(newest, { count: 10 });
+  }
+  state.lastWaitingCount = players.length;
   const editInput = document.getElementById('editNameInput');
   if (document.activeElement !== editInput) {
     editInput.value = state.studentName;
@@ -869,6 +979,7 @@ function getFocusedSlotType() {
 
 function onChemKey(val) {
   if (!state.eqController) return;
+  sfx('tap');
   const q = getCurrentQuestion();
   const slotType = getFocusedSlotType();
 
@@ -903,6 +1014,7 @@ function onCoefKey(key) {
   if (!state.eqController?.inputDigit) return;
   const slotType = getFocusedSlotType();
   if (slotType === 'blank') return;
+  sfx('tap');
   if (key === '⌫') {
     state.focusedSlotId = state.eqController.backspace(state.focusedSlotId);
   } else {
@@ -936,6 +1048,7 @@ function updateSyncedTimerUI() {
   if (game.paused) pill.classList.add('paused');
   else if (sec <= 3) pill.classList.add('danger');
   else if (sec <= 5) pill.classList.add('warn');
+  if (!game.paused) timerTickFx(sec);
   return sec;
 }
 
@@ -1042,9 +1155,15 @@ function startQuestion() {
 
   resetQuestionAnswerState();
   state.selectedAnswer = null;
+  state.lastTickSec = null;
   const screen = document.querySelector('.question-screen');
   screen.classList.toggle('mode-input', q.type === 'input');
   screen.classList.toggle('mode-mc', q.type === 'mc');
+
+  // Intro: card rơi xuống + tiếng "vào câu"
+  replayAnim(document.getElementById('qCard'), 'q-drop-in');
+  sfx('countdown-go');
+  updateStreakBadge();
 
   document.getElementById('qProgress').textContent = isBackendMode()
     ? `Câu ${state.questionIndex + 1}`
@@ -1114,6 +1233,7 @@ function startQuestionTimer(q, onEnd) {
         if (sec <= 3) pill.classList.add('danger');
         else if (sec <= 5) pill.classList.add('warn');
       }
+      timerTickFx(sec);
       return sec;
     };
     tick();
@@ -1154,14 +1274,20 @@ function renderMcOptions(q, container) {
   ['A', 'B', 'C', 'D'].forEach((label, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'mc-option';
+    btn.className = 'mc-option opt-pop';
+    btn.style.animationDelay = `${i * 60}ms`; // đáp án pop lần lượt
     const optText = q.options[i] || '';
     btn.innerHTML =
       `<span class="mc-option-label">${label}.</span>` +
       `<span class="mc-option-text">${EquationUI.chemToHtml(optText)}</span>` +
       `<span class="mc-check" aria-hidden="true">✓</span>`;
+    btn.addEventListener('animationend', () => {
+      btn.classList.remove('opt-pop');
+      btn.style.animationDelay = '';
+    }, { once: true });
     btn.onclick = () => {
       if (state.awaitingResult || state.submitting) return;
+      sfx('tap');
       wrap.querySelectorAll('.mc-option').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
       state.selectedAnswer = i;
@@ -1283,6 +1409,8 @@ function showLockedBanner(answerDisplay, elapsedSeconds) {
   answerEl.textContent = state.lockedAnswerDisplay;
   timeEl.textContent = `Thời gian nộp: ${state.lockedElapsedSeconds}s`;
   banner.hidden = false;
+  replayAnim(banner, 'stamp-in');
+  sfx('pop');
 
   const submitBtn = document.getElementById('mcSubmitBtn');
   if (submitBtn) submitBtn.textContent = 'Cập nhật đáp án';
@@ -1499,9 +1627,35 @@ function showResult(result) {
     state.myScore = Number(result.total_score);
   }
 
+  // Chuỗi đúng liên tiếp
+  state.streak = ok ? state.streak + 1 : 0;
+  updateStreakBadge();
+
+  const card = ov.querySelector('.result-card');
+  ov.classList.toggle('wrong-bg', !ok);
+  if (card) card.classList.toggle('is-wrong', !ok);
+
   ov.classList.add('show');
-  if (ok && typeof confetti === 'function') {
-    confetti({ particleCount: 60, spread: 55, origin: { y: 0.6 } });
+  if (ok) {
+    sfx('correct');
+    if (typeof confetti === 'function') {
+      // hai nguồn confetti chéo từ 2 mép dưới
+      confetti({ particleCount: 50, angle: 60, spread: 60, origin: { x: 0, y: 0.85 } });
+      confetti({ particleCount: 50, angle: 120, spread: 60, origin: { x: 1, y: 0.85 } });
+    }
+    setTimeout(() => {
+      const circle = document.getElementById('resultCircle');
+      if (window.HTDFx) {
+        HTDFx.burstAtElement(circle, { count: 22 });
+        if (pts > 0) {
+          HTDFx.floatText(window.innerWidth / 2, window.innerHeight * 0.3, `+${pts}`, { size: 34 });
+        }
+      }
+    }, 120);
+  } else {
+    sfx('wrong');
+    if (window.HTDFx) HTDFx.shake();
+    if (card) replayAnim(card, 'wobble-sad');
   }
 
   if (!isBackendMode()) updateScores();
@@ -1635,6 +1789,8 @@ function renderLeaderboard() {
             el.style.transition = 'transform 0.5s ease';
             el.style.transform = '';
           });
+          // vượt hạng (đi lên) → nháy vàng sau khi trượt xong
+          if (diff > 2) replayAnim(el, 'lb-flash');
         }
       }
     });
@@ -1736,6 +1892,33 @@ function renderFinal() {
     ${renderSlot(slot3, 3)}
   `;
 
+  // Nghi lễ trao giải: bậc 3 → 2 → 1 lần lượt trồi lên, rồi vương miện + pháo sao + fanfare
+  state.finalTimers.forEach(id => clearTimeout(id));
+  state.finalTimers = [];
+  const slots = [
+    [podiumEl.querySelector('.slot-3'), 0],
+    [podiumEl.querySelector('.slot-2'), 500],
+    [podiumEl.querySelector('.slot-1'), 1000],
+  ];
+  slots.forEach(([el, delay]) => {
+    if (!el) return;
+    state.finalTimers.push(setTimeout(() => {
+      el.classList.add('podium-rise');
+      sfx('pop');
+    }, delay));
+  });
+  state.finalTimers.push(setTimeout(() => {
+    const winnerCard = podiumEl.querySelector('.slot-1 .student-final-podium-card');
+    if (winnerCard && !winnerCard.querySelector('.student-final-podium-crown')) {
+      winnerCard.insertAdjacentHTML(
+        'afterbegin',
+        '<svg class="icon student-final-podium-crown crown-drop" aria-hidden="true"><use href="#i-crown"/></svg>'
+      );
+    }
+    if (window.HTDFx) HTDFx.sparkleRain({ count: 44 });
+    sfx('fanfare');
+  }, 1600));
+
   listEl.innerHTML = rows
     .map((row, index) => {
       const time = formatStudentFinishTime(row.finishElapsedS);
@@ -1765,6 +1948,8 @@ function restartGame() {
   state.fakeScores = {};
   state.lastGameQuestionIndex = -1;
   state.waitingJoinedAt = Date.now();
+  state.streak = 0;
+  state.lastDuckScore = null;
   initDisplayPlayers();
   showScreen('waiting');
 }
@@ -1946,6 +2131,10 @@ function setupStudentBackendBridge() {
 setupStudentBackendBridge();
 
 document.getElementById('qStarBtn')?.addEventListener('click', function () {
+  sfx('tap');
   this.classList.toggle('active');
   this.textContent = this.classList.contains('active') ? '★' : '☆';
+  if (this.classList.contains('active') && window.HTDFx) {
+    HTDFx.burstAtElement(this, { count: 8, color: '#FFC93C' });
+  }
 });
