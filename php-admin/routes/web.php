@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\GameController as AdminGameController;
+use App\Http\Controllers\Admin\ImageCropperController as AdminImageCropperController;
 use App\Http\Controllers\Admin\KeyboardController as AdminKeyboardController;
 use App\Http\Controllers\Admin\QuestionBankController as AdminQuestionBankController;
 use App\Http\Controllers\Admin\QuestionController as AdminQuestionController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Admin\SessionController as AdminSessionController;
 use App\Http\Controllers\Admin\TagController as AdminTagController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\GameSessionController;
+use App\Http\Controllers\Api\ImageCropController;
 use App\Http\Controllers\Api\KeyboardController;
 use App\Http\Controllers\Api\PracticeController;
 use App\Http\Controllers\Api\QuestionController;
@@ -77,6 +79,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('dashboard/export', [AdminDashboardController::class, 'export'])->name('dashboard.export');
         Route::view('appearance', 'admin.appearance.index')->name('appearance');
+        Route::get('image-cropper', [AdminImageCropperController::class, 'index'])->name('image-cropper');
 
         Route::resource('keyboards', AdminKeyboardController::class)->except(['show', 'update']);
         Route::get('keyboards/{keyboard}/editor', [AdminKeyboardController::class, 'editor'])->name('keyboards.editor');
@@ -141,6 +144,7 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('quizzes', QuizController::class);
 
         Route::post('question-content-images', [QuestionImageController::class, 'store'])->name('question-images.store');
+        Route::post('image-crops', [ImageCropController::class, 'store'])->name('image-crops.store');
 
         Route::post('site-feedback', [SiteFeedbackController::class, 'store'])->name('site-feedback.store');
 
