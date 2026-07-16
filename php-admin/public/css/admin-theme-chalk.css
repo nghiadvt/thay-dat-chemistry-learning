@@ -1,0 +1,387 @@
+/* ═══════════════════════════════════════════════════════════════
+   Theme "Bảng Phấn Lớp Học" — bảng xanh, khung gỗ, chữ phấn viết tay.
+   Kích hoạt bằng html[data-theme="chalk"]; các theme khác không đổi.
+   ═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Itim&display=swap');
+
+html[data-theme="chalk"] {
+  --ch-board: #24443a;
+  --ch-board-dark: #1a352c;
+  --ch-panel: rgba(10, 34, 26, 0.55);
+  --ch-panel-solid: #17332a;
+  --ch-chalk: #f2f7f0;
+  --ch-chalk-dim: rgba(242, 247, 240, 0.62);
+  --ch-yellow: #ffe9a8;
+  --ch-pink: #ffb9c8;
+  --ch-blue: #bfe3ff;
+  --ch-wood-1: #8b5a2b;
+  --ch-wood-2: #5c3a1e;
+  --ch-dash: rgba(242, 247, 240, 0.4);
+  /* bo góc "vẽ tay" lệch nhẹ */
+  --ch-wobble: 18px 8px 16px 10px / 10px 16px 8px 18px;
+  --ch-wobble-sm: 12px 6px 14px 8px / 8px 14px 6px 12px;
+  color-scheme: dark;
+}
+
+/* ── Tấm bảng + khung gỗ quanh màn hình ── */
+html[data-theme="chalk"] body.admin-body {
+  font-family: 'Patrick Hand', 'Itim', cursive;
+  font-size: 1.08rem;
+  letter-spacing: 0.01em;
+  color: var(--ch-chalk);
+  background:
+    radial-gradient(900px 500px at 20% 10%, rgba(255, 255, 255, 0.045), transparent 60%),
+    radial-gradient(700px 460px at 85% 85%, rgba(255, 255, 255, 0.035), transparent 60%),
+    radial-gradient(ellipse at center, var(--ch-board) 0%, var(--ch-board-dark) 100%);
+  background-attachment: fixed;
+}
+html[data-theme="chalk"] body.admin-body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9990;
+  border: 10px solid;
+  border-image: linear-gradient(135deg, var(--ch-wood-1), var(--ch-wood-2) 55%, #7a4e26) 1;
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="chalk"] .admin-shell {
+  position: relative;
+  z-index: 1;
+}
+html[data-theme="chalk"] a { color: var(--ch-blue); }
+html[data-theme="chalk"] ::selection {
+  background: var(--ch-yellow);
+  color: #1a352c;
+}
+html[data-theme="chalk"] h1,
+html[data-theme="chalk"] h2,
+html[data-theme="chalk"] h3,
+html[data-theme="chalk"] h4 {
+  color: var(--ch-yellow);
+  font-family: 'Patrick Hand', cursive;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* lớp bụi phấn + công thức viết phấn (admin-theme.js tạo .chalk-fx) */
+.chalk-fx { display: none; }
+html[data-theme="chalk"] .chalk-fx {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.chalk-dust {
+  position: absolute;
+  top: -8px;
+  border-radius: 50%;
+  background: rgba(242, 247, 240, 0.55);
+  filter: blur(0.6px);
+  animation: chalkDustFall linear infinite;
+}
+@keyframes chalkDustFall {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.7; }
+  100% { transform: translateY(105vh) translateX(26px); opacity: 0; }
+}
+.chalk-doodle {
+  position: absolute;
+  opacity: 0.13;
+  animation: chalkDoodleSway ease-in-out infinite alternate;
+}
+.chalk-doodle svg { width: 100%; height: 100%; }
+@keyframes chalkDoodleSway {
+  from { transform: rotate(-2deg) translateY(0); }
+  to { transform: rotate(2.5deg) translateY(-10px); }
+}
+
+/* ── Sidebar: khung gỗ + bảng con ── */
+html[data-theme="chalk"] .admin-sidebar {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 88px),
+    linear-gradient(170deg, #7a5230, #5c3a1e 70%, #4c2f16);
+  border-right: 4px solid #3d2513;
+  box-shadow: 6px 0 24px rgba(10, 20, 12, 0.5);
+}
+html[data-theme="chalk"] .admin-brand {
+  border-bottom: 2px dashed rgba(255, 233, 168, 0.35);
+}
+html[data-theme="chalk"] .admin-brand h1 {
+  color: var(--ch-yellow);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.25rem;
+}
+html[data-theme="chalk"] .admin-brand h1::before {
+  content: '🧑‍🏫';
+  animation: chalkBrandNod 3.2s ease-in-out infinite;
+}
+@keyframes chalkBrandNod {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(6deg) translateY(-2px); }
+}
+html[data-theme="chalk"] .admin-brand p { color: #dcc196; }
+
+html[data-theme="chalk"] .admin-nav { padding: 14px 12px; }
+html[data-theme="chalk"] .admin-nav a {
+  margin: 3px 0;
+  color: #f4e8d0;
+  font-size: 1.08rem;
+  border: 2px dashed transparent;
+  border-radius: var(--ch-wobble-sm);
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+html[data-theme="chalk"] .admin-nav a::before {
+  width: 22px;
+  text-align: center;
+  font-size: 1rem;
+}
+html[data-theme="chalk"] .admin-nav a:nth-of-type(1)::before { content: '🏠'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(2)::before { content: '⌨️'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(3)::before { content: '🎯'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(4)::before { content: '🖍️'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(5)::before { content: '📖'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(6)::before { content: '🔔'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(7)::before { content: '📐'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(8)::before { content: '💌'; }
+html[data-theme="chalk"] .admin-nav a:nth-of-type(9)::before { content: '🖌️'; }
+html[data-theme="chalk"] .admin-nav a:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  transform: translateX(3px);
+}
+/* mục active = giáo viên khoanh tròn bằng phấn vàng */
+html[data-theme="chalk"] .admin-nav a.active {
+  background: rgba(255, 233, 168, 0.1);
+  border-color: var(--ch-yellow);
+  border-radius: 50% 40% 55% 45% / 45% 55% 40% 50%;
+  color: var(--ch-yellow);
+  transform: rotate(-1.2deg);
+}
+
+/* ── Topbar: mép bảng + khay phấn ── */
+html[data-theme="chalk"] .admin-topbar {
+  background: rgba(12, 36, 28, 0.82);
+  border-bottom: 6px solid;
+  border-image: linear-gradient(90deg, var(--ch-wood-1), #6d4522, var(--ch-wood-1)) 1;
+}
+html[data-theme="chalk"] .admin-topbar-left h2 {
+  color: var(--ch-chalk);
+  text-decoration: underline wavy rgba(255, 233, 168, 0.7) 2px;
+  text-underline-offset: 7px;
+  font-size: 1.4rem;
+}
+html[data-theme="chalk"] .admin-user { color: var(--ch-chalk-dim); }
+html[data-theme="chalk"] .admin-sidebar-toggle {
+  background: transparent;
+  border: 2px dashed var(--ch-dash);
+  border-radius: var(--ch-wobble-sm);
+  color: var(--ch-chalk-dim);
+}
+html[data-theme="chalk"] .admin-sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--ch-chalk);
+  color: var(--ch-chalk);
+}
+
+/* ── Nội dung: hiện như phấn vừa viết ── */
+html[data-theme="chalk"] .admin-content {
+  animation: chalkWriteIn 0.45s ease both;
+}
+@keyframes chalkWriteIn {
+  from { opacity: 0; filter: blur(2px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+/* ── Card: khung kẻ phấn nét đứt ── */
+html[data-theme="chalk"] .card {
+  background: var(--ch-panel);
+  border: 2px dashed var(--ch-dash);
+  border-radius: var(--ch-wobble);
+  box-shadow: inset 0 0 46px rgba(255, 255, 255, 0.035);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+html[data-theme="chalk"] .card:hover {
+  border-color: rgba(242, 247, 240, 0.7);
+  background: rgba(10, 34, 26, 0.72);
+}
+html[data-theme="chalk"] .page-header__meta,
+html[data-theme="chalk"] .hint-inline,
+html[data-theme="chalk"] .form-group .hint {
+  color: var(--ch-chalk-dim);
+}
+
+/* ── Nút: viền phấn, hover tô kín ── */
+html[data-theme="chalk"] .btn {
+  font-family: 'Patrick Hand', cursive;
+  font-size: 1.05rem;
+  background: transparent;
+  border: 2px solid;
+  border-radius: var(--ch-wobble-sm);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+html[data-theme="chalk"] .btn-primary {
+  color: var(--ch-yellow);
+  border-color: var(--ch-yellow);
+  background: rgba(255, 233, 168, 0.08);
+}
+html[data-theme="chalk"] .btn-primary:hover {
+  background: var(--ch-yellow);
+  color: #3d2f0e;
+  box-shadow: 0 0 16px rgba(255, 233, 168, 0.35);
+  transform: rotate(-0.5deg);
+}
+html[data-theme="chalk"] .btn-secondary {
+  color: var(--ch-chalk);
+  border-color: rgba(242, 247, 240, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+}
+html[data-theme="chalk"] .btn-secondary:hover {
+  background: var(--ch-chalk);
+  color: #24443a;
+  transform: rotate(0.5deg);
+}
+html[data-theme="chalk"] .btn-danger {
+  color: var(--ch-pink);
+  border-color: var(--ch-pink);
+  background: rgba(255, 185, 200, 0.08);
+}
+html[data-theme="chalk"] .btn-danger:hover {
+  background: var(--ch-pink);
+  color: #5c1626;
+  box-shadow: 0 0 16px rgba(255, 185, 200, 0.35);
+}
+
+/* ── Form: viết lên bảng ── */
+html[data-theme="chalk"] input[type=text],
+html[data-theme="chalk"] input[type=email],
+html[data-theme="chalk"] input[type=password],
+html[data-theme="chalk"] input[type=number],
+html[data-theme="chalk"] input[type=date],
+html[data-theme="chalk"] input[type=search],
+html[data-theme="chalk"] select,
+html[data-theme="chalk"] textarea {
+  background: rgba(0, 0, 0, 0.22);
+  border: 2px dashed var(--ch-dash);
+  border-radius: var(--ch-wobble-sm);
+  color: var(--ch-chalk);
+  font-family: inherit;
+  font-size: 1.02rem;
+  caret-color: var(--ch-yellow);
+}
+html[data-theme="chalk"] input:focus,
+html[data-theme="chalk"] select:focus,
+html[data-theme="chalk"] textarea:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--ch-yellow);
+  box-shadow: 0 0 14px rgba(255, 233, 168, 0.2);
+}
+html[data-theme="chalk"] input::placeholder,
+html[data-theme="chalk"] textarea::placeholder { color: rgba(242, 247, 240, 0.35); }
+html[data-theme="chalk"] .form-group > label { color: var(--ch-blue); }
+html[data-theme="chalk"] select option { background: var(--ch-panel-solid); color: var(--ch-chalk); }
+
+/* ── Bảng: kẻ dòng bằng phấn ── */
+html[data-theme="chalk"] table.data-table { font-size: 1rem; }
+html[data-theme="chalk"] table.data-table th {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ch-yellow);
+  border-bottom: 3px double rgba(242, 247, 240, 0.5);
+}
+html[data-theme="chalk"] table.data-table td {
+  border-bottom: 1px dashed rgba(242, 247, 240, 0.22);
+  color: var(--ch-chalk);
+}
+html[data-theme="chalk"] table.data-table tr:hover td {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+/* ── Trang danh sách ── */
+html[data-theme="chalk"] .list-search input[type="search"] { background: rgba(0, 0, 0, 0.22); }
+html[data-theme="chalk"] .list-toolbar__filter-toggle,
+html[data-theme="chalk"] .csv-exchange__trigger,
+html[data-theme="chalk"] .row-action-menu__trigger,
+html[data-theme="chalk"] .table-column-picker__trigger {
+  background: transparent;
+  border: 2px dashed var(--ch-dash);
+  border-radius: var(--ch-wobble-sm);
+  color: var(--ch-chalk);
+}
+html[data-theme="chalk"] .list-toolbar__filter-toggle:hover,
+html[data-theme="chalk"] .csv-exchange__trigger:hover,
+html[data-theme="chalk"] .row-action-menu__trigger:hover {
+  border-color: var(--ch-chalk);
+  background: rgba(255, 255, 255, 0.07);
+}
+html[data-theme="chalk"] .list-filters-panel,
+html[data-theme="chalk"] .row-action-menu__panel,
+html[data-theme="chalk"] .csv-exchange__panel,
+html[data-theme="chalk"] .table-column-picker__panel {
+  background: var(--ch-panel-solid);
+  border: 2px dashed rgba(242, 247, 240, 0.5);
+  border-radius: var(--ch-wobble);
+  box-shadow: 0 16px 40px rgba(5, 15, 10, 0.6);
+  color: var(--ch-chalk);
+}
+html[data-theme="chalk"] .row-action-menu__item { color: var(--ch-chalk); }
+html[data-theme="chalk"] .row-action-menu__item:hover { background: rgba(255, 255, 255, 0.08); }
+html[data-theme="chalk"] .filter-chip {
+  background: rgba(255, 233, 168, 0.1);
+  border: 1.5px dashed rgba(255, 233, 168, 0.6);
+  color: var(--ch-yellow);
+}
+html[data-theme="chalk"] .empty-state { color: var(--ch-chalk-dim); }
+html[data-theme="chalk"] .list-table-footer__summary,
+html[data-theme="chalk"] .list-table-footer { color: var(--ch-chalk-dim); }
+html[data-theme="chalk"] .session-pin-badge {
+  background: transparent;
+  border: 2px dashed var(--ch-yellow);
+  border-radius: var(--ch-wobble-sm);
+  color: var(--ch-yellow);
+  transform: rotate(-1.5deg);
+  display: inline-block;
+  letter-spacing: 0.1em;
+}
+
+/* ── Game cards: tranh vẽ trên bảng ── */
+html[data-theme="chalk"] .game-card {
+  background: var(--ch-panel);
+  border: 2px dashed var(--ch-dash);
+  border-radius: var(--ch-wobble);
+}
+html[data-theme="chalk"] .game-card:hover {
+  border-color: rgba(242, 247, 240, 0.75);
+  transform: translateY(-3px) rotate(-0.4deg);
+  box-shadow: 0 14px 30px rgba(5, 15, 10, 0.45);
+}
+html[data-theme="chalk"] .game-card__meta,
+html[data-theme="chalk"] .game-card__desc { color: var(--ch-chalk-dim); }
+
+/* ── Thanh cuộn viên phấn ── */
+html[data-theme="chalk"] ::-webkit-scrollbar { width: 12px; height: 12px; }
+html[data-theme="chalk"] ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); }
+html[data-theme="chalk"] ::-webkit-scrollbar-thumb {
+  background: rgba(242, 247, 240, 0.4);
+  border-radius: 8px;
+  border: 3px solid rgba(0, 0, 0, 0.2);
+}
+html[data-theme="chalk"] ::-webkit-scrollbar-thumb:hover { background: rgba(242, 247, 240, 0.65); }
+
+html[data-theme="chalk"] .field-error { color: var(--ch-pink); }
+
+/* ── Trang chọn giao diện ── */
+html[data-theme="chalk"] .theme-pick-card {
+  background: var(--ch-panel);
+  border: 2px dashed var(--ch-dash);
+  border-radius: var(--ch-wobble);
+}
+html[data-theme="chalk"] .theme-pick-card.is-active {
+  border-color: var(--ch-yellow);
+  box-shadow: 0 0 20px rgba(255, 233, 168, 0.2);
+}
+html[data-theme="chalk"] .theme-pick-body p { color: var(--ch-chalk-dim); }

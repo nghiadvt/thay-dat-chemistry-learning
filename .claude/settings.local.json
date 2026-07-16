@@ -1,9 +1,12 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(grep -n \"PIN\\\\s*·\\\\s*123456\" -A3 -B15 \"//wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning/prototype/teacher.html\" | head -40)",
       "Read(///wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning/prototype/**)",
-      "Bash(php -v)"
+      "Bash(php -v)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ]
   }
 }

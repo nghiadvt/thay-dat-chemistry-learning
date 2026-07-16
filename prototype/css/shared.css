@@ -150,6 +150,40 @@ html, body {
 .cartoon-toast[hidden] { display: none; }
 .cartoon-toast-emoji { font-size: 22px; }
 
+/* ── Banner mất kết nối / đang kết nối lại ───────────────────── */
+.net-banner {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #FF5D5D;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  border: 3px solid rgba(255,255,255,0.7);
+  box-shadow: 0 6px 0 rgba(160,20,20,0.4), 0 10px 26px rgba(38,35,92,0.3);
+  max-width: min(440px, calc(100vw - 24px));
+}
+.net-banner[hidden] { display: none; }
+.net-banner.reconnected { background: #2EC27E; box-shadow: 0 6px 0 rgba(16,110,70,0.4), 0 10px 26px rgba(38,35,92,0.3); }
+.net-banner-spinner {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.45);
+  border-top-color: #fff;
+  animation: net-banner-spin 0.8s linear infinite;
+}
+.net-banner.reconnected .net-banner-spinner { display: none; }
+@keyframes net-banner-spin { to { transform: rotate(360deg); } }
+
 /* ── Nút điều hướng tròn (back) ──────────────────────────────── */
 .back-btn {
   background: rgba(255,255,255,0.9);

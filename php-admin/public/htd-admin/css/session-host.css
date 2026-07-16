@@ -482,6 +482,39 @@ body.teacher-resizing {
   background: #f9fafb;
   border-color: #9ca3af;
 }
+
+/* Chọn giao diện màn hình học sinh (GV quyết định, HS không tự đổi) */
+.teacher-theme-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.teacher-theme-select-wrap:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+.teacher-theme-select {
+  border: none;
+  background: transparent;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  max-width: 150px;
+}
+body.admin-body--session-host .teacher-theme-select-wrap {
+  background: #f5f7ff;
+  border-color: #dfe6ff;
+}
+body.admin-body--session-host .teacher-theme-select { color: #4338ca; }
 .teacher-room-card-info.compact .teacher-room-meta-row {
   display: inline-flex;
   margin: 0;
@@ -1598,9 +1631,18 @@ body.teacher-resizing .teacher-main-resizer-grip {
   border: 1px solid #e5e7eb;
 }
 .teacher-q-eq .eq-coef-box,
-.teacher-q-eq .eq-blank-box {
+.teacher-q-eq .eq-blank-box,
+.teacher-q-eq .eq-sub-box {
   pointer-events: none;
   cursor: default;
+}
+
+/* Ô số nhỏ (chỉ số) hiển thị trên màn hình giáo viên: nhỏ + lệch xuống. */
+.eq-sub-box {
+  font-size: 0.72em;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.3em;
 }
 
 .teacher-lb-banner,
@@ -2006,6 +2048,63 @@ body.teacher-resizing .teacher-main-resizer-grip {
   max-height: min(42vh, 360px);
   overflow-y: auto;
   line-height: normal;
+}
+
+/* ── Banner mất kết nối phía giáo viên ── */
+.teacher-net-banner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #dc2626;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+}
+
+.teacher-net-banner[hidden] { display: none; }
+
+.teacher-net-banner.reconnected { background: #16a34a; }
+
+.teacher-net-banner-spinner {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  animation: teacher-net-spin 0.8s linear infinite;
+}
+
+.teacher-net-banner.reconnected .teacher-net-banner-spinner { display: none; }
+
+@keyframes teacher-net-spin { to { transform: rotate(360deg); } }
+
+.teacher-final-podium-reopen {
+  display: block;
+  margin: 0 auto 14px;
+  padding: 9px 20px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #facc15 0%, #f59e0b 100%);
+  color: #422006;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.teacher-final-podium-reopen:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.45);
 }
 
 .teacher-final-lb-row {
@@ -2804,5 +2903,223 @@ body.admin-body--session-host .admin-host-wrap a.btn-secondary {
     flex: 1;
     min-width: 200px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Session host v2 — UI gọn, hiện đại (chỉ trang admin/sessions/{id})
+   ═══════════════════════════════════════════════════════════ */
+
+/* 1) Ẩn topbar admin, phòng chơi chiếm trọn chiều cao */
+body.admin-body--session-host .admin-topbar {
+  display: none !important;
+}
+body.admin-body--session-host .admin-host-wrap .teacher-layout {
+  height: 100vh;
+  background: #f3f5fc;
+}
+body.admin-body--session-host .teacher-main {
+  background: transparent;
+}
+
+/* 2) Khung card đồng bộ, bo tròn mềm */
+body.admin-body--session-host .teacher-room-card {
+  background: #fff;
+  border: 1px solid #e6e9f4;
+  border-radius: 22px;
+  box-shadow: 0 10px 40px rgba(49, 46, 129, 0.08);
+}
+body.admin-body--session-host .teacher-panel {
+  border: 1px solid #e6e9f4;
+  border-radius: 22px;
+  box-shadow: 0 10px 40px rgba(49, 46, 129, 0.08);
+  padding: 22px;
+}
+
+/* 3) Header phòng: giấu phần thừa */
+body.admin-body--session-host .teacher-join-room-label,
+body.admin-body--session-host #teacherTeacherName,
+body.admin-body--session-host .teacher-qr-join-url {
+  display: none !important;
+}
+body.admin-body--session-host .teacher-room-card-info.compact .teacher-join-room-name::after {
+  display: none;
+}
+body.admin-body--session-host .teacher-room-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eef2ff;
+  border: 1px solid #dfe6ff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  color: #4338ca;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+body.admin-body--session-host .teacher-room-back:hover {
+  background: #e0e7ff;
+  text-decoration: none;
+}
+body.admin-body--session-host .teacher-join-room-name {
+  font-size: clamp(20px, 2.2vw, 26px);
+  margin: 2px 0 0;
+}
+body.admin-body--session-host .teacher-room-meta-row {
+  margin: 6px 0 0;
+}
+
+/* pill trạng thái có chấm nhấp nháy */
+body.admin-body--session-host .teacher-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff7ed;
+  color: #b45309;
+  border: 1px solid #fed7aa;
+}
+body.admin-body--session-host .teacher-status-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: hostPingDot 1.5s ease-in-out infinite;
+}
+body.admin-body--session-host .teacher-status-pill.started {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+body.admin-body--session-host .teacher-status-pill.started::before {
+  background: #10b981;
+}
+@keyframes hostPingDot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); }
+  55% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+}
+
+body.admin-body--session-host .teacher-room-quick-btn {
+  background: #f5f7ff;
+  border: 1px solid #dfe6ff;
+  color: #4338ca;
+}
+body.admin-body--session-host .teacher-room-quick-btn:hover {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+}
+body.admin-body--session-host .btn-end-room {
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+body.admin-body--session-host .btn-end-room:hover {
+  background: #fff1f2;
+  border-color: #fda4af;
+}
+
+/* 4) Màn chờ = hero gradient */
+body.admin-body--session-host .teacher-waiting-view {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.6cqh, 16px);
+  padding: clamp(14px, 3cqh, 28px) clamp(14px, 3cqw, 32px);
+  background:
+    radial-gradient(560px 300px at 88% -12%, rgba(167, 139, 250, 0.4), transparent 62%),
+    radial-gradient(520px 340px at -12% 112%, rgba(56, 189, 248, 0.28), transparent 62%),
+    linear-gradient(140deg, #312e81 0%, #4338ca 48%, #6d28d9 100%);
+}
+body.admin-body--session-host .teacher-join-illustration-wrap {
+  max-height: min(36cqh, 260px);
+}
+body.admin-body--session-host .teacher-join-illustration {
+  filter: drop-shadow(0 12px 24px rgba(10, 6, 50, 0.45));
+}
+body.admin-body--session-host .teacher-waiting-caption {
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 600;
+}
+
+/* PIN nổi bật */
+body.admin-body--session-host .teacher-pin-label {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+body.admin-body--session-host .teacher-join-bottom .teacher-pin-digits {
+  gap: 10px;
+}
+body.admin-body--session-host .teacher-join-bottom .teacher-pin-digit {
+  width: clamp(46px, 6cqw, 58px);
+  height: clamp(56px, 9cqh, 72px);
+  font-size: clamp(26px, 4.4cqh, 36px);
+  border: none;
+  border-radius: 14px;
+  color: #312e81;
+  box-shadow: 0 10px 22px rgba(10, 6, 50, 0.4), inset 0 -3px 0 #dbe3ff;
+}
+
+/* QR trong thẻ trắng */
+body.admin-body--session-host .teacher-join-bottom .teacher-join-card-qr {
+  background: #fff;
+  border-radius: 18px;
+  padding: 14px 16px 12px;
+  box-shadow: 0 10px 26px rgba(10, 6, 50, 0.4);
+}
+body.admin-body--session-host .teacher-qr-hint {
+  color: #64748b;
+  font-size: 12.5px;
+  margin-top: 6px;
+}
+body.admin-body--session-host .teacher-qr-enlarge-btn {
+  top: 8px;
+  right: 8px;
+  border-color: #e5e8f0;
+}
+
+/* 5) Panel học sinh */
+body.admin-body--session-host .teacher-panel-title {
+  font-size: 17px;
+}
+body.admin-body--session-host .teacher-count {
+  display: inline-flex;
+  align-items: center;
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+body.admin-body--session-host .teacher-btn-start {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  border-radius: 999px;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+body.admin-body--session-host .teacher-btn-start:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+body.admin-body--session-host .teacher-btn-start:disabled {
+  opacity: 0.4;
+  filter: grayscale(0.4);
+  box-shadow: none;
+}
+body.admin-body--session-host .teacher-player {
+  background: #f8faff;
+  border: 1px solid #edf0fa;
+  border-radius: 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+body.admin-body--session-host .teacher-player:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(49, 46, 129, 0.12);
 }
 

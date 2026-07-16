@@ -1,0 +1,384 @@
+/* ═══════════════════════════════════════════════════════════════
+   Theme "Vũ Trụ Galaxy" — tinh vân tím hồng, sao băng, hành tinh.
+   Kích hoạt bằng html[data-theme="galaxy"]; các theme khác không đổi.
+   ═══════════════════════════════════════════════════════════════ */
+
+html[data-theme="galaxy"] {
+  --gal-bg-0: #070214;
+  --gal-bg-1: #0d0430;
+  --gal-panel: rgba(22, 12, 54, 0.68);
+  --gal-panel-solid: #170b3a;
+  --gal-line: rgba(167, 139, 250, 0.2);
+  --gal-line-strong: rgba(196, 152, 255, 0.45);
+  --gal-violet: #a78bfa;
+  --gal-pink: #f472b6;
+  --gal-blue: #60a5fa;
+  --gal-text: #e6e0ff;
+  --gal-dim: #9d94c9;
+  --gal-glow: 0 0 20px rgba(167, 139, 250, 0.4);
+  color-scheme: dark;
+}
+
+/* ── Nền tinh vân ── */
+html[data-theme="galaxy"] body.admin-body {
+  color: var(--gal-text);
+  background:
+    radial-gradient(900px 560px at 82% -8%, rgba(236, 72, 153, 0.16), transparent 60%),
+    radial-gradient(760px 520px at -8% 42%, rgba(124, 58, 237, 0.2), transparent 62%),
+    radial-gradient(680px 480px at 62% 108%, rgba(59, 130, 246, 0.14), transparent 60%),
+    linear-gradient(165deg, var(--gal-bg-0) 0%, var(--gal-bg-1) 52%, #060218 100%);
+  background-attachment: fixed;
+}
+html[data-theme="galaxy"] .admin-shell {
+  position: relative;
+  z-index: 1;
+}
+html[data-theme="galaxy"] a { color: var(--gal-blue); }
+html[data-theme="galaxy"] ::selection {
+  background: var(--gal-pink);
+  color: #fff;
+}
+html[data-theme="galaxy"] h1,
+html[data-theme="galaxy"] h2,
+html[data-theme="galaxy"] h3,
+html[data-theme="galaxy"] h4 { color: #f5f1ff; }
+
+/* lớp sao + sao băng + hành tinh (admin-theme.js tạo .gal-fx) */
+.gal-fx { display: none; }
+html[data-theme="galaxy"] .gal-fx {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.gal-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  animation: galTwinkle ease-in-out infinite;
+}
+@keyframes galTwinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.8); }
+  50% { opacity: 0.95; transform: scale(1.2); }
+}
+.gal-shoot {
+  position: absolute;
+  width: 110px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(167, 139, 250, 0.5), transparent);
+  transform: rotate(-35deg);
+  opacity: 0;
+  animation: galShoot 9s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+}
+@keyframes galShoot {
+  0% { opacity: 0; translate: 0 0; }
+  3% { opacity: 1; }
+  12% { opacity: 0; translate: -46vw 32vh; }
+  100% { opacity: 0; translate: -46vw 32vh; }
+}
+.gal-planet {
+  position: absolute;
+  animation: galPlanetDrift 26s ease-in-out infinite alternate;
+  opacity: 0.5;
+}
+.gal-planet svg { width: 100%; height: 100%; }
+@keyframes galPlanetDrift {
+  from { transform: translate(0, 0) rotate(-4deg); }
+  to { transform: translate(-26px, 22px) rotate(5deg); }
+}
+
+/* ── Sidebar: đài quan sát ── */
+html[data-theme="galaxy"] .admin-sidebar {
+  background: rgba(10, 4, 32, 0.88);
+  backdrop-filter: blur(14px);
+  border-right: 1px solid var(--gal-line);
+  box-shadow: 8px 0 40px rgba(3, 0, 16, 0.7);
+}
+html[data-theme="galaxy"] .admin-brand {
+  border-bottom: 1px solid var(--gal-line);
+}
+html[data-theme="galaxy"] .admin-brand h1 {
+  background: linear-gradient(90deg, #c4b5fd, #f472b6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+html[data-theme="galaxy"] .admin-brand h1::before {
+  content: '🪐';
+  -webkit-text-fill-color: initial;
+  animation: galPlanetSpin 7s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgba(196, 152, 255, 0.8));
+}
+@keyframes galPlanetSpin {
+  0%, 100% { transform: rotate(-10deg) translateY(0); }
+  50% { transform: rotate(12deg) translateY(-3px); }
+}
+html[data-theme="galaxy"] .admin-brand p { color: var(--gal-dim); }
+
+html[data-theme="galaxy"] .admin-nav { padding: 12px 10px; }
+html[data-theme="galaxy"] .admin-nav a {
+  position: relative;
+  margin: 2px 0;
+  border-radius: 12px;
+  color: var(--gal-dim);
+  border: 1px solid transparent;
+  transition: color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+html[data-theme="galaxy"] .admin-nav a::before {
+  width: 22px;
+  text-align: center;
+  font-size: 1rem;
+  filter: grayscale(0.6) opacity(0.85);
+  transition: filter 0.18s ease, transform 0.18s ease;
+}
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(1)::before { content: '🌍'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(2)::before { content: '🛸'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(3)::before { content: '👽'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(4)::before { content: '☄️'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(5)::before { content: '🌟'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(6)::before { content: '🚀'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(7)::before { content: '📡'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(8)::before { content: '💫'; }
+html[data-theme="galaxy"] .admin-nav a:nth-of-type(9)::before { content: '🎨'; }
+html[data-theme="galaxy"] .admin-nav a:hover {
+  background: rgba(167, 139, 250, 0.1);
+  color: #f1ecff;
+  transform: translateX(3px);
+}
+html[data-theme="galaxy"] .admin-nav a:hover::before { filter: none; transform: scale(1.15); }
+html[data-theme="galaxy"] .admin-nav a.active {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.28), rgba(236, 72, 153, 0.16));
+  border-color: var(--gal-line-strong);
+  color: #fff;
+  box-shadow: var(--gal-glow);
+}
+html[data-theme="galaxy"] .admin-nav a.active::before { filter: none; }
+html[data-theme="galaxy"] .admin-nav a.active::after {
+  content: '✦';
+  position: absolute;
+  right: 12px;
+  color: #f9a8d4;
+  animation: galTwinkle 1.6s ease-in-out infinite;
+}
+
+/* ── Topbar ── */
+html[data-theme="galaxy"] .admin-topbar {
+  background: rgba(12, 5, 36, 0.82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--gal-line);
+}
+html[data-theme="galaxy"] .admin-topbar-left h2 {
+  background: linear-gradient(90deg, #f5f1ff, #c4b5fd 60%, #f9a8d4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html[data-theme="galaxy"] .admin-user { color: var(--gal-dim); }
+html[data-theme="galaxy"] .admin-sidebar-toggle {
+  background: rgba(22, 12, 54, 0.8);
+  border-color: var(--gal-line);
+  color: var(--gal-dim);
+}
+html[data-theme="galaxy"] .admin-sidebar-toggle:hover {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: var(--gal-line-strong);
+  color: #e9d5ff;
+}
+
+/* ── Nội dung bay vào ── */
+html[data-theme="galaxy"] .admin-content {
+  animation: galContentIn 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+@keyframes galContentIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Card: khoang tàu kính ── */
+html[data-theme="galaxy"] .card {
+  background: var(--gal-panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--gal-line);
+  border-radius: 16px;
+  box-shadow: 0 16px 44px rgba(3, 0, 16, 0.6);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+html[data-theme="galaxy"] .card:hover {
+  border-color: var(--gal-line-strong);
+  box-shadow: 0 16px 48px rgba(3, 0, 16, 0.65), var(--gal-glow);
+}
+html[data-theme="galaxy"] .page-header__meta,
+html[data-theme="galaxy"] .hint-inline,
+html[data-theme="galaxy"] .form-group .hint { color: var(--gal-dim); }
+
+/* ── Nút: năng lượng tinh vân ── */
+html[data-theme="galaxy"] .btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease;
+}
+html[data-theme="galaxy"] .btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -70%;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.45s ease;
+  pointer-events: none;
+}
+html[data-theme="galaxy"] .btn:hover::after { left: 125%; }
+html[data-theme="galaxy"] .btn-primary {
+  background: linear-gradient(120deg, #8b5cf6, #ec4899);
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.5);
+}
+html[data-theme="galaxy"] .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(236, 72, 153, 0.55);
+  filter: brightness(1.08);
+}
+html[data-theme="galaxy"] .btn-secondary {
+  background: rgba(167, 139, 250, 0.1);
+  border: 1px solid var(--gal-line-strong);
+  color: #ddd2ff;
+}
+html[data-theme="galaxy"] .btn-secondary:hover {
+  background: rgba(167, 139, 250, 0.2);
+  color: #fff;
+}
+html[data-theme="galaxy"] .btn-danger {
+  background: linear-gradient(120deg, #f43f5e, #c026d3);
+  box-shadow: 0 4px 18px rgba(244, 63, 94, 0.45);
+}
+html[data-theme="galaxy"] .btn-danger:hover { filter: brightness(1.12); }
+
+/* ── Form ── */
+html[data-theme="galaxy"] input[type=text],
+html[data-theme="galaxy"] input[type=email],
+html[data-theme="galaxy"] input[type=password],
+html[data-theme="galaxy"] input[type=number],
+html[data-theme="galaxy"] input[type=date],
+html[data-theme="galaxy"] input[type=search],
+html[data-theme="galaxy"] select,
+html[data-theme="galaxy"] textarea {
+  background: rgba(8, 3, 26, 0.75);
+  border: 1px solid var(--gal-line);
+  color: var(--gal-text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+html[data-theme="galaxy"] input:focus,
+html[data-theme="galaxy"] select:focus,
+html[data-theme="galaxy"] textarea:focus {
+  outline: none;
+  border-color: var(--gal-pink);
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.2), 0 0 18px rgba(167, 139, 250, 0.3);
+}
+html[data-theme="galaxy"] input::placeholder,
+html[data-theme="galaxy"] textarea::placeholder { color: #6b5f9e; }
+html[data-theme="galaxy"] .form-group > label { color: #d8ccff; }
+html[data-theme="galaxy"] select option { background: var(--gal-panel-solid); }
+
+/* ── Bảng ── */
+html[data-theme="galaxy"] table.data-table th {
+  background: rgba(139, 92, 246, 0.1);
+  color: #cbb9ff;
+  border-bottom: 1px solid var(--gal-line-strong);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+html[data-theme="galaxy"] table.data-table td {
+  border-bottom: 1px solid rgba(167, 139, 250, 0.1);
+  color: var(--gal-text);
+}
+html[data-theme="galaxy"] table.data-table tr:hover td {
+  background: rgba(167, 139, 250, 0.08);
+}
+
+/* ── Trang danh sách ── */
+html[data-theme="galaxy"] .list-search input[type="search"] { background: rgba(8, 3, 26, 0.75); }
+html[data-theme="galaxy"] .list-toolbar__filter-toggle,
+html[data-theme="galaxy"] .csv-exchange__trigger,
+html[data-theme="galaxy"] .row-action-menu__trigger,
+html[data-theme="galaxy"] .table-column-picker__trigger {
+  background: rgba(22, 12, 54, 0.8);
+  border-color: var(--gal-line);
+  color: var(--gal-text);
+}
+html[data-theme="galaxy"] .list-toolbar__filter-toggle:hover,
+html[data-theme="galaxy"] .csv-exchange__trigger:hover,
+html[data-theme="galaxy"] .row-action-menu__trigger:hover {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: var(--gal-line-strong);
+}
+html[data-theme="galaxy"] .list-filters-panel,
+html[data-theme="galaxy"] .row-action-menu__panel,
+html[data-theme="galaxy"] .csv-exchange__panel,
+html[data-theme="galaxy"] .table-column-picker__panel {
+  background: var(--gal-panel-solid);
+  border-color: var(--gal-line-strong);
+  box-shadow: 0 18px 50px rgba(3, 0, 16, 0.8);
+  color: var(--gal-text);
+}
+html[data-theme="galaxy"] .row-action-menu__item { color: var(--gal-text); }
+html[data-theme="galaxy"] .row-action-menu__item:hover { background: rgba(167, 139, 250, 0.12); }
+html[data-theme="galaxy"] .filter-chip {
+  background: rgba(167, 139, 250, 0.12);
+  border-color: var(--gal-line-strong);
+  color: #e3d6ff;
+}
+html[data-theme="galaxy"] .empty-state { color: var(--gal-dim); }
+html[data-theme="galaxy"] .list-table-footer__summary,
+html[data-theme="galaxy"] .list-table-footer { color: var(--gal-dim); }
+html[data-theme="galaxy"] .session-pin-badge {
+  background: rgba(139, 92, 246, 0.16);
+  border: 1px solid var(--gal-line-strong);
+  color: #ecd9ff;
+  text-shadow: 0 0 12px rgba(196, 152, 255, 0.7);
+}
+
+/* ── Game cards ── */
+html[data-theme="galaxy"] .game-card {
+  background: var(--gal-panel);
+  border-color: var(--gal-line);
+}
+html[data-theme="galaxy"] .game-card:hover {
+  border-color: var(--gal-line-strong);
+  box-shadow: 0 14px 36px rgba(3, 0, 16, 0.7), var(--gal-glow);
+  transform: translateY(-3px);
+}
+html[data-theme="galaxy"] .game-card__meta,
+html[data-theme="galaxy"] .game-card__desc { color: var(--gal-dim); }
+
+/* ── Thanh cuộn dải ngân hà ── */
+html[data-theme="galaxy"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+html[data-theme="galaxy"] ::-webkit-scrollbar-track { background: rgba(8, 3, 26, 0.7); }
+html[data-theme="galaxy"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(167, 139, 250, 0.6), rgba(244, 114, 182, 0.6));
+  border-radius: 8px;
+}
+html[data-theme="galaxy"] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(167, 139, 250, 0.9), rgba(244, 114, 182, 0.9));
+}
+
+html[data-theme="galaxy"] .field-error { color: #fda4af; }
+
+/* ── Trang chọn giao diện ── */
+html[data-theme="galaxy"] .theme-pick-card {
+  background: var(--gal-panel);
+  border-color: var(--gal-line);
+}
+html[data-theme="galaxy"] .theme-pick-card.is-active {
+  border-color: var(--gal-line-strong);
+  box-shadow: var(--gal-glow);
+}
+html[data-theme="galaxy"] .theme-pick-body p { color: var(--gal-dim); }

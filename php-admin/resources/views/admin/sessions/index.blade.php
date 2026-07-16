@@ -7,7 +7,6 @@
     $sessionColumns = [
         ['key' => 'name', 'label' => 'Tên phòng'],
         ['key' => 'pin', 'label' => 'PIN'],
-        ['key' => 'qr', 'label' => 'QR'],
         ['key' => 'quiz', 'label' => 'Quiz'],
         ['key' => 'game', 'label' => 'Game'],
         ['key' => 'host', 'label' => 'Giáo viên'],
@@ -229,28 +228,15 @@
                 <tbody>
                     @foreach ($sessions as $session)
                     @php
-                        $joinUrl = rtrim(config('app.url'), '/').'/join/'.$session->pin;
-                        $qrSrc = $session->qr_url
-                            ?: 'https://api.qrserver.com/v1/create-qr-code/?size=128x128&data='.rawurlencode($joinUrl);
-
-                        $rowActions = [
-                            ['key' => 'edit', 'label' => 'Sửa phòng'],
-                        ];
+                        $rowActions = [];
                         if ($session->quiz_id) {
                             $rowActions[] = ['key' => 'trial', 'label' => 'Chơi thử'];
                         }
                         if ($session->status !== 'ended') {
                             $rowActions[] = ['key' => 'host', 'label' => 'Vào phòng chơi'];
                         }
-                        $rowActions[] = ['key' => 'link', 'label' => 'Link học sinh'];
-                        if ($session->status !== 'playing') {
-                            $rowActions[] = ['key' => 'regenerate-pin', 'label' => 'Đổi PIN & QR'];
-                        }
-                        if ($session->status === 'ended') {
-                            if ($session->is_active) {
-                                $rowActions[] = ['key' => 'replay', 'label' => 'Chơi lại'];
-                            }
-                            $rowActions[] = ['key' => 'report', 'label' => 'Xem báo cáo'];
+                        if ($session->status === 'ended' && $session->is_active) {
+                            $rowActions[] = ['key' => 'replay', 'label' => 'Chơi lại'];
                         }
                         if ($session->status !== 'playing') {
                             $rowActions[] = ['key' => 'delete', 'label' => 'Xóa phòng', 'danger' => true];
@@ -272,13 +258,8 @@
                         <td data-col="pin">
                             <span class="session-pin-badge">{{ $session->pin }}</span>
                         </td>
-                        <td data-col="qr" class="session-qr-cell">
-                            <a href="{{ $joinUrl }}" target="_blank" rel="noopener" class="session-qr-link" title="{{ $joinUrl }}">
-                                <img src="{{ $qrSrc }}" alt="QR {{ $joinUrl }}" width="44" height="44" loading="lazy">
-                            </a>
-                        </td>
-                        <td data-col="quiz">{{ $session->quiz?->name ?? '—' }}</td>
-                        <td data-col="game">{{ $session->game?->name ?? '—' }}</td>
+                        <td data-col="quiz" title="{{ $session->quiz?->name }}">{{ $session->quiz?->name ?? '—' }}</td>
+                        <td data-col="game" title="{{ $session->game?->name }}">{{ $session->game?->name ?? '—' }}</td>
                         <td data-col="host">{{ $session->host?->name ?? '—' }}</td>
                         <td data-col="status">
                             <span class="badge badge-{{ $session->status }}">
@@ -295,22 +276,24 @@
                         </td>
                         <td data-col="created" class="session-created-cell">{{ $session->created_at?->format('d/m/Y H:i') }}</td>
                         <td data-col="actions" class="actions-cell">
-                            @include('admin.partials.row-action-menu', [
-                                'actions' => $rowActions,
-                                'dataAttrs' => [
-                                    'edit-url' => route('admin.sessions.edit', $session),
-                                    'host-url' => route('admin.sessions.show', $session),
-                                    'join-url' => $joinUrl,
-                                    'report-url' => route('admin.reports.show', $session),
-                                    'reset-url' => route('admin.sessions.reset', $session),
-                                    'regenerate-pin-url' => route('admin.sessions.regenerate-pin', $session),
-                                    'delete-url' => route('admin.sessions.destroy', $session),
-                                    'quiz-id' => $session->quiz_id,
-                                    'quiz-name' => $session->quiz?->name,
-                                    'session-pin' => $session->pin,
-                                    'session-name' => $session->name ?? ('Phòng '.$session->pin),
-                                ],
-                            ])
+                            <div class="row-actions-group">
+                                <a href="{{ route('admin.sessions.edit', $session) }}" class="btn btn-secondary btn-sm">Chi tiết</a>
+                                @if (!empty($rowActions))
+                                    @include('admin.partials.row-action-menu', [
+                                        'menuLabel' => 'Khác',
+                                        'actions' => $rowActions,
+                                        'dataAttrs' => [
+                                            'host-url' => route('admin.sessions.show', $session),
+                                            'reset-url' => route('admin.sessions.reset', $session),
+                                            'delete-url' => route('admin.sessions.destroy', $session),
+                                            'quiz-id' => $session->quiz_id,
+                                            'quiz-name' => $session->quiz?->name,
+                                            'session-pin' => $session->pin,
+                                            'session-name' => $session->name ?? ('Phòng '.$session->pin),
+                                        ],
+                                    ])
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @endforeach
@@ -345,21 +328,6 @@
             <div class="admin-modal__actions">
                 <button type="button" class="btn btn-secondary" data-close-delete-modal>Hủy</button>
                 <button type="submit" class="btn btn-danger">Xóa vĩnh viễn</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="admin-modal" id="sessionPinModal" hidden>
-    <div class="admin-modal__backdrop" data-close-pin-modal></div>
-    <div class="admin-modal__panel" role="dialog" aria-labelledby="sessionPinModalTitle" aria-modal="true">
-        <h3 id="sessionPinModalTitle">Đổi mã PIN và QR?</h3>
-        <p id="sessionPinModalBody" class="admin-modal__text"></p>
-        <form id="sessionPinModalForm" method="POST" action="">
-            @csrf
-            <div class="admin-modal__actions">
-                <button type="button" class="btn btn-secondary" data-close-pin-modal>Hủy</button>
-                <button type="submit" class="btn btn-primary">Đổi PIN &amp; QR</button>
             </div>
         </form>
     </div>

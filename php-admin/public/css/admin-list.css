@@ -412,6 +412,16 @@
   white-space: nowrap;
 }
 
+.row-actions-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.row-actions-group .row-action-menu__trigger {
+  min-width: 0;
+}
+
 table.data-table th[data-col="actions"],
 table.data-table td[data-col="actions"],
 table.data-table th[data-col="select"],
@@ -483,15 +493,66 @@ table.data-table td[data-col="select"] {
   white-space: nowrap;
 }
 
-.session-qr-cell img {
+.sessions-data-table td[data-col="quiz"],
+.sessions-data-table td[data-col="game"] {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Session edit — consolidated detail (link, QR, PIN, report) */
+.session-detail-top {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.session-detail-qr {
+  flex-shrink: 0;
   display: block;
-  border-radius: 8px;
+  line-height: 0;
+}
+
+.session-detail-qr img {
+  display: block;
+  border-radius: 10px;
   border: 1px solid #e2e8f0;
 }
 
-.session-qr-link:hover img {
+.session-detail-qr:hover img {
   border-color: #a5b4fc;
   box-shadow: 0 0 0 2px rgba(165, 180, 252, 0.35);
+}
+
+.session-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-detail-link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.session-detail-link input {
+  flex: 1 1 320px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 0.8125rem;
+  color: #334155;
+}
+
+.session-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 /* Game card grid inside list card */

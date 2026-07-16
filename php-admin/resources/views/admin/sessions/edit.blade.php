@@ -9,16 +9,41 @@
     <a href="{{ route('admin.sessions.index') }}" class="btn btn-secondary">← Danh sách phòng</a>
 </div>
 
+<div class="card session-detail-card">
+    <div class="session-detail-top">
+        <a href="{{ $joinUrl }}" target="_blank" rel="noopener" class="session-detail-qr" title="{{ $joinUrl }}">
+            <img src="{{ $qrUrl }}" alt="QR tham gia phòng {{ $session->pin }}" width="120" height="120">
+        </a>
+        <div class="session-detail-info">
+            <p class="hint">
+                PIN: <span class="session-pin-badge">{{ $session->pin }}</span>
+                · Trạng thái: <span class="badge badge-{{ $session->status }}">{{ \App\Support\StatusLabels::session($session->status) }}</span>
+                · Bật: {{ $session->is_active ? 'có' : 'không' }}
+            </p>
+            <div class="session-detail-link">
+                <input type="text" readonly value="{{ $joinUrl }}" id="sessionJoinUrl" onclick="this.select()" aria-label="Link học sinh tham gia">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCopyJoinUrl">Sao chép</button>
+                <a href="{{ $joinUrl }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Mở link</a>
+            </div>
+            <div class="session-detail-actions">
+                @if ($session->status !== 'playing')
+                <form method="POST" action="{{ route('admin.sessions.regenerate-pin', $session) }}" data-confirm="Đổi PIN sẽ tạo mã mới và QR mới — link/QR cũ không còn dùng được. Tiếp tục?" data-confirm-title="Đổi mã PIN &amp; QR">
+                    @csrf
+                    <button type="submit" class="btn btn-secondary btn-sm">Đổi mã PIN &amp; QR</button>
+                </form>
+                @endif
+                @if ($session->status === 'ended')
+                <a href="{{ route('admin.reports.show', $session) }}" class="btn btn-secondary btn-sm">Xem báo cáo</a>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <form method="POST" action="{{ route('admin.sessions.update', $session) }}" id="sessionEditForm">
         @csrf
         @method('PUT')
-
-        <div class="form-group">
-            <label>PIN</label>
-            <p class="session-pin-cell"><strong>{{ $session->pin }}</strong></p>
-            <p class="hint">PIN và QR không đổi khi sửa phòng.</p>
-        </div>
 
         <div class="form-group">
             <label for="name">Tên phòng *</label>
@@ -72,13 +97,28 @@
             </div>
         </div>
 
-        <p class="hint">Trạng thái: <span class="badge badge-{{ $session->status }}">{{ $session->status }}</span>
-            · Bật: {{ $session->is_active ? 'có' : 'không' }}</p>
-
         <button type="submit" class="btn btn-primary">Cập nhật phòng</button>
     </form>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const copyBtn = document.getElementById('btnCopyJoinUrl');
+    const joinInput = document.getElementById('sessionJoinUrl');
+    if (copyBtn && joinInput) {
+        copyBtn.addEventListener('click', function () {
+            navigator.clipboard.writeText(joinInput.value).then(function () {
+                const original = copyBtn.textContent;
+                copyBtn.textContent = 'Đã chép!';
+                setTimeout(function () { copyBtn.textContent = original; }, 1500);
+            });
+        });
+    }
+});
+</script>
+@endpush
 
 @if ($canChangeQuiz)
 @push('scripts')

@@ -96,7 +96,9 @@
                         </div>
                         <p class="qe-template-hint">
                             Cân bằng hệ số: gõ chất + đáp án số (2,1,2).
-                            Điền thiếu: dùng <code>___</code> cho ô trống + đáp án công thức.
+                            Điền thiếu: dùng <code>___</code> cho ô trống + đáp án công thức,
+                            hoặc gõ kèm luôn đáp án trong ngoặc: <code>Fe + [O2] → Fe2O3</code>.
+                            Số nhỏ (chỉ số): gõ số trong ngoặc sau nguyên tố, VD <code>C[6]H[12]O[6]</code>.
                         </p>
                     </div>
 
@@ -104,6 +106,7 @@
 
                     <div class="qe-template-toolbar">
                         <button type="button" id="btnAddCoef" class="btn btn-secondary btn-sm">+ Hệ số</button>
+                        <button type="button" id="btnAddSub" class="btn btn-secondary btn-sm">+ Số nhỏ</button>
                         <button type="button" id="btnAddBlank" class="btn btn-secondary btn-sm">+ Ô điền</button>
                         <button type="button" id="btnAddChem" class="btn btn-secondary btn-sm">+ Chất</button>
                         @foreach ([' + ', ' → ', ' = ', ' ↑ ', ' ↓ '] as $sym)
@@ -160,7 +163,7 @@
                     <div class="form-group">
                         <label for="input_mode">Chế độ phương trình</label>
                         <select id="input_mode" name="input_mode">
-                            @foreach (['balance' => 'Cân bằng hệ số', 'blank' => 'Điền chỗ thiếu', 'blank_balance' => 'Cân bằng + điền thiếu', 'product' => 'Điền sản phẩm'] as $val => $label)
+                            @foreach (['balance' => 'Cân bằng hệ số', 'blank' => 'Điền chỗ thiếu', 'blank_balance' => 'Cân bằng + điền thiếu', 'product' => 'Điền sản phẩm', 'subscript' => 'Điền chỉ số'] as $val => $label)
                                 <option value="{{ $val }}" @selected($initialInputMode === $val)>{{ $label }}</option>
                             @endforeach
                         </select>

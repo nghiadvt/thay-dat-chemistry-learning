@@ -13,6 +13,9 @@ const MAX_NAME_LENGTH = 20;
 /** JPEG data URL from student camera (~240×240) — reject oversized payloads */
 const MAX_AVATAR_LENGTH = 120000;
 
+/** Theme màn hình học sinh — GV chọn, đồng bộ mọi HS (khớp prototype/js/student-theme.js) */
+const STUDENT_THEMES = ['default', 'lab', 'galaxy', 'arcade', 'chalk'];
+
 function sanitizeAvatar(raw) {
   if (raw == null || raw === '') return null;
   const avatar = String(raw).trim();
@@ -36,12 +39,33 @@ function registerRoomHandlers(io, redis) {
         if (payload.is_host && (result.room_status === 'playing' || result.room_status === 'ended')) {
           const { syncLateJoinHost } = require('./gameplay');
           await syncLateJoinHost(io, redis, socket, result.pin);
-        } else if (!payload.is_host && result.room_status === 'playing') {
+        } else if (!payload.is_host && (result.room_status === 'playing' || result.room_status === 'ended')) {
           const { syncLateJoinStudent } = require('./gameplay');
           await syncLateJoinStudent(io, redis, socket, result.pin);
         }
       } catch (err) {
         const message = err.message || 'Không thể vào phòng.';
+        socket.emit('room_error', { message });
+        if (typeof ack === 'function') ack({ success: false, error: message });
+      }
+    });
+
+    socket.on('host_set_theme', async (payload = {}, ack) => {
+      try {
+        const { pin, isHost } = socket.data || {};
+        if (!isHost || !pin) {
+          throw new Error('Chỉ giáo viên mới được đổi giao diện.');
+        }
+        const theme = String(payload.theme || '').trim();
+        if (!STUDENT_THEMES.includes(theme)) {
+          throw new Error('Giao diện không hợp lệ.');
+        }
+        await redis.hset(roomKey(pin), 'student_theme', theme);
+        await refreshRoomTtl(redis, pin);
+        io.to(pin).emit('theme_update', { theme });
+        if (typeof ack === 'function') ack({ success: true, data: { theme } });
+      } catch (err) {
+        const message = err.message || 'Không đổi được giao diện.';
         socket.emit('room_error', { message });
         if (typeof ack === 'function') ack({ success: false, error: message });
       }
@@ -83,7 +107,12 @@ async function handleJoinRoom(io, redis, socket, payload) {
   }
 
   const room = await redis.hgetall(roomKey(pin));
-  if (room.status === 'ended' && !isHost) {
+
+  const providedToken = payload.player_token ? String(payload.player_token).trim() : null;
+  const existingRaw = await redis.hget(playersKey(pin), name);
+
+  // HS mới không vào được phòng đã kết thúc; HS đã chơi được quay lại xem kết quả.
+  if (room.status === 'ended' && !isHost && !existingRaw) {
     throw new Error('Phòng đã kết thúc.');
   }
 
@@ -92,9 +121,6 @@ async function handleJoinRoom(io, redis, socket, payload) {
       throw new Error('Không tìm thấy session cho PIN này.');
     }
   }
-
-  const providedToken = payload.player_token ? String(payload.player_token).trim() : null;
-  const existingRaw = await redis.hget(playersKey(pin), name);
   let player;
   let reconnected = false;
 
@@ -179,6 +205,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
     is_host: player.is_host,
     room_status: room.status || 'waiting',
     question_index: room.status === 'playing' ? Number(room.question_index || 0) : null,
+    student_theme: STUDENT_THEMES.includes(room.student_theme) ? room.student_theme : 'default',
   };
 }
 

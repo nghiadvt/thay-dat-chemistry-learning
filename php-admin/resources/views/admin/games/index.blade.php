@@ -18,7 +18,32 @@
     }
 @endphp
 
+@push('head')
+<link rel="stylesheet" href="@vasset('css/battle-arena-demo.css')">
+<link rel="stylesheet" href="@vasset('css/dragon-hunt-demo.css')">
+@endpush
+
 @section('content')
+<div class="demo-promo-row">
+    <a href="{{ route('admin.games.dragon-demo') }}" class="drg-promo-banner">
+        <span class="drg-promo-banner__badge">MỚI</span>
+        <span class="drg-promo-banner__icon">🐲</span>
+        <span class="drg-promo-banner__text">
+            <strong>Game mới: Săn Rồng Hóa Học</strong>
+            <span>Cả lớp hợp sức hạ boss Hắc Long — chí mạng, mưa thiên thạch, rồng phun lửa!</span>
+        </span>
+        <span class="drg-promo-banner__cta">Xem demo →</span>
+    </a>
+    <a href="{{ route('admin.games.battle-demo') }}" class="bat-promo-banner">
+        <span class="bat-promo-banner__icon">⚔️</span>
+        <span class="bat-promo-banner__text">
+            <strong>Game: Đấu Trường Hóa Học</strong>
+            <span>2 đội phù thủy đấu phép — trả lời đúng để tấn công, combo cộng dồn sát thương.</span>
+        </span>
+        <span class="bat-promo-banner__cta">Xem demo →</span>
+    </a>
+</div>
+
 <div class="page-header">
     <div class="page-header__text">
         <h2>Danh sách game</h2>

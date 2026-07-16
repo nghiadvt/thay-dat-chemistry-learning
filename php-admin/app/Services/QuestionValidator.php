@@ -8,9 +8,9 @@ use Illuminate\Validation\ValidationException;
 
 class QuestionValidator
 {
-    private const STRUCTURED_INPUT_MODES = ['balance', 'blank', 'blank_balance', 'product'];
+    private const STRUCTURED_INPUT_MODES = ['balance', 'blank', 'blank_balance', 'product', 'subscript'];
 
-    private const TEMPLATE_PART_TYPES = ['txt', 'chem', 'coef', 'blank'];
+    private const TEMPLATE_PART_TYPES = ['txt', 'chem', 'coef', 'blank', 'sub'];
 
     public function __construct(
         private HtmlSanitizer $htmlSanitizer,
@@ -108,9 +108,9 @@ class QuestionValidator
         }
 
         $slots = $this->extractTemplateSlots($template);
-        if ($slots['coef'] === [] && $slots['blank'] === []) {
+        if ($slots['coef'] === [] && $slots['blank'] === [] && $slots['sub'] === []) {
             throw ValidationException::withMessages([
-                'template' => 'Phương trình cần ít nhất một ô hệ số hoặc ô điền.',
+                'template' => 'Phương trình cần ít nhất một ô hệ số, ô số nhỏ hoặc ô điền.',
             ]);
         }
 
@@ -121,11 +121,13 @@ class QuestionValidator
             ]);
         }
 
-        foreach ($slots['coef'] as $id) {
+        // Hệ số và số nhỏ (chỉ số) cùng dùng kho đáp án `coef` — đều là số nguyên dương.
+        foreach ([...$slots['coef'], ...$slots['sub']] as $id) {
             $value = trim((string) ($correctAnswer['coef'][$id] ?? ''));
             if ($value === '' || ! preg_match('/^[0-9]+$/', $value)) {
+                $label = in_array($id, $slots['sub'], true) ? 'Số nhỏ' : 'Hệ số';
                 throw ValidationException::withMessages([
-                    'correct_answer' => "Hệ số «{$id}» cần đáp án là số nguyên dương.",
+                    'correct_answer' => "{$label} «{$id}» cần đáp án là số nguyên dương.",
                 ]);
             }
         }
@@ -156,16 +158,23 @@ class QuestionValidator
                 'template' => 'Chế độ «Điền sản phẩm» cần đúng một ô điền, không có hệ số.',
             ]);
         }
+
+        if ($inputMode === 'subscript' && ($slots['coef'] !== [] || $slots['blank'] !== [])) {
+            throw ValidationException::withMessages([
+                'template' => 'Chế độ «Điền chỉ số» chỉ dùng ô số nhỏ (không hệ số, không ô điền công thức).',
+            ]);
+        }
     }
 
     /**
      * @param  array<int, array<string, mixed>>  $template
-     * @return array{coef: list<string>, blank: list<string>}
+     * @return array{coef: list<string>, blank: list<string>, sub: list<string>}
      */
     private function extractTemplateSlots(array $template): array
     {
         $coef = [];
         $blank = [];
+        $sub = [];
         $seen = [];
 
         foreach ($template as $index => $part) {
@@ -182,16 +191,18 @@ class QuestionValidator
                 ]);
             }
 
-            if (in_array($type, ['coef', 'blank'], true)) {
+            if (in_array($type, ['coef', 'blank', 'sub'], true)) {
                 $id = $part['id'] ?? null;
                 if (! is_string($id) || $id === '' || isset($seen[$id])) {
                     throw ValidationException::withMessages([
-                        'template' => 'Mỗi ô hệ số/điền cần id duy nhất.',
+                        'template' => 'Mỗi ô hệ số/số nhỏ/điền cần id duy nhất.',
                     ]);
                 }
                 $seen[$id] = true;
                 if ($type === 'coef') {
                     $coef[] = $id;
+                } elseif ($type === 'sub') {
+                    $sub[] = $id;
                 } else {
                     $blank[] = $id;
                 }
@@ -210,6 +221,6 @@ class QuestionValidator
             }
         }
 
-        return ['coef' => $coef, 'blank' => $blank];
+        return ['coef' => $coef, 'blank' => $blank, 'sub' => $sub];
     }
 }

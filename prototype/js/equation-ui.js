@@ -178,6 +178,14 @@ const EquationUI = (() => {
       const filled = v ? ' filled' : '';
       return `<button type="button" class="eq-coef-box${focused}${filled}" data-slot="coef" data-id="${part.id}" aria-label="Hệ số">${v || '&nbsp;'}</button>`;
     }
+    if (part.t === 'sub') {
+      // Ô số nhỏ (chỉ số): dùng chung kho đáp án `coef`, bàn phím số như hệ số,
+      // nhưng render nhỏ và lệch xuống như subscript.
+      const v = values.coef[part.id] || '';
+      const focused = focusedId === part.id ? ' focused' : '';
+      const filled = v ? ' filled' : '';
+      return `<button type="button" class="eq-sub-box${focused}${filled}" data-slot="coef" data-id="${part.id}" aria-label="Chỉ số">${v || '&nbsp;'}</button>`;
+    }
     if (part.t === 'blank') {
       const tokens = values.blankTokens?.[part.id];
       const raw = values.blank[part.id] || '';
@@ -199,7 +207,7 @@ const EquationUI = (() => {
   function createInputState(template) {
     const values = { coef: {}, blank: {}, blankTokens: {} };
     (template || []).forEach(p => {
-      if (p.t === 'coef') values.coef[p.id] = '';
+      if (p.t === 'coef' || p.t === 'sub') values.coef[p.id] = '';
       if (p.t === 'blank') {
         values.blank[p.id] = '';
         values.blankTokens[p.id] = [];
@@ -215,7 +223,9 @@ const EquationUI = (() => {
   function getSlotOrder(template) {
     const order = [];
     template.forEach(p => {
-      if (p.t === 'coef' || p.t === 'blank') order.push({ type: p.t, id: p.id });
+      // Ô số nhỏ (sub) đi cùng luồng nhập số như hệ số (type 'coef').
+      if (p.t === 'coef' || p.t === 'sub') order.push({ type: 'coef', id: p.id });
+      else if (p.t === 'blank') order.push({ type: 'blank', id: p.id });
     });
     return order;
   }

@@ -30,10 +30,18 @@ const teacherState = {
   serverQuestionIndex: 0,
   playerScores: {},
   finalLeaderboard: [],
+  /** GV đã chủ động tắt modal bục vinh danh — không tự mở lại cho tới game sau */
+  podiumDismissed: false,
   presentationTick: null,
   /** Đồng hồ câu hiện tại (memory) — tránh race ghi đè localStorage */
   liveTimerEndsAt: null,
   livePhaseEndsAt: null,
+  /** Thông tin join host — dùng để tự vào lại phòng khi socket rớt */
+  hostJoin: null,
+  reconnectSetup: false,
+  wasDisconnected: false,
+  /** Đang re-join sau reconnect — gameStarted không được reset state cục bộ */
+  resyncing: false,
 };
 const LS_SIDEBAR_COLLAPSED = 'htd_teacher_sidebar_collapsed';
 const LS_MAIN_SPLIT = 'htd_teacher_main_split';
@@ -157,6 +165,7 @@ function restoreTeacherRoomFromJoin(joinData) {
 
   const serverStatus = joinData.room_status || 'waiting';
   room.status = mapRoomStatusFromServer(serverStatus);
+  if (joinData.student_theme) room.studentTheme = joinData.student_theme;
 
   if (serverStatus === 'playing') {
     const game = ensureTeacherGameState(room);
@@ -215,6 +224,7 @@ function joinExistingRoomFromAdmin(pin, params) {
       });
     })
     .then((joinData) => {
+      rememberTeacherHostJoin(pin, boot.hostName || 'Host');
       restoreTeacherRoomFromJoin(joinData);
       showTeacherScreen('dashboard');
     })
@@ -257,7 +267,7 @@ function createTeacherRoom() {
           pin,
           name: session.host?.name || 'Host',
           isHost: true,
-        });
+        }).then(() => rememberTeacherHostJoin(pin, session.host?.name || 'Host'));
       })
       .then(() => showTeacherScreen('dashboard'))
       .catch(err => {
@@ -1024,6 +1034,7 @@ function buildTeacherPodiumStageHtml(podiumBySlot, isDuckRace) {
 }
 
 function openTeacherPodiumModal(podiumBySlot, isDuckRace) {
+  if (teacherState.podiumDismissed) return;
   const modal = document.getElementById('teacherPodiumModal');
   const content = document.getElementById('teacherPodiumModalContent');
   if (!modal || !content) return;
@@ -1044,6 +1055,21 @@ function closeTeacherPodiumModal() {
   modal.classList.remove('open');
   modal.hidden = true;
   modal.setAttribute('aria-hidden', 'true');
+}
+
+/** GV tự tay đóng modal — nhớ lựa chọn để poll không mở lại. */
+function dismissTeacherPodiumModal() {
+  teacherState.podiumDismissed = true;
+  closeTeacherPodiumModal();
+}
+
+/** Mở lại bục vinh danh từ nút trên màn hình kết quả cuối. */
+function reopenTeacherPodiumModal() {
+  teacherState.podiumDismissed = false;
+  const rows = teacherState.finalLeaderboard || [];
+  if (!rows.length) return;
+  const isDuckRace = isTeacherDuckRaceMode();
+  openTeacherPodiumModal(getTeacherPodiumBySlot(rows, isDuckRace), isDuckRace);
 }
 
 function renderTeacherFinalLeaderboardList(rows, isDuckRace) {
@@ -1095,6 +1121,7 @@ function renderTeacherFinal() {
         `<div class="teacher-final-lb-section">
           <img class="teacher-final-lb-header" src="${TEACHER_FINAL_ASSETS.leaderboard}" alt="Cập nhật bảng xếp hạng">
           <ol class="teacher-final-lb-list">${renderTeacherFinalLeaderboardList(rows, isDuckRace)}</ol>
+          <button type="button" class="teacher-final-podium-reopen" onclick="reopenTeacherPodiumModal()">🏆 Xem bục vinh danh</button>
         </div>` +
         '</div>';
 
@@ -1136,7 +1163,9 @@ function renderTeacherGame(room) {
     }
   } else if (game.phase === 'final') {
     closeTeacherLbModal();
-    renderTeacherFinal();
+    // Chỉ render lại khi vừa chuyển sang final — tránh poll 1.5s mở lại modal
+    // bục vinh danh mà GV đã đóng và reset animation liên tục.
+    if (needsFullRender) renderTeacherFinal();
   }
 
   teacherState.lastRenderedPhase = game.phase;
@@ -1369,6 +1398,39 @@ function wireTeacherRoomQuickActions(room) {
       if (room?.joinUrl) copyTextToClipboard(room.joinUrl);
     });
   }
+  wireTeacherThemeSelect(room);
+}
+
+/** GV chọn giao diện màn hình học sinh — đồng bộ realtime cho cả phòng. */
+function wireTeacherThemeSelect(room) {
+  const select = document.getElementById('teacherThemeSelect');
+  if (!select) return;
+
+  if (!select.dataset.wired) {
+    select.dataset.wired = '1';
+    select.addEventListener('change', () => {
+      const theme = select.value;
+      const prev = HTD.getRoom()?.studentTheme || 'default';
+      HTDBridge.hostSetTheme(theme)
+        .then(() => {
+          const latest = HTD.getRoom();
+          if (latest) {
+            latest.studentTheme = theme;
+            HTD.setRoom(latest);
+          }
+        })
+        .catch(err => {
+          select.value = prev;
+          alert(err.message || 'Không đổi được giao diện.');
+        });
+    });
+  }
+
+  // Đồng bộ giá trị hiển thị (khi load lại trang / tab khác đổi theme)
+  const current = room?.studentTheme || 'default';
+  if (select.value !== current && document.activeElement !== select) {
+    select.value = current;
+  }
 }
 
 function isTeacherBackendRoom() {
@@ -1554,6 +1616,8 @@ function startTeacherPoll() {
 function teacherStartGame() {
   const room = HTD.getRoom();
   if (!room || room.status === 'started') return;
+  teacherState.podiumDismissed = false;
+  closeTeacherPodiumModal();
 
   if (isBackendMode()) {
     HTDBridge.hostStartGame()
@@ -1638,6 +1702,7 @@ function resetTeacherSessionLocalState() {
   teacherState.advancingQuestion = false;
   teacherState.liveTimerEndsAt = null;
   teacherState.livePhaseEndsAt = null;
+  teacherState.podiumDismissed = false;
   if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
   closeTeacherLbModal();
   closeTeacherPodiumModal();
@@ -1657,7 +1722,7 @@ function teacherPlayAgain() {
           pin: room.pin,
           name: room.teacher || 'Host',
           isHost: true,
-        });
+        }).then(() => rememberTeacherHostJoin(room.pin, room.teacher || 'Host'));
       })
       .then(() => renderDashboard())
       .catch(err => alert(err.message || 'Không reset được phòng.'));
@@ -1673,6 +1738,8 @@ function teacherPlayAgain() {
   teacherState.lastScoreTick = -1;
   teacherState.presentationOpen = false;
   teacherState.leaderboardAnimSecond = null;
+  teacherState.podiumDismissed = false;
+  closeTeacherPodiumModal();
   closeTeacherActionMenu();
   renderDashboard();
 }
@@ -1680,6 +1747,7 @@ function teacherPlayAgain() {
 function resetTeacherRoom() {
   if (!confirm('Kết thúc phòng? Học sinh sẽ bị đưa ra và phòng chuyển sang trạng thái tắt.')) return;
   closeTeacherActionMenu();
+  teacherState.hostJoin = null; // phòng đóng — ngừng tự re-join
 
   const room = HTD.getRoom();
   if (isBackendMode() && room?.sessionId) {
@@ -1910,8 +1978,8 @@ function initTeacherDashboardUi() {
   document.getElementById('teacherQrEnlargeBtn')?.addEventListener('click', openTeacherQrModal);
   document.getElementById('teacherQrModalBackdrop')?.addEventListener('click', closeTeacherQrModal);
   document.getElementById('teacherQrModalClose')?.addEventListener('click', closeTeacherQrModal);
-  document.getElementById('teacherPodiumModalBackdrop')?.addEventListener('click', closeTeacherPodiumModal);
-  document.getElementById('teacherPodiumModalClose')?.addEventListener('click', closeTeacherPodiumModal);
+  document.getElementById('teacherPodiumModalBackdrop')?.addEventListener('click', dismissTeacherPodiumModal);
+  document.getElementById('teacherPodiumModalClose')?.addEventListener('click', dismissTeacherPodiumModal);
   document.getElementById('teacherActionBtn')?.addEventListener('click', e => {
     e.stopPropagation();
     toggleTeacherActionMenu();
@@ -2005,6 +2073,7 @@ window.teacherTogglePause = teacherTogglePause;
 window.teacherEndGame = teacherEndGame;
 window.teacherPlayAgain = teacherPlayAgain;
 window.toggleTeacherPresentation = toggleTeacherPresentation;
+window.reopenTeacherPodiumModal = reopenTeacherPodiumModal;
 window.createTeacherRoom = createTeacherRoom;
 window.teacherExportCsv = teacherExportCsv;
 window.demoTeacherGo = demoTeacherGo;
@@ -2031,6 +2100,74 @@ function teacherExportCsv() {
   HTDApi.exportSessionCsv(sessionId);
 }
 
+// ─── Mất mạng / tự động vào lại phòng (host) ───
+let teacherNetBannerTimer = null;
+
+function showTeacherNetBanner(text, reconnected = false) {
+  const banner = document.getElementById('teacherNetBanner');
+  const textEl = document.getElementById('teacherNetBannerText');
+  if (!banner) return;
+  clearTimeout(teacherNetBannerTimer);
+  if (textEl) textEl.textContent = text;
+  banner.classList.toggle('reconnected', reconnected);
+  banner.hidden = false;
+  if (reconnected) {
+    teacherNetBannerTimer = setTimeout(() => { banner.hidden = true; }, 2200);
+  }
+}
+
+function hideTeacherNetBanner() {
+  clearTimeout(teacherNetBannerTimer);
+  const banner = document.getElementById('teacherNetBanner');
+  if (banner) banner.hidden = true;
+}
+
+/** Gọi sau mỗi lần join host thành công — ghi nhớ pin/tên để tự re-join. */
+function rememberTeacherHostJoin(pin, name) {
+  teacherState.hostJoin = { pin, name };
+  setupTeacherReconnect();
+}
+
+function setupTeacherReconnect() {
+  if (teacherState.reconnectSetup || !isBackendMode()) return;
+  teacherState.reconnectSetup = true;
+
+  HTDSocket.on('disconnect', () => {
+    if (!teacherState.hostJoin) return;
+    teacherState.wasDisconnected = true;
+    showTeacherNetBanner('Mất kết nối — đang kết nối lại…');
+  });
+
+  HTDSocket.on('connect', () => {
+    if (!teacherState.hostJoin || !teacherState.wasDisconnected) return;
+    teacherRejoinAfterReconnect();
+  });
+}
+
+function teacherRejoinAfterReconnect(attempt = 0) {
+  const join = teacherState.hostJoin;
+  if (!join) return;
+  showTeacherNetBanner('Có mạng lại — đang vào lại phòng…');
+  teacherState.resyncing = true;
+  HTDBridge.joinRoom({ pin: join.pin, name: join.name, isHost: true })
+    .then(() => {
+      teacherState.wasDisconnected = false;
+      showTeacherNetBanner('Đã kết nối lại!', true);
+      if (document.querySelector('[data-screen="dashboard"]')?.classList.contains('active')) {
+        renderDashboard();
+      }
+    })
+    .catch(err => {
+      teacherState.resyncing = false;
+      if (attempt < 4) {
+        setTimeout(() => teacherRejoinAfterReconnect(attempt + 1), 2500);
+        return;
+      }
+      showTeacherNetBanner('Không vào lại được phòng — thử tải lại trang.');
+      console.error('Host rejoin failed', err);
+    });
+}
+
 function setupTeacherBackendBridge() {
   if (!isBackendMode()) return;
 
@@ -2041,6 +2178,14 @@ function setupTeacherBackendBridge() {
     room.backendMode = true;
     if (data?.play_mode) room.playModeSlug = data.play_mode;
     if (data?.mode_config) room.modeConfig = data.mode_config;
+
+    // Re-join sau khi rớt mạng: giữ nguyên câu hỏi/đồng hồ đang chạy —
+    // server sẽ gửi tiếp new_question / game_ended nếu trạng thái đã đổi.
+    if (teacherState.resyncing) {
+      teacherState.resyncing = false;
+      HTD.setRoom(room);
+      return;
+    }
 
     if (data?.play_mode === 'duck_race' || (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode())) {
       const game = ensureTeacherGameState(room);
@@ -2083,7 +2228,14 @@ function setupTeacherBackendBridge() {
 
     const room = HTD.getRoom();
     if (!room) return;
-    teacherState.serverQuestionIndex += 1;
+    teacherState.resyncing = false;
+    // Server gửi kèm chỉ số câu toàn cục — tin server thay vì tự đếm
+    // (tự đếm bị lệch khi reload/reconnect giữa câu vì câu hiện tại được gửi lại)
+    if (payload.question_index != null) {
+      teacherState.serverQuestionIndex = Number(payload.question_index) + 1;
+    } else {
+      teacherState.serverQuestionIndex += 1;
+    }
     teacherState.currentQuestion = HTDGameAdapter.mapNewQuestion(
       payload,
       teacherState.serverQuestionIndex - 1
@@ -2153,6 +2305,17 @@ function setupTeacherBackendBridge() {
     syncTeacherPresentationFromRoom();
   });
 
+  HTDBridge.on('themeUpdate', data => {
+    if (!data?.theme) return;
+    const room = HTD.getRoom();
+    if (room) {
+      room.studentTheme = data.theme;
+      HTD.setRoom(room);
+    }
+    const select = document.getElementById('teacherThemeSelect');
+    if (select && document.activeElement !== select) select.value = data.theme;
+  });
+
   HTDBridge.on('submitCountUpdate', data => {
     const el = document.getElementById('teacherSubmitCount');
     if (el) {
@@ -2179,6 +2342,7 @@ function setupTeacherBackendBridge() {
 
   HTDBridge.on('gameEnded', data => {
     if (typeof DuckRaceHost !== 'undefined') DuckRaceHost.hidePhase();
+    teacherState.resyncing = false;
     const room = HTD.getRoom();
     if (!room) return;
     room.status = 'ended';
@@ -2195,6 +2359,7 @@ function setupTeacherBackendBridge() {
     teacherState.advancingQuestion = false;
     teacherState.liveTimerEndsAt = null;
     teacherState.livePhaseEndsAt = null;
+    teacherState.podiumDismissed = false;
     closeTeacherLbModal();
     stopPresentationTick();
     if (teacherState.presentationOpen) {

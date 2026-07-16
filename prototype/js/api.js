@@ -54,6 +54,20 @@ window.HTDApi = (function () {
     async checkPin(pin) {
       return request(`/api/rooms/${encodeURIComponent(pin)}`, { skipCsrf: true });
     },
+    async practiceTopics({ grade } = {}) {
+      const params = new URLSearchParams();
+      if (grade) params.set('grade', grade);
+      const qs = params.toString();
+      return request(`/api/practice/topics${qs ? `?${qs}` : ''}`, { skipCsrf: true });
+    },
+    async practiceQuestions({ grade, topic, count } = {}) {
+      const params = new URLSearchParams();
+      if (grade) params.set('grade', grade);
+      if (topic) params.set('topic', topic);
+      if (count) params.set('count', String(count));
+      const qs = params.toString();
+      return request(`/api/practice/questions${qs ? `?${qs}` : ''}`, { skipCsrf: true });
+    },
     async listGames() {
       await ensureCsrf();
       const data = await request('/api/games');

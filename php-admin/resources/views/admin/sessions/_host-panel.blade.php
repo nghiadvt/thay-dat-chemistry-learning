@@ -24,6 +24,16 @@
               <div class="teacher-room-quick-actions" id="teacherRoomQuickActions">
                 <button type="button" class="teacher-room-quick-btn" id="teacherCopyPinBtn" title="Copy PIN">Copy PIN</button>
                 <button type="button" class="teacher-room-quick-btn" id="teacherCopyLinkBtn" title="Copy link tham gia">Copy link HS</button>
+                <label class="teacher-theme-select-wrap" title="Giao diện màn hình học sinh">
+                  <span aria-hidden="true">🎨</span>
+                  <select id="teacherThemeSelect" class="teacher-theme-select" aria-label="Giao diện màn hình học sinh">
+                    <option value="default">Candy trời mây</option>
+                    <option value="lab">🧪 Phòng thí nghiệm</option>
+                    <option value="galaxy">🌌 Vũ trụ</option>
+                    <option value="arcade">🕹️ Arcade 8-bit</option>
+                    <option value="chalk">🧑‍🏫 Bảng phấn</option>
+                  </select>
+                </label>
               </div>
               <button type="button" class="btn-end-room" id="btnEndRoom" onclick="resetTeacherRoom()">Kết thúc phòng</button>
             </div>
@@ -228,6 +238,11 @@
   <div class="teacher-podium-modal-backdrop" id="teacherPodiumModalBackdrop"></div>
   <button type="button" class="teacher-podium-modal-close" id="teacherPodiumModalClose" aria-label="Đóng bục vinh danh">×</button>
   <div class="teacher-podium-modal-content" id="teacherPodiumModalContent" role="img" aria-label="Bục vinh danh top 3"></div>
+</div>
+
+<div class="teacher-net-banner" id="teacherNetBanner" role="status" aria-live="assertive" hidden>
+  <span class="teacher-net-banner-spinner" aria-hidden="true"></span>
+  <span id="teacherNetBannerText">Mất kết nối — đang kết nối lại…</span>
 </div>
 
 <div class="teacher-presentation" id="teacherPresentation" hidden>

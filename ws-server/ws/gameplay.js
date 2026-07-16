@@ -241,7 +241,20 @@ async function advanceQuestion(io, redis, pin) {
   return emitCurrentQuestion(io, redis, pin);
 }
 
-function buildStudentQuestionPayload(quiz, question, serverTime) {
+/** Chỉ số câu tính xuyên suốt mọi quiz trong plan (0-based) — client dùng để đánh số "Câu N". */
+function globalQuestionIndex(plan, quizIndex, questionIndex) {
+  let total = 0;
+  for (let i = 0; i < quizIndex && i < plan.length; i += 1) {
+    total += plan[i].questions.length;
+  }
+  return total + questionIndex;
+}
+
+function planQuestionTotal(plan) {
+  return plan.reduce((sum, quiz) => sum + quiz.questions.length, 0);
+}
+
+function buildStudentQuestionPayload(quiz, question, serverTime, indexInfo = null) {
   return {
     quiz_id: quiz.quiz_id,
     question_id: question.id,
@@ -253,6 +266,9 @@ function buildStudentQuestionPayload(quiz, question, serverTime) {
     keyboard_config: quiz.keyboard_config,
     time_limit: question.time_limit_seconds,
     server_time: serverTime,
+    // Reconnect/late-join: client đồng bộ số thứ tự câu thay vì tự đếm
+    question_index: indexInfo ? indexInfo.index : null,
+    question_count: indexInfo ? indexInfo.total : null,
   };
 }
 
@@ -274,8 +290,8 @@ async function getOrCreateOptionOrder(redis, pin, question, studentName) {
   return order;
 }
 
-async function emitNewQuestionToStudentSocket(io, redis, pin, socket, quiz, question, startedAt) {
-  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt);
+async function emitNewQuestionToStudentSocket(io, redis, pin, socket, quiz, question, startedAt, indexInfo = null) {
+  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt, indexInfo);
 
   if (shouldShuffleOptions(quiz, question)) {
     const order = await getOrCreateOptionOrder(redis, pin, question, socket.data.name);
@@ -353,11 +369,15 @@ async function syncLateJoinHost(io, redis, socket, pin) {
   const question = quiz.questions[questionIndex];
   const startedAt = Number(room.question_started_at);
   const finalized = await redis.get(finalizedKey(pin, question.id));
+  const indexInfo = {
+    index: globalQuestionIndex(plan, quizIndex, questionIndex),
+    total: planQuestionTotal(plan),
+  };
 
   socket.emit('game_started', {});
   if (finalized) return;
 
-  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt);
+  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt, indexInfo);
   socket.emit('new_question', {
     ...studentPayload,
     correct_index: question.correct_index,
@@ -373,6 +393,24 @@ async function syncLateJoinStudent(io, redis, socket, pin) {
   if (socket.data?.isHost) return;
 
   const room = await redis.hgetall(roomKey(pin));
+
+  // HS quay lại phòng đã kết thúc — gửi lại kết quả cuối để xem màn final.
+  if (room.status === 'ended') {
+    let finalLeaderboard;
+    if (duckRace.isDuckRaceRoom(room)) {
+      const { parseModeConfig, getRules } = require('./engines/duck-race-config');
+      const rules = getRules(parseModeConfig(room));
+      finalLeaderboard = await duckRace.buildFinalLeaderboard(redis, pin, rules);
+    } else {
+      finalLeaderboard = await buildFinalLeaderboardPayload(redis, pin);
+    }
+    socket.emit('game_ended', {
+      play_mode: room.play_mode_slug || null,
+      final_leaderboard: finalLeaderboard,
+    });
+    return;
+  }
+
   if (room.status !== 'playing') return;
 
   if (duckRace.isDuckRaceRoom(room)) {
@@ -389,6 +427,10 @@ async function syncLateJoinStudent(io, redis, socket, pin) {
   const question = quiz.questions[questionIndex];
   const startedAt = Number(room.question_started_at);
   const finalized = await redis.get(finalizedKey(pin, question.id));
+  const indexInfo = {
+    index: globalQuestionIndex(plan, quizIndex, questionIndex),
+    total: planQuestionTotal(plan),
+  };
 
   socket.emit('game_started', {});
   if (finalized) {
@@ -396,7 +438,7 @@ async function syncLateJoinStudent(io, redis, socket, pin) {
     return;
   }
 
-  await emitNewQuestionToStudentSocket(io, redis, pin, socket, quiz, question, startedAt);
+  await emitNewQuestionToStudentSocket(io, redis, pin, socket, quiz, question, startedAt, indexInfo);
   await emitSubmitCount(io, redis, pin, question.id);
 }
 
@@ -419,7 +461,11 @@ async function emitCurrentQuestion(io, redis, pin) {
   await refreshRoomTtl(redis, pin);
   await redis.expire(submittedKey(pin, question.id), 7200);
 
-  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt);
+  const indexInfo = {
+    index: globalQuestionIndex(plan, quizIndex, questionIndex),
+    total: planQuestionTotal(plan),
+  };
+  const studentPayload = buildStudentQuestionPayload(quiz, question, startedAt, indexInfo);
 
   const hostPayload = {
     ...studentPayload,
@@ -556,11 +602,20 @@ async function finalizeCurrentQuestion(io, redis, pin) {
   const quiz = plan[quizIndex];
   const startedAt = Number(room.question_started_at);
   const timeLimitSeconds = question.time_limit_seconds;
+
+  // Chấm điểm theo danh sách người chơi trong Redis (không theo socket đang nối)
+  // — HS đã nộp rồi rớt mạng trước khi chốt câu vẫn được tính điểm.
   const studentSockets = await getStudentSockets(io, pin);
+  const socketByName = new Map(studentSockets.map((s) => [s.data.name, s]));
+  const allPlayersRaw = await redis.hgetall(playersKey(pin));
+  const studentNames = Object.values(allPlayersRaw)
+    .map((raw) => JSON.parse(raw))
+    .filter((p) => !p.is_host)
+    .map((p) => p.name);
   const scored = [];
 
-  for (const studentSocket of studentSockets) {
-    const name = studentSocket.data.name;
+  for (const name of studentNames) {
+    const studentSocket = socketByName.get(name) || null;
     const raw = await redis.get(answerKey(pin, questionId, name));
     let answer = null;
     let firstSubmitAt = startedAt + timeLimitSeconds * 1000;
@@ -632,6 +687,7 @@ async function finalizeCurrentQuestion(io, redis, pin) {
   const fastestCorrect = ranking.find((entry) => entry.correct) || null;
 
   for (const entry of ranking) {
+    if (!entry.socket) continue; // HS đang mất kết nối — điểm đã ghi, kết quả sẽ đồng bộ khi quay lại
     const rank = await getPlayerRank(redis, pin, entry.name);
     const correctRank = entry.correct
       ? ranking.filter((r) => r.correct).findIndex((r) => r.name === entry.name) + 1

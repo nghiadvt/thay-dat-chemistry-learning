@@ -36,6 +36,24 @@ class GameController extends Controller
         return view('admin.games.index', compact('games', 'search', 'playModes'));
     }
 
+    /**
+     * Demo game "Đấu Trường Hóa Học" — dữ liệu giả lập bằng JS,
+     * chưa có play mode / bảng riêng trong database.
+     */
+    public function battleDemo(): View
+    {
+        return view('admin.games.battle-demo');
+    }
+
+    /**
+     * Demo game "Săn Rồng Hóa Học" — boss raid, dữ liệu giả lập bằng JS,
+     * chưa có play mode / bảng riêng trong database.
+     */
+    public function dragonDemo(): View
+    {
+        return view('admin.games.dragon-demo');
+    }
+
     public function create(): View
     {
         return view('admin.games.form', [

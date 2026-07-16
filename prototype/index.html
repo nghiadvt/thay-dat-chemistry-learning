@@ -18,7 +18,11 @@
   <link rel="stylesheet" href="css/animations.css">
   <link rel="stylesheet" href="css/elements.css">
   <link rel="stylesheet" href="css/keyboard-runtime.css">
+  <link rel="stylesheet" href="css/quiz.css">
+  <link rel="stylesheet" href="css/balance.css">
   <link rel="stylesheet" href="css/duck-race-student.css">
+  <link rel="stylesheet" href="css/student-themes.css">
+  <script>(function(){try{var t=localStorage.getItem('htd_student_theme');if(t&&t!=='default')document.documentElement.setAttribute('data-student-theme',t);}catch(e){}})();</script>
 </head>
 <body class="student-app">
 
@@ -304,6 +308,55 @@
     </div>
   </section>
 
+  <!-- Ôn trắc nghiệm: chọn lớp -->
+  <section class="screen quiz-screen no-pad" data-screen="quiz-grade">
+    <div class="el-header">
+      <button type="button" class="el-back" onclick="goStudentHome()" aria-label="Quay lại">
+        <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
+      </button>
+      <h2 class="el-title">Ôn trắc nghiệm</h2>
+    </div>
+    <div class="qz-grade-body" id="qzGradeBody"></div>
+  </section>
+
+  <!-- Ôn trắc nghiệm: chọn chủ đề + số câu -->
+  <section class="screen quiz-screen no-pad" data-screen="quiz-setup">
+    <div class="el-header">
+      <button type="button" class="el-back" onclick="QuizModule.backToGrade()" aria-label="Chọn lại lớp">
+        <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
+      </button>
+      <h2 class="el-title" id="qzSetupTitle">Ôn trắc nghiệm</h2>
+    </div>
+    <div class="qz-setup-body" id="qzSetupBody"></div>
+  </section>
+
+  <!-- Ôn trắc nghiệm: làm bài -->
+  <section class="screen quiz-screen no-pad" data-screen="quiz-play">
+    <div class="qz-play-body" id="qzPlayBody"></div>
+  </section>
+
+  <!-- Ôn trắc nghiệm: kết quả -->
+  <section class="screen quiz-screen no-pad" data-screen="quiz-result">
+    <div class="qz-result-body" id="qzResultBody"></div>
+  </section>
+
+  <!-- Cân bằng phương trình: bản đồ màn chơi -->
+  <section class="screen balance-screen no-pad" data-screen="balance-map">
+    <div class="el-header">
+      <button type="button" class="el-back" onclick="goStudentHome()" aria-label="Quay lại">
+        <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
+      </button>
+      <h2 class="el-title">Cân bằng phương trình</h2>
+      <div class="bl-total-stars" id="blTotalStars">⭐ 0</div>
+    </div>
+    <div class="bl-map-body" id="blMapBody"></div>
+  </section>
+
+  <!-- Cân bằng phương trình: chơi -->
+  <section class="screen balance-screen no-pad" data-screen="balance-play">
+    <div class="bl-play-body" id="blPlayBody"></div>
+  </section>
+
   <!-- Đọc nguyên tố: chế độ luyện tập nghe-đoán -->
   <section class="screen practice-screen no-pad" data-screen="element-practice">
     <div class="el-header">
@@ -335,6 +388,11 @@
   <span id="cartoonToastText"></span>
 </div>
 
+<div class="net-banner" id="netBanner" role="status" aria-live="assertive" hidden>
+  <span class="net-banner-spinner" aria-hidden="true"></span>
+  <span id="netBannerText">Mất kết nối — đang kết nối lại…</span>
+</div>
+
 <div class="result-overlay" id="resultOverlay">
   <div class="result-card">
     <div class="result-circle" id="resultCircle">✓</div>
@@ -357,10 +415,14 @@
 <script src="js/shared.js"></script>
 <script src="js/elements-data.js"></script>
 <script src="js/elements-module.js"></script>
+<script src="js/quiz-module.js"></script>
+<script src="js/balance-data.js"></script>
+<script src="js/balance-module.js"></script>
 <script src="js/equation-ui.js"></script>
 <script src="js/keyboard-runtime.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/fx.js"></script>
+<script src="js/student-theme.js"></script>
 <script src="js/student.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

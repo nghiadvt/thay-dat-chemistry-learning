@@ -165,7 +165,10 @@ class SessionController extends Controller
 
         $canChangeQuiz = $session->status === 'waiting';
 
-        return view('admin.sessions.edit', compact('session', 'games', 'quizzes', 'canChangeQuiz'));
+        $joinUrl = $this->sessionQrService->joinUrl($session);
+        $qrUrl = $this->sessionQrService->displayQrUrl($session, $joinUrl);
+
+        return view('admin.sessions.edit', compact('session', 'games', 'quizzes', 'canChangeQuiz', 'joinUrl', 'qrUrl'));
     }
 
     public function update(Request $request, GameSession $session): RedirectResponse

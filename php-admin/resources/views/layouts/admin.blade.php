@@ -5,7 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin — Hóa Thầy Đạt')</title>
+    {{-- Áp theme trước khi render để không chớp trắng (chọn ở Admin → Giao diện) --}}
+    <script>(function(){try{var t=localStorage.getItem('adminTheme');if(t&&t!=='default')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
     <link rel="stylesheet" href="@vasset('css/admin.css')">
+    <link rel="stylesheet" href="@vasset('css/admin-theme-lab.css')">
+    <link rel="stylesheet" href="@vasset('css/admin-theme-notebook.css')">
+    <link rel="stylesheet" href="@vasset('css/admin-theme-arcade.css')">
+    <link rel="stylesheet" href="@vasset('css/admin-theme-chalk.css')">
+    <link rel="stylesheet" href="@vasset('css/admin-theme-galaxy.css')">
     <link rel="stylesheet" href="@vasset('css/admin-list.css')">
     <link rel="stylesheet" href="@vasset('css/admin-confirm.css')">
     <link rel="stylesheet" href="@vasset('css/feedback-widget.css')">
@@ -32,6 +39,7 @@
             <a href="{{ route('admin.sessions.index') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Báo cáo</a>
             <a href="{{ route('admin.feedback.index') }}" class="{{ request()->routeIs('admin.feedback.*') ? 'active' : '' }}">Góp ý</a>
+            <a href="{{ route('admin.appearance') }}" class="{{ request()->routeIs('admin.appearance') ? 'active' : '' }}">Giao diện</a>
         </nav>
     </aside>
 
@@ -78,6 +86,7 @@ window.__ADMIN_FLASH__ = @json(array_filter([
 ]));
 </script>
 @endif
+<script src="@vasset('js/admin-theme.js')"></script>
 <script src="@vasset('js/admin-confirm.js')"></script>
 <script src="@vasset('js/admin-loading.js')"></script>
 <script src="@vasset('js/admin-list-page.js')"></script>

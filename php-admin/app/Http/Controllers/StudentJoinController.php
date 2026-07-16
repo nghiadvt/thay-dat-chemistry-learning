@@ -84,13 +84,20 @@ class StudentJoinController extends Controller
             'js/fx.js' => public_path('app/js/fx.js'),
             'js/elements-data.js' => public_path('app/js/elements-data.js'),
             'js/elements-module.js' => public_path('app/js/elements-module.js'),
+            'js/quiz-module.js' => public_path('app/js/quiz-module.js'),
+            'js/balance-data.js' => public_path('app/js/balance-data.js'),
+            'js/balance-module.js' => public_path('app/js/balance-module.js'),
+            'js/student-theme.js' => public_path('app/js/student-theme.js'),
             'js/student.js' => public_path('app/js/student.js'),
             'css/shared.css' => public_path('app/css/shared.css'),
             'css/student.css' => public_path('app/css/student.css'),
             'css/animations.css' => public_path('app/css/animations.css'),
             'css/elements.css' => public_path('app/css/elements.css'),
             'css/duck-race-student.css' => public_path('app/css/duck-race-student.css'),
+            'css/student-themes.css' => public_path('app/css/student-themes.css'),
             'css/keyboard-runtime.css' => public_path('app/css/keyboard-runtime.css'),
+            'css/quiz.css' => public_path('app/css/quiz.css'),
+            'css/balance.css' => public_path('app/css/balance.css'),
         ];
         foreach ($assetMap as $rel => $abs) {
             $v = is_readable($abs) ? (string) filemtime($abs) : (string) time();

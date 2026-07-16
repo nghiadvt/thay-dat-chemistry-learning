@@ -1,7 +1,7 @@
 /**
  * Admin — cấu hình đua vịt: thước vạch, canvas resize vịt, preview di chuyển.
  */
-const DuckRaceGameConfig = (function () {
+window.DuckRaceGameConfig = (function () {
   const MIN_GAP = 2;
   const DUCK_SIZE_MIN = 32;
   const DUCK_SIZE_MAX = 128;

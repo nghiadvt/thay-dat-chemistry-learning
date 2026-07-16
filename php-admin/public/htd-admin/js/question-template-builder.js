@@ -6,6 +6,7 @@ window.QuestionTemplateBuilder = (function () {
 
   const PART_TYPES = [
     { value: 'coef', label: 'Hệ số' },
+    { value: 'sub', label: 'Số nhỏ (chỉ số)' },
     { value: 'blank', label: 'Ô điền' },
     { value: 'chem', label: 'Chất cố định' },
     { value: 'txt', label: 'Ký hiệu' },
@@ -16,6 +17,7 @@ window.QuestionTemplateBuilder = (function () {
     blank: 'Điền chỗ thiếu',
     blank_balance: 'Cân bằng + điền thiếu',
     product: 'Điền sản phẩm',
+    subscript: 'Điền chỉ số',
   };
 
   const PRESETS = {
@@ -59,6 +61,14 @@ window.QuestionTemplateBuilder = (function () {
       ],
       correct_answer: { coef: {}, blank: { b0: 'NH4Cl' } },
     },
+    subscript: {
+      template: [
+        { t: 'chem', text: 'C' }, { t: 'sub', id: 's0' },
+        { t: 'chem', text: 'H' }, { t: 'sub', id: 's1' },
+        { t: 'chem', text: 'O' }, { t: 'sub', id: 's2' },
+      ],
+      correct_answer: { coef: { s0: '6', s1: '12', s2: '6' }, blank: {} },
+    },
   };
 
   let template = [];
@@ -76,7 +86,7 @@ window.QuestionTemplateBuilder = (function () {
   function nextId(prefix) {
     let max = -1;
     template.forEach((part) => {
-      if ((part.t === 'coef' && prefix === 'c') || (part.t === 'blank' && prefix === 'b')) {
+      if ((part.t === 'coef' && prefix === 'c') || (part.t === 'blank' && prefix === 'b') || (part.t === 'sub' && prefix === 's')) {
         const match = String(part.id || '').match(new RegExp('^' + prefix + '(\\d+)$'));
         if (match) max = Math.max(max, parseInt(match[1], 10));
       }
@@ -84,11 +94,13 @@ window.QuestionTemplateBuilder = (function () {
     return prefix + (max + 1);
   }
 
+  // Số nhỏ (sub) dùng chung kho đáp án `coef` với hệ số — cùng là số nguyên,
+  // chấm giống nhau ở scoring.js nên không phải đổi logic chấm.
   function syncCorrectAnswerKeys() {
     const coef = {};
     const blank = {};
     template.forEach((part) => {
-      if (part.t === 'coef' && part.id) {
+      if ((part.t === 'coef' || part.t === 'sub') && part.id) {
         coef[part.id] = correctAnswer.coef?.[part.id] ?? '';
       }
       if (part.t === 'blank' && part.id) {
@@ -130,6 +142,15 @@ window.QuestionTemplateBuilder = (function () {
         const val = correctAnswer.coef?.[part.id] || '';
         return (
           '<button type="button" class="qe-preview-chip qe-preview-chip--coef' + selected + '" data-preview-index="' + index + '" ' +
+          'title="' + escapeAttr(label + ' — click để chọn') + '">' +
+          (val ? escapeHtml(val) : '□') + '</button>'
+        );
+      }
+
+      if (part.t === 'sub') {
+        const val = correctAnswer.coef?.[part.id] || '';
+        return (
+          '<button type="button" class="qe-preview-chip qe-preview-chip--sub' + selected + '" data-preview-index="' + index + '" ' +
           'title="' + escapeAttr(label + ' — click để chọn') + '">' +
           (val ? escapeHtml(val) : '□') + '</button>'
         );
@@ -189,6 +210,13 @@ window.QuestionTemplateBuilder = (function () {
           '<input type="text" inputmode="numeric" class="qe-inline-coef" data-part-index="' + index + '" ' +
           'value="' + escapeAttr(correctAnswer.coef?.[part.id] || '') + '" placeholder="2" maxlength="3">' +
           '</label>';
+      } else if (part.t === 'sub') {
+        body =
+          '<label class="qe-part-answer-inline">' +
+          '<span>Số nhỏ</span>' +
+          '<input type="text" inputmode="numeric" class="qe-inline-coef" data-part-index="' + index + '" ' +
+          'value="' + escapeAttr(correctAnswer.coef?.[part.id] || '') + '" placeholder="6" maxlength="3">' +
+          '</label>';
       } else if (part.t === 'blank') {
         body =
           '<label class="qe-part-answer-inline">' +
@@ -238,19 +266,24 @@ window.QuestionTemplateBuilder = (function () {
     if (!part || part.t === newType) return;
 
     const preservedText = part.text || '';
-    const oldCoef = part.t === 'coef' ? correctAnswer.coef?.[part.id] : null;
+    const oldNum = (part.t === 'coef' || part.t === 'sub') ? correctAnswer.coef?.[part.id] : null;
     const oldBlank = part.t === 'blank' ? correctAnswer.blank?.[part.id] : null;
 
     if (newType === 'coef') {
       const id = nextId('c');
       template[index] = { t: 'coef', id };
-      if (oldCoef != null) correctAnswer.coef[id] = oldCoef;
+      if (oldNum != null) correctAnswer.coef[id] = oldNum;
+      else if (oldBlank != null) correctAnswer.coef[id] = oldBlank.replace(/\D/g, '');
+    } else if (newType === 'sub') {
+      const id = nextId('s');
+      template[index] = { t: 'sub', id };
+      if (oldNum != null) correctAnswer.coef[id] = oldNum;
       else if (oldBlank != null) correctAnswer.coef[id] = oldBlank.replace(/\D/g, '');
     } else if (newType === 'blank') {
       const id = nextId('b');
       template[index] = { t: 'blank', id };
       if (oldBlank != null) correctAnswer.blank[id] = oldBlank;
-      else if (oldCoef != null) correctAnswer.blank[id] = oldCoef;
+      else if (oldNum != null) correctAnswer.blank[id] = oldNum;
     } else if (newType === 'chem') {
       template[index] = { t: 'chem', text: preservedText || oldBlank || '' };
     } else if (newType === 'txt') {
@@ -270,10 +303,16 @@ window.QuestionTemplateBuilder = (function () {
     renderPartsList();
   }
 
+  // Chèn ngay SAU phần tử đang chọn (nếu có), thay vì luôn thêm vào cuối.
+  // Nhờ vậy giáo viên click chọn vị trí rồi bấm thêm là chèn đúng chỗ mong muốn;
+  // phần mới trở thành phần đang chọn nên bấm thêm liên tiếp sẽ nối tiếp về sau.
   function addPart(part) {
-    template.push(part);
+    const at = (selectedIndex != null && selectedIndex >= 0 && selectedIndex < template.length)
+      ? selectedIndex + 1
+      : template.length;
+    template.splice(at, 0, part);
     syncCorrectAnswerKeys();
-    selectedIndex = template.length - 1;
+    selectedIndex = at;
     renderPartsList();
   }
 
@@ -310,6 +349,11 @@ window.QuestionTemplateBuilder = (function () {
     });
   }
 
+  // Cú pháp nhập nhanh (1 ô):
+  //   ___ hoặc [] hoặc [?]  → ô trống, đáp án lấy từ ô "Đáp án" theo thứ tự.
+  //   [6]  (toàn chữ số)     → ô SỐ NHỎ (chỉ số), đáp án chính là 6 (nhập kèm luôn).
+  //   [O2] (có chữ cái)      → ô điền công thức, đáp án chính là O2 (nhập kèm luôn).
+  //   Chế độ cân bằng: mỗi chất tự thêm 1 ô hệ số phía trước (đáp án lấy từ ô "Đáp án").
   function parseQuickEquation(eqRaw, answerRaw, mode) {
     let eq = normalizeArrowText(String(eqRaw || '').trim())
       .replace(/\s+/g, '')
@@ -317,14 +361,16 @@ window.QuestionTemplateBuilder = (function () {
 
     if (!eq) return null;
 
-    const tokenRe = /(\[\?\]|\[\]|[+→=↑↓-]|[A-Z][a-z]?(?:\d+)?(?:[A-Z][a-z]?\d*)*)/g;
+    const tokenRe = /(\[[^\]]*\]|[+→=↑↓-]|[A-Z][a-z]?(?:\d+)?(?:[A-Z][a-z]?\d*)*)/g;
     const tokens = eq.match(tokenRe) || [];
     if (!tokens.length) return null;
 
     const newTemplate = [];
     const newAnswers = { coef: {}, blank: {} };
+    const inlineIds = new Set();
     let cIdx = 0;
     let bIdx = 0;
+    let sIdx = 0;
     const autoCoef = mode === 'balance' || mode === 'blank_balance';
 
     const pushTxt = (text) => {
@@ -334,12 +380,23 @@ window.QuestionTemplateBuilder = (function () {
     };
 
     tokens.forEach((tok) => {
-      if (tok === '[?]') {
-        newTemplate.push({ t: 'blank', id: 'b' + bIdx++ });
-        return;
-      }
-      if (tok === '[]') {
-        newTemplate.push({ t: 'coef', id: 'c' + cIdx++ });
+      if (tok[0] === '[') {
+        const content = tok.slice(1, -1).trim();
+        if (content === '' || content === '?') {
+          newTemplate.push({ t: 'blank', id: 'b' + bIdx++ });
+          return;
+        }
+        if (/^\d+$/.test(content)) {
+          const id = 's' + sIdx++;
+          newTemplate.push({ t: 'sub', id });
+          newAnswers.coef[id] = content;
+          inlineIds.add(id);
+          return;
+        }
+        const id = 'b' + bIdx++;
+        newTemplate.push({ t: 'blank', id });
+        newAnswers.blank[id] = normalizeArrowText(content);
+        inlineIds.add(id);
         return;
       }
       if (tok === '+' || tok === '-') {
@@ -368,9 +425,10 @@ window.QuestionTemplateBuilder = (function () {
 
     if (!newTemplate.length) return null;
 
+    // Điền đáp án theo vị trí cho các ô CHƯA có đáp án nhập kèm trong ngoặc.
     const answerParts = String(answerRaw || '').split(/[,;|]/).map((s) => s.trim()).filter(Boolean);
     const coefIds = newTemplate.filter((p) => p.t === 'coef').map((p) => p.id);
-    const blankIds = newTemplate.filter((p) => p.t === 'blank').map((p) => p.id);
+    const blankIds = newTemplate.filter((p) => p.t === 'blank' && !inlineIds.has(p.id)).map((p) => p.id);
 
     if (mode === 'blank_balance' && coefIds.length && blankIds.length) {
       coefIds.forEach((id, i) => { newAnswers.coef[id] = answerParts[i] || ''; });
@@ -469,6 +527,10 @@ window.QuestionTemplateBuilder = (function () {
       addPart({ t: 'coef', id: nextId('c') });
     });
 
+    root.querySelector('#btnAddSub')?.addEventListener('click', () => {
+      addPart({ t: 'sub', id: nextId('s') });
+    });
+
     root.querySelector('#btnAddBlank')?.addEventListener('click', () => {
       addPart({ t: 'blank', id: nextId('b') });
     });
@@ -533,7 +595,7 @@ window.QuestionTemplateBuilder = (function () {
       if (coefInput) {
         const index = parseInt(coefInput.dataset.partIndex, 10);
         const part = template[index];
-        if (part?.t === 'coef') {
+        if (part?.t === 'coef' || part?.t === 'sub') {
           correctAnswer.coef[part.id] = coefInput.value.replace(/\D/g, '');
           renderPreview();
           syncHiddenFields();

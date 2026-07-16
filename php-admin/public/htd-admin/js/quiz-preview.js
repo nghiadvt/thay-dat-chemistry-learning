@@ -16,6 +16,7 @@ window.HTDQuizPreview = (function () {
         blank: 'Điền chỗ thiếu',
         blank_balance: 'Cân bằng + điền',
         product: 'Điền sản phẩm',
+        subscript: 'Điền chỉ số',
       };
       return labels[inputMode] || 'Phương trình';
     }

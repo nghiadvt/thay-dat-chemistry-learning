@@ -16,6 +16,7 @@ const HTDBridge = (function () {
     raceUpdate: [],
     playerFinished: [],
     roomClosed: [],
+    themeUpdate: [],
   };
 
   let roomMeta = null;
@@ -50,6 +51,7 @@ const HTDBridge = (function () {
     HTDSocket.on('race_update', data => emitLocal('raceUpdate', data));
     HTDSocket.on('player_finished', data => emitLocal('playerFinished', data));
     HTDSocket.on('room_closed', data => emitLocal('roomClosed', data));
+    HTDSocket.on('theme_update', data => emitLocal('themeUpdate', data));
   }
 
   async function init() {

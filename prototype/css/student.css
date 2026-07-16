@@ -942,6 +942,35 @@ body.student-app {
 }
 .eq-coef-box.filled { background: #F3EDFF; border-color: var(--grape); }
 
+/* Ô số nhỏ (chỉ số): nhỏ hơn ô hệ số và lệch xuống như subscript trong công thức. */
+.eq-sub-box {
+  min-width: 22px;
+  height: 24px;
+  padding: 0 3px;
+  border: 2px solid #C9D8F2;
+  border-radius: 7px;
+  background: #F6F9FF;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--grape);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.34em;
+  box-shadow: 0 2px 0 rgba(38,35,92,0.1);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.eq-sub-box.focused {
+  border-color: var(--bubblegum);
+  animation: pinPulse 1.2s ease infinite;
+}
+.eq-sub-box.filled { background: #F3EDFF; border-color: var(--grape); }
+
 .eq-blank-box {
   min-width: 56px;
   min-height: 36px;

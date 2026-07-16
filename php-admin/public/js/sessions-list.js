@@ -1,31 +1,7 @@
 /**
- * Sessions list — PIN modal, bulk delete, session-specific row actions.
+ * Sessions list — delete modal, bulk delete, session-specific row actions.
  */
 (function () {
-  function initPinModal() {
-    const pinModal = document.getElementById('sessionPinModal');
-    const pinForm = document.getElementById('sessionPinModalForm');
-    const pinBody = document.getElementById('sessionPinModalBody');
-    if (!pinModal) return;
-
-    function closePinModal() {
-      pinModal.hidden = true;
-    }
-
-    pinModal.querySelectorAll('[data-close-pin-modal]').forEach((el) => {
-      el.addEventListener('click', closePinModal);
-    });
-
-    window.openSessionPinModal = function (menu) {
-      const pin = menu.dataset.sessionPin || '';
-      const url = menu.dataset.regeneratePinUrl || '';
-      if (!pinForm || !pinBody || !url) return;
-      pinForm.action = url;
-      pinBody.textContent = `PIN hiện tại: ${pin}. Đổi PIN sẽ tạo mã mới và QR mới — link/QR cũ không còn dùng được.`;
-      pinModal.hidden = false;
-    };
-  }
-
   function initDeleteModal() {
     const modal = document.getElementById('sessionDeleteModal');
     const form = document.getElementById('sessionDeleteModalForm');
@@ -143,10 +119,6 @@
         submitReplay(menu.dataset.resetUrl);
         return;
       }
-      if (action === 'regenerate-pin') {
-        window.openSessionPinModal?.(menu);
-        return;
-      }
       if (action === 'delete') {
         window.openSessionDeleteModal?.(menu);
         return;
@@ -159,16 +131,11 @@
         );
         return;
       }
-      if (action === 'link') {
-        window.open(menu.dataset.joinUrl, '_blank', 'noopener');
-        return;
-      }
       if (typeof previous === 'function') previous(menu, action);
     };
   }
 
   function init() {
-    initPinModal();
     initDeleteModal();
     initBulkSelection();
     initSessionActions();

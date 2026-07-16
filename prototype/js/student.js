@@ -46,6 +46,11 @@ const state = {
   lastDuckScore: null,
   lastWaitingCount: 0,
   finalTimers: [],
+  /** PIN của phòng đang tham gia (backend) — dùng để tự vào lại khi mất mạng */
+  joinedPin: null,
+  questionTotal: null,
+  reconnectSetup: false,
+  wasDisconnected: false,
 };
 
 /* ── Game-feel helpers (âm thanh + hiệu ứng, an toàn khi thiếu engine) ── */
@@ -247,6 +252,14 @@ function openHomeFeature(feature) {
   }
   if (feature === 'elements' && window.ElementsModule) {
     showScreen('elements');
+    return;
+  }
+  if (feature === 'quiz' && window.QuizModule) {
+    QuizModule.open();
+    return;
+  }
+  if (feature === 'balance' && window.BalanceModule) {
+    BalanceModule.open();
     return;
   }
   const label = HOME_FEATURE_LABELS[feature] || 'Tính năng';
@@ -690,6 +703,8 @@ function submitProfile() {
         state.playerId = state.studentName;
         state.waitingJoinedAt = Date.now();
         state.backendMode = true;
+        state.joinedPin = room.pin;
+        setupStudentReconnect();
         sfx('join');
         handleBackendRoomJoined(data);
       })
@@ -704,8 +719,90 @@ function submitProfile() {
   showScreen('waiting');
 }
 
+// ─── Mất mạng / tự động vào lại phòng ───
+let netBannerHideTimer = null;
+
+function showNetBanner(text, reconnected = false) {
+  const banner = document.getElementById('netBanner');
+  const textEl = document.getElementById('netBannerText');
+  if (!banner) return;
+  clearTimeout(netBannerHideTimer);
+  if (textEl) textEl.textContent = text;
+  banner.classList.toggle('reconnected', reconnected);
+  banner.hidden = false;
+  if (reconnected) {
+    netBannerHideTimer = setTimeout(() => { banner.hidden = true; }, 2200);
+  }
+}
+
+function hideNetBanner() {
+  clearTimeout(netBannerHideTimer);
+  const banner = document.getElementById('netBanner');
+  if (banner) banner.hidden = true;
+}
+
+/**
+ * Socket.io tự nối lại transport, nhưng server chỉ nhớ HS qua join_room —
+ * nên sau mỗi lần reconnect phải join lại (player_token trong sessionStorage
+ * chứng minh danh tính, server đồng bộ lại câu hỏi/kết quả hiện tại).
+ */
+function setupStudentReconnect() {
+  if (state.reconnectSetup) return;
+  state.reconnectSetup = true;
+
+  HTDSocket.on('disconnect', () => {
+    if (!state.joinedPin) return;
+    state.wasDisconnected = true;
+    showNetBanner('Mất kết nối — đang kết nối lại…');
+  });
+
+  HTDSocket.on('connect', () => {
+    if (!state.joinedPin || !state.wasDisconnected) return;
+    rejoinAfterReconnect();
+  });
+}
+
+function rejoinAfterReconnect(attempt = 0) {
+  if (!state.joinedPin || !state.studentName) return;
+  showNetBanner('Có mạng lại — đang vào lại phòng…');
+  HTDBridge.joinRoom({
+    pin: state.joinedPin,
+    name: state.studentName,
+    isHost: false,
+    avatar: state.avatarDataUrl || null,
+  })
+    .then(data => {
+      state.wasDisconnected = false;
+      showNetBanner('Đã kết nối lại! 🎉', true);
+      handleBackendRoomJoined(data);
+    })
+    .catch(err => {
+      const msg = err?.message || '';
+      // Socket cũ chưa kịp bị server đánh dấu rời phòng — chờ chút rồi thử lại
+      if (attempt < 4 && /đã được sử dụng/i.test(msg)) {
+        setTimeout(() => rejoinAfterReconnect(attempt + 1), 2500);
+        return;
+      }
+      state.joinedPin = null;
+      state.wasDisconnected = false;
+      hideNetBanner();
+      alert(msg || 'Không vào lại được phòng.');
+      showScreen('home');
+    });
+}
+
 function handleBackendRoomJoined(data) {
   state.myScore = Number(data?.score || 0);
+
+  // Theme màn hình HS do giáo viên quyết định — áp dụng ngay khi vào phòng
+  if (data?.student_theme && window.HTDTheme) {
+    HTDTheme.set(data.student_theme);
+  }
+
+  if (data?.room_status === 'ended') {
+    // Phòng đã kết thúc — server sẽ gửi lại game_ended để hiện màn kết quả.
+    return;
+  }
 
   if (data?.room_status === 'playing') {
     state.lateJoinSync = true;
@@ -1166,7 +1263,9 @@ function startQuestion() {
   updateStreakBadge();
 
   document.getElementById('qProgress').textContent = isBackendMode()
-    ? `Câu ${state.questionIndex + 1}`
+    ? state.questionTotal
+      ? `Câu ${state.questionIndex + 1}/${state.questionTotal}`
+      : `Câu ${state.questionIndex + 1}`
     : `Câu ${state.questionIndex + 1}/${FAKE_QUESTIONS.length}`;
   document.getElementById('qId').textContent = `ID: ${q.id || '—'}`;
 
@@ -1322,8 +1421,12 @@ function setupInputQuestion(q) {
   const eqEl = document.getElementById('qEqDisplay');
   const chemKb = document.getElementById('chemKb');
   const coefPad = document.getElementById('coefNumpad');
-  const showCoef = q.inputMode === 'balance' || q.inputMode === 'blank_balance';
-  const showChem = q.inputMode !== 'balance';
+  // Chọn bàn phím theo nội dung template (hỗ trợ trộn hệ số / số nhỏ / ô điền):
+  // có ô số (hệ số hoặc chỉ số) → hiện bàn phím số; có ô điền công thức → hiện bàn phím hóa học.
+  const hasNumeric = (q.template || []).some(p => p.t === 'coef' || p.t === 'sub');
+  const hasChem = (q.template || []).some(p => p.t === 'blank');
+  const showCoef = hasNumeric;
+  const showChem = hasChem;
 
   chemKb.style.display = showChem ? '' : 'none';
   coefPad.style.display = showCoef ? '' : 'none';
@@ -1365,16 +1468,16 @@ function setupInputQuestion(q) {
     smartContext,
   };
 
-  if (q.inputMode === 'balance') {
-    state.eqController = EquationUI.CoefController(ctrlOpts);
-  } else if (q.inputMode === 'blank_balance') {
+  if (hasNumeric && hasChem) {
     state.eqController = EquationUI.MixedController(ctrlOpts);
+  } else if (hasNumeric) {
+    state.eqController = EquationUI.CoefController(ctrlOpts);
   } else {
     state.eqController = EquationUI.BlankController(ctrlOpts);
   }
 
   state.eqController.render(null);
-  const firstSlot = q.template.find(p => p.t === 'coef' || p.t === 'blank');
+  const firstSlot = q.template.find(p => p.t === 'coef' || p.t === 'sub' || p.t === 'blank');
   if (firstSlot) state.focusedSlotId = firstSlot.id;
   state.eqController.render(state.focusedSlotId);
 }
@@ -2023,10 +2126,30 @@ renderPinDisplay();
 
 function applyNewQuestion(payload) {
   if (payload?.play_mode) state.playMode = payload.play_mode;
-  state.serverQuestionIndex += 1;
-  state.questionIndex = state.serverQuestionIndex - 1;
+
+  const sameQuestion =
+    state.currentQuestion &&
+    payload?.question_id != null &&
+    String(state.currentQuestion.id) === String(payload.question_id);
+
+  // Server đánh số câu xuyên suốt các quiz — tin server thay vì tự đếm
+  if (payload?.question_index != null) {
+    state.serverQuestionIndex = Number(payload.question_index) + 1;
+  } else if (!sameQuestion) {
+    state.serverQuestionIndex += 1;
+  }
+  if (payload?.question_count != null) {
+    state.questionTotal = Number(payload.question_count) || null;
+  }
+  state.questionIndex = Math.max(0, state.serverQuestionIndex - 1);
   state.currentQuestion = HTDGameAdapter.mapNewQuestion(payload, state.questionIndex);
   state.pendingNewQuestion = null;
+
+  if (sameQuestion && state.lockedIn && state.screen === 'question') {
+    // Reconnect giữa câu: server gửi lại đúng câu đang chờ — giữ nguyên đáp án đã nộp
+    return;
+  }
+
   resetQuestionAnswerState();
   document.querySelector('.question-screen')?.classList.toggle('duck-race-mode', isDuckRaceMode());
   updateDuckScoreDisplay();
@@ -2114,6 +2237,9 @@ function setupStudentBackendBridge() {
   });
 
   HTDBridge.on('roomClosed', (data) => {
+    state.joinedPin = null;
+    state.wasDisconnected = false;
+    hideNetBanner();
     alert(data?.message || 'Phòng đã được giáo viên kết thúc.');
     HTD.setRoom(null);
     HTD.setPlayers([]);
@@ -2125,6 +2251,10 @@ function setupStudentBackendBridge() {
 
   HTDBridge.on('roomError', data => {
     alert(data.message || 'Lỗi phòng.');
+  });
+
+  HTDBridge.on('themeUpdate', data => {
+    if (data?.theme && window.HTDTheme) HTDTheme.set(data.theme);
   });
 }
 

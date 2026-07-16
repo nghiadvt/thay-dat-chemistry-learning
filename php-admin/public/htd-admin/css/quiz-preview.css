@@ -302,6 +302,20 @@
   pointer-events: none;
 }
 
+.htd-preview-eq-wrap .eq-sub-box {
+  min-width: 22px;
+  padding: 1px 5px;
+  border: 2px solid #93c5fd;
+  border-radius: 6px;
+  background: #eff6ff;
+  font-size: 0.78em;
+  font-weight: 700;
+  vertical-align: baseline;
+  position: relative;
+  top: 0.3em;
+  pointer-events: none;
+}
+
 .htd-preview-eq-wrap .eq-blank-box {
   min-width: 72px;
   min-height: 40px;

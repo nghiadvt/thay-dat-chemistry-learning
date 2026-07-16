@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\TagController as AdminTagController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\GameSessionController;
 use App\Http\Controllers\Api\KeyboardController;
+use App\Http\Controllers\Api\PracticeController;
 use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\QuestionImageController;
 use App\Http\Controllers\Api\QuizController;
@@ -58,6 +59,10 @@ Route::get('app/index.html', [StudentJoinController::class, 'legacyIndex']);
 
 Route::get('api/rooms/{pin}', [RoomController::class, 'show']);
 
+// Ôn trắc nghiệm (học sinh, không cần đăng nhập)
+Route::get('api/practice/topics', [PracticeController::class, 'topics']);
+Route::get('api/practice/questions', [PracticeController::class, 'questions']);
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
@@ -71,9 +76,12 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('dashboard/export', [AdminDashboardController::class, 'export'])->name('dashboard.export');
+        Route::view('appearance', 'admin.appearance.index')->name('appearance');
 
         Route::resource('keyboards', AdminKeyboardController::class)->except(['show', 'update']);
         Route::get('keyboards/{keyboard}/editor', [AdminKeyboardController::class, 'editor'])->name('keyboards.editor');
+        Route::get('games/battle-arena-demo', [AdminGameController::class, 'battleDemo'])->name('games.battle-demo');
+        Route::get('games/dragon-hunt-demo', [AdminGameController::class, 'dragonDemo'])->name('games.dragon-demo');
         Route::resource('games', AdminGameController::class)->except(['show']);
         Route::get('quizzes/export-csv', [AdminQuizController::class, 'exportCsv'])->name('quizzes.export-csv');
         Route::get('quizzes/import-template', [AdminQuizController::class, 'importTemplate'])->name('quizzes.import-template');

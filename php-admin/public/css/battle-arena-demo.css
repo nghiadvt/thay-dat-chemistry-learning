@@ -1,0 +1,676 @@
+/* Đấu Trường Hóa Học — demo admin (fake data JS, chưa nối DB) */
+
+/* ============ Banner giới thiệu ở trang danh sách game ============ */
+.bat-promo-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 20px;
+  padding: 16px 22px;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #1e1b4b 0%, #4c1d95 45%, #7c2d12 100%);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(76, 29, 149, 0.35);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bat-promo-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(76, 29, 149, 0.45);
+  color: #fff;
+}
+.bat-promo-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% 20%, rgba(255, 214, 102, 0.25), transparent 45%);
+  pointer-events: none;
+}
+.bat-promo-banner__icon {
+  font-size: 2.2rem;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+}
+.bat-promo-banner__text strong {
+  display: block;
+  font-size: 1.05rem;
+}
+.bat-promo-banner__text span {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+.bat-promo-banner__cta {
+  margin-left: auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #ffd166;
+  color: #4c1d95;
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 #d4a73f;
+}
+
+/* ============ Layout trang demo ============ */
+.bat-page-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.bat-intro__rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.bat-rule-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 0.85rem;
+}
+.bat-rule-chip strong { color: #4c1d95; }
+
+/* ============ Scoreboard ============ */
+.bat-scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.bat-hpbar__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+.bat-hpbar--blue .bat-hpbar__head { flex-direction: row-reverse; }
+.bat-hpbar__name { font-size: 0.95rem; }
+.bat-hpbar--red .bat-hpbar__name { color: #c2361f; }
+.bat-hpbar--blue .bat-hpbar__name { color: #2456a8; }
+.bat-hpbar__value {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+.bat-hpbar__track {
+  position: relative;
+  height: 22px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  border: 2px solid #cbd5e1;
+  overflow: hidden;
+}
+.bat-hpbar__ghost,
+.bat-hpbar__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 999px;
+}
+.bat-hpbar--blue .bat-hpbar__ghost,
+.bat-hpbar--blue .bat-hpbar__fill { left: auto; right: 0; }
+.bat-hpbar__ghost {
+  background: #fca5a5;
+  transition: width 0.9s ease 0.35s;
+}
+.bat-hpbar__fill {
+  transition: width 0.25s ease;
+}
+.bat-hpbar--red .bat-hpbar__fill {
+  background: linear-gradient(180deg, #ff8a5c, #e0492e 60%, #b93217);
+}
+.bat-hpbar--blue .bat-hpbar__fill {
+  background: linear-gradient(180deg, #6fbcf8, #2f6fd0 60%, #1d4f9e);
+}
+.bat-hpbar.is-low .bat-hpbar__fill {
+  animation: batHpPulse 0.7s ease-in-out infinite;
+}
+@keyframes batHpPulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.5) saturate(1.4); }
+}
+.bat-vs-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 1.05rem;
+  color: #fff;
+  background: radial-gradient(circle at 35% 30%, #fbbf24, #d97706 70%);
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.5);
+  animation: batVsPulse 2.4s ease-in-out infinite;
+}
+@keyframes batVsPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* ============ Sân khấu ============ */
+.bat-stage {
+  position: relative;
+  height: 440px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1e1b4b 0%, #4338ca 42%, #7e57c2 62%, #2d224f 62.5%, #3b2d63 100%);
+  border: 3px solid #312e81;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+.bat-stage.is-shaking {
+  animation: batShake 0.35s linear;
+}
+@keyframes batShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, 3px); }
+  40% { transform: translate(5px, -4px); }
+  60% { transform: translate(-4px, 2px); }
+  80% { transform: translate(3px, -2px); }
+}
+
+.bat-stage__sky {
+  position: absolute;
+  inset: 0 0 38% 0;
+  pointer-events: none;
+}
+.bat-star {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.7;
+  animation: batTwinkle 2.6s ease-in-out infinite;
+}
+@keyframes batTwinkle {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.9; }
+}
+.bat-moon {
+  position: absolute;
+  top: 26px;
+  right: 60px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 35%, #fffbe6, #fde68a 70%);
+  box-shadow: 0 0 40px 12px rgba(253, 230, 138, 0.35);
+}
+.bat-cloud {
+  position: absolute;
+  height: 18px;
+  width: 70px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  animation: batCloudDrift 26s linear infinite;
+}
+.bat-cloud::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 18px;
+  width: 34px;
+  height: 22px;
+  border-radius: 999px;
+  background: inherit;
+}
+.bat-cloud--1 { top: 44px; left: -80px; }
+.bat-cloud--2 { top: 96px; left: -80px; animation-delay: -12s; transform: scale(1.4); }
+.bat-cloud--3 { top: 150px; left: -80px; animation-delay: -20s; transform: scale(0.8); }
+@keyframes batCloudDrift {
+  from { margin-left: 0; }
+  to { margin-left: 120%; }
+}
+
+.bat-stage__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38%;
+  background:
+    radial-gradient(ellipse at 50% -18%, rgba(255, 214, 102, 0.22), transparent 55%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 46px, transparent 46px 92px),
+    linear-gradient(180deg, #4a3a78, #322757 55%, #241c40);
+  border-top: 3px solid #6d5aa8;
+}
+.bat-stage__floor::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  width: 190px;
+  height: 66%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 214, 102, 0.4);
+}
+
+.bat-torch {
+  position: absolute;
+  bottom: 34%;
+  width: 10px;
+  height: 74px;
+  background: linear-gradient(180deg, #8b5a2b, #5d3a18);
+  border-radius: 4px;
+}
+.bat-torch--left { left: 5%; }
+.bat-torch--right { right: 5%; }
+.bat-torch::after {
+  content: '';
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  width: 22px;
+  height: 30px;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 42% 42%;
+  background: radial-gradient(circle at 50% 82%, #fff3c4 8%, #ffb347 42%, #ff6b35 78%, transparent 82%);
+  animation: batFlame 0.4s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 14px rgba(255, 165, 60, 0.8));
+}
+@keyframes batFlame {
+  from { transform: translateX(-50%) scale(1) rotate(-3deg); }
+  to { transform: translateX(-52%) scale(1.15, 1.28) rotate(3deg); }
+}
+
+/* ============ Hai phe & nhân vật ============ */
+.bat-side {
+  position: absolute;
+  bottom: 4%;
+  width: 42%;
+  display: flex;
+  justify-content: center;
+}
+.bat-side--red { left: 2%; }
+.bat-side--blue { right: 2%; }
+.bat-slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.bat-char {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.bat-char:focus-visible {
+  outline: 2px dashed #ffd166;
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+.bat-char__sprite {
+  display: block;
+  width: 104px;
+  height: 130px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  animation: batIdle 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+.bat-char:nth-child(2) .bat-char__sprite { animation-delay: -0.7s; }
+.bat-char:nth-child(3) .bat-char__sprite { animation-delay: -1.4s; }
+.bat-char:nth-child(4) .bat-char__sprite { animation-delay: -2.1s; }
+.bat-char--blue .bat-char__sprite { transform: scaleX(-1); }
+.bat-char:hover .bat-char__sprite { filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)) brightness(1.12); }
+.bat-svg { width: 100%; height: 100%; }
+@keyframes batIdle {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
+
+.bat-char__plate {
+  margin-top: -6px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(15, 12, 41, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.bat-char--red .bat-char__plate { box-shadow: 0 0 0 2px rgba(224, 73, 46, 0.45); }
+.bat-char--blue .bat-char__plate { box-shadow: 0 0 0 2px rgba(47, 111, 208, 0.45); }
+
+.bat-char__streak {
+  position: absolute;
+  top: -4px;
+  right: 2px;
+  z-index: 2;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fbbf24, #d97706);
+  color: #7c2d12;
+  font-size: 0.72rem;
+  font-weight: 900;
+  border: 2px solid #fff;
+  animation: batStreakPop 0.3s ease;
+}
+@keyframes batStreakPop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+/* Trạng thái nhân vật */
+.bat-char.is-attacking .bat-char__sprite {
+  animation: batLungeRight 0.42s ease;
+}
+.bat-char--blue.is-attacking .bat-char__sprite {
+  animation: batLungeLeft 0.42s ease;
+}
+@keyframes batLungeRight {
+  0% { translate: 0 0; rotate: 0deg; }
+  35% { translate: 18px -10px; rotate: 8deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes batLungeLeft {
+  0% { translate: 0 0; rotate: 0deg; }
+  35% { translate: -18px -10px; rotate: -8deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+.bat-char.is-hit .bat-char__sprite {
+  animation: batHit 0.52s ease;
+}
+@keyframes batHit {
+  0% { filter: brightness(3) saturate(0); }
+  25% { translate: -7px 0; }
+  45% { translate: 6px 0; filter: brightness(2); }
+  65% { translate: -4px 0; }
+  100% { translate: 0 0; filter: none; }
+}
+.bat-char.is-wrong .bat-char__sprite {
+  animation: batDizzy 0.75s ease;
+}
+@keyframes batDizzy {
+  0% { rotate: 0deg; filter: grayscale(0); }
+  25% { rotate: -10deg; filter: grayscale(0.9); }
+  50% { rotate: 9deg; }
+  75% { rotate: -6deg; filter: grayscale(0.9); }
+  100% { rotate: 0deg; filter: grayscale(0); }
+}
+.bat-char.is-winner .bat-char__sprite {
+  animation: batWinnerJump 0.7s ease-in-out infinite;
+}
+@keyframes batWinnerJump {
+  0%, 100% { translate: 0 0; }
+  40% { translate: 0 -22px; }
+}
+.bat-char.is-ko { pointer-events: none; }
+.bat-char.is-ko .bat-char__sprite {
+  filter: grayscale(1) brightness(0.75);
+  transform: rotate(84deg) translateY(10px);
+  animation: none;
+}
+.bat-char--blue.is-ko .bat-char__sprite {
+  transform: scaleX(-1) rotate(84deg) translateY(10px);
+}
+
+/* Chi tiết SVG động */
+.bat-orb-glow { animation: batOrbGlow 1.6s ease-in-out infinite; }
+@keyframes batOrbGlow {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.45; }
+}
+.bat-hat-star { animation: batTwinkle 1.8s ease-in-out infinite; }
+.bat-bubble { animation: batBubble 1.4s ease-in-out infinite; }
+.bat-bubble--slow { animation-duration: 2.1s; }
+@keyframes batBubble {
+  0%, 100% { transform: translateY(0); opacity: 0.8; }
+  50% { transform: translateY(-4px); opacity: 0.4; }
+}
+
+/* ============ Lớp hiệu ứng ============ */
+.bat-fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.bat-proj {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  will-change: transform;
+  filter: drop-shadow(0 0 10px rgba(255, 220, 130, 0.7));
+}
+.bat-proj-svg { width: 100%; height: 100%; }
+.bat-proj-svg--spin { animation: batSpin 0.5s linear infinite; }
+@keyframes batSpin {
+  to { transform: rotate(360deg); }
+}
+.bat-trail {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.8;
+  animation: batTrailFade 0.45s ease-out forwards;
+}
+@keyframes batTrailFade {
+  to { opacity: 0; scale: 0.2; }
+}
+
+.bat-burst {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.bat-burst > span {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: batBurstFly 0.65s ease-out forwards;
+}
+.bat-burst--big > span { width: 14px; height: 14px; }
+@keyframes batBurstFly {
+  to {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.1);
+    opacity: 0;
+  }
+}
+.bat-burst__ring {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: batRing 0.5s ease-out forwards;
+}
+@keyframes batRing {
+  to {
+    width: 90px;
+    height: 90px;
+    opacity: 0;
+  }
+}
+
+.bat-float {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  font-weight: 900;
+  -webkit-text-stroke: 1.5px #fff;
+  animation: batFloatUp 1.25s ease-out forwards;
+  z-index: 6;
+}
+.bat-float--dmg { color: #f43f5e; }
+.bat-float--self { color: #94a3b8; font-size: 1.15rem; }
+@keyframes batFloatUp {
+  0% { opacity: 0; translate: 0 10px; scale: 0.5; }
+  15% { opacity: 1; scale: 1.25; }
+  30% { scale: 1; }
+  100% { opacity: 0; translate: 0 -46px; }
+}
+
+.bat-combo {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 22px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #7c3aed, #d946ef);
+  color: #fff;
+  font-weight: 900;
+  font-size: 1rem;
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 7;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.6);
+  pointer-events: none;
+}
+.bat-combo.is-showing {
+  animation: batComboPop 1.5s ease forwards;
+}
+@keyframes batComboPop {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  12% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+  22% { transform: translateX(-50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.9); }
+}
+
+/* ============ Màn chiến thắng ============ */
+.bat-victory {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 12, 41, 0.62);
+  backdrop-filter: blur(2px);
+}
+.bat-victory__confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bat-victory__confetti > span {
+  position: absolute;
+  top: -14px;
+  width: 10px;
+  height: 14px;
+  border-radius: 3px;
+  animation: batConfetti linear infinite;
+}
+@keyframes batConfetti {
+  to {
+    transform: translate(var(--drift), 480px) rotate(720deg);
+  }
+}
+.bat-victory__card {
+  --team-color: #d97706;
+  position: relative;
+  text-align: center;
+  padding: 28px 44px;
+  border-radius: 20px;
+  background: #fff;
+  border: 4px solid var(--team-color);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  animation: batVictoryIn 0.5s cubic-bezier(0.18, 1.4, 0.4, 1);
+}
+@keyframes batVictoryIn {
+  from { transform: scale(0.3) rotate(-6deg); opacity: 0; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
+.bat-victory__trophy {
+  font-size: 3.4rem;
+  display: block;
+  animation: batTrophy 1.4s ease-in-out infinite;
+}
+@keyframes batTrophy {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-8px) rotate(4deg); }
+}
+.bat-victory__team {
+  margin: 8px 0 4px;
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: var(--team-color);
+}
+.bat-victory__sub {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+/* ============ Điều khiển & cấu hình ============ */
+.bat-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.bat-controls__spacer { flex: 1; }
+.bat-btn-red,
+.bat-btn-blue {
+  color: #fff !important;
+  border: 0;
+}
+.bat-btn-red { background: linear-gradient(180deg, #f0603f, #c2361f); }
+.bat-btn-blue { background: linear-gradient(180deg, #4f8fe0, #2456a8); }
+.bat-btn-red:hover, .bat-btn-blue:hover { filter: brightness(1.1); }
+.bat-controls .is-on {
+  background: #16a34a;
+  color: #fff;
+}
+.bat-speed-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+.bat-speed-label select { padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; }
+
+.bat-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+}
+.bat-config-hint {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+@media (max-width: 860px) {
+  .bat-stage { height: 400px; }
+  .bat-char__sprite { width: 78px; height: 98px; }
+  .bat-scoreboard { grid-template-columns: 1fr; }
+  .bat-vs-badge { display: none; }
+}

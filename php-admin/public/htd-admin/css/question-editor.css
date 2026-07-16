@@ -334,6 +334,19 @@
   color: #1e3a8a;
 }
 
+.qe-preview-chip--sub {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 2px 6px;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: #1e3a8a;
+  position: relative;
+  top: 0.28em;
+}
+
 .qe-preview-chip--blank {
   min-width: 56px;
   min-height: 40px;

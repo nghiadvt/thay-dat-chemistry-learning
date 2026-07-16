@@ -1,0 +1,410 @@
+/* ═══════════════════════════════════════════════════════════════
+   Theme "Arcade 8-bit" — game thùng retro, pixel, CRT scanline.
+   Kích hoạt bằng html[data-theme="arcade"]; các theme khác không đổi.
+   ═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+html[data-theme="arcade"] {
+  --arc-bg: #0d0e21;
+  --arc-panel: #14163000;
+  --arc-panel-solid: #161832;
+  --arc-border: #34386b;
+  --arc-black: #05060f;
+  --arc-yellow: #ffd54a;
+  --arc-cyan: #4dd8ff;
+  --arc-magenta: #ff5db1;
+  --arc-green: #6dff7c;
+  --arc-text: #e8e9ff;
+  --arc-dim: #8d90c0;
+  color-scheme: dark;
+}
+
+/* ── Màn hình CRT ── */
+html[data-theme="arcade"] body.admin-body {
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 1.12rem;
+  letter-spacing: 0.02em;
+  color: var(--arc-text);
+  background:
+    radial-gradient(1000px 620px at 50% -20%, #1c1f4a, transparent 70%),
+    var(--arc-bg);
+  background-attachment: fixed;
+}
+/* scanline + vignette phủ toàn màn hình */
+html[data-theme="arcade"] body.admin-body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 62%, rgba(2, 3, 10, 0.5) 100%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 4px);
+  animation: arcCrtFlicker 5s steps(50) infinite;
+}
+@keyframes arcCrtFlicker {
+  0%, 100% { opacity: 1; }
+  48% { opacity: 0.92; }
+  50% { opacity: 1; }
+  86% { opacity: 0.95; }
+}
+html[data-theme="arcade"] .admin-shell {
+  position: relative;
+  z-index: 1;
+}
+html[data-theme="arcade"] a { color: var(--arc-cyan); }
+html[data-theme="arcade"] ::selection {
+  background: var(--arc-magenta);
+  color: #fff;
+}
+html[data-theme="arcade"] h1,
+html[data-theme="arcade"] h2,
+html[data-theme="arcade"] h3,
+html[data-theme="arcade"] h4 {
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* lớp sao pixel + sprite trôi (admin-theme.js tạo .arc-fx) */
+.arc-fx { display: none; }
+html[data-theme="arcade"] .arc-fx {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.arc-star {
+  position: absolute;
+  background: #cdd2ff;
+  animation: arcTwinkle steps(2) infinite;
+}
+@keyframes arcTwinkle {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.15; }
+}
+.arc-sprite {
+  position: absolute;
+  left: -80px;
+  animation: arcDrift linear infinite;
+  image-rendering: pixelated;
+}
+.arc-sprite svg { width: 100%; height: 100%; shape-rendering: crispEdges; }
+@keyframes arcDrift {
+  0% { transform: translateX(-90px) translateY(0); }
+  50% { transform: translateX(55vw) translateY(-14px); }
+  100% { transform: translateX(110vw) translateY(0); }
+}
+
+/* ── Sidebar: bảng chọn màn ── */
+html[data-theme="arcade"] .admin-sidebar {
+  background: #0a0b1c;
+  border-right: 3px solid var(--arc-border);
+  box-shadow: 6px 0 0 rgba(5, 6, 15, 0.55);
+}
+html[data-theme="arcade"] .admin-brand {
+  border-bottom: 3px solid var(--arc-border);
+  position: relative;
+}
+html[data-theme="arcade"] .admin-brand h1 {
+  color: var(--arc-yellow);
+  text-shadow: 2px 2px 0 var(--arc-magenta);
+  letter-spacing: 0.06em;
+  font-size: 1.3rem;
+}
+html[data-theme="arcade"] .admin-brand p { color: var(--arc-dim); }
+html[data-theme="arcade"] .admin-brand::after {
+  content: '● INSERT COIN';
+  display: block;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--arc-green);
+  letter-spacing: 0.12em;
+  animation: arcBlink 1.1s steps(2) infinite;
+}
+@keyframes arcBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.1; }
+}
+
+html[data-theme="arcade"] .admin-nav { padding: 12px 8px; }
+html[data-theme="arcade"] .admin-nav a {
+  margin: 2px 0;
+  color: var(--arc-dim);
+  font-size: 1.12rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 2px solid transparent;
+  transition: color 0.12s steps(2), background 0.12s steps(2);
+}
+html[data-theme="arcade"] .admin-nav a::before {
+  content: '▸';
+  width: 18px;
+  color: var(--arc-border);
+}
+html[data-theme="arcade"] .admin-nav a:hover {
+  background: rgba(77, 216, 255, 0.08);
+  color: var(--arc-cyan);
+}
+html[data-theme="arcade"] .admin-nav a:hover::before {
+  content: '▶';
+  color: var(--arc-cyan);
+}
+html[data-theme="arcade"] .admin-nav a.active {
+  background: rgba(255, 213, 74, 0.1);
+  border-color: var(--arc-yellow);
+  color: var(--arc-yellow);
+  box-shadow: 3px 3px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .admin-nav a.active::before {
+  content: '▶';
+  color: var(--arc-yellow);
+  animation: arcBlink 0.9s steps(2) infinite;
+}
+
+/* ── Topbar: thanh HUD ── */
+html[data-theme="arcade"] .admin-topbar {
+  background: var(--arc-panel-solid);
+  border-bottom: 3px solid var(--arc-border);
+  box-shadow: 0 4px 0 rgba(5, 6, 15, 0.5);
+}
+html[data-theme="arcade"] .admin-topbar-left h2 {
+  font-size: 1.35rem;
+  color: var(--arc-cyan);
+  text-shadow: 2px 2px 0 rgba(255, 93, 177, 0.55);
+}
+html[data-theme="arcade"] .admin-topbar-left h2::after {
+  content: '_';
+  color: var(--arc-yellow);
+  animation: arcBlink 1s steps(2) infinite;
+}
+html[data-theme="arcade"] .admin-user { color: var(--arc-dim); }
+html[data-theme="arcade"] .admin-sidebar-toggle {
+  background: var(--arc-panel-solid);
+  border: 2px solid var(--arc-border);
+  border-radius: 0;
+  color: var(--arc-dim);
+  box-shadow: 3px 3px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .admin-sidebar-toggle:hover {
+  color: var(--arc-yellow);
+  border-color: var(--arc-yellow);
+}
+
+/* ── Nội dung: hiện theo nhịp pixel ── */
+html[data-theme="arcade"] .admin-content {
+  animation: arcContentIn 0.3s steps(5) both;
+}
+@keyframes arcContentIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Card: hộp pixel ── */
+html[data-theme="arcade"] .card {
+  background: var(--arc-panel-solid);
+  border: 3px solid var(--arc-border);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 rgba(5, 6, 15, 0.6);
+  transition: border-color 0.12s steps(2), transform 0.12s steps(2), box-shadow 0.12s steps(2);
+}
+html[data-theme="arcade"] .card:hover {
+  border-color: #4a4f8f;
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 rgba(5, 6, 15, 0.6);
+}
+html[data-theme="arcade"] .page-header__meta,
+html[data-theme="arcade"] .hint-inline,
+html[data-theme="arcade"] .form-group .hint {
+  color: var(--arc-dim);
+}
+
+/* ── Nút: phím máy game ── */
+html[data-theme="arcade"] .btn {
+  border-radius: 0;
+  border: 3px solid var(--arc-black);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: transform 0.1s steps(2), box-shadow 0.1s steps(2);
+}
+html[data-theme="arcade"] .btn-primary {
+  background: var(--arc-yellow);
+  color: #241a02;
+  box-shadow: 4px 4px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .btn-primary:hover {
+  background: #ffe27a;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .btn-secondary {
+  background: var(--arc-panel-solid);
+  color: var(--arc-cyan);
+  border-color: var(--arc-cyan);
+  box-shadow: 4px 4px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .btn-secondary:hover {
+  background: rgba(77, 216, 255, 0.12);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .btn-danger {
+  background: var(--arc-magenta);
+  color: #fff;
+  box-shadow: 4px 4px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .btn-danger:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--arc-black);
+}
+html[data-theme="arcade"] .btn:active {
+  transform: translate(3px, 3px) !important;
+  box-shadow: 0 0 0 transparent !important;
+}
+
+/* ── Form: ô nhập lệnh ── */
+html[data-theme="arcade"] input[type=text],
+html[data-theme="arcade"] input[type=email],
+html[data-theme="arcade"] input[type=password],
+html[data-theme="arcade"] input[type=number],
+html[data-theme="arcade"] input[type=date],
+html[data-theme="arcade"] input[type=search],
+html[data-theme="arcade"] select,
+html[data-theme="arcade"] textarea {
+  background: #0a0b1c;
+  border: 3px solid var(--arc-border);
+  border-radius: 0;
+  color: var(--arc-green);
+  font-family: inherit;
+  font-size: 1.05rem;
+  caret-color: var(--arc-green);
+}
+html[data-theme="arcade"] input:focus,
+html[data-theme="arcade"] select:focus,
+html[data-theme="arcade"] textarea:focus {
+  outline: none;
+  border-color: var(--arc-cyan);
+  box-shadow: 4px 4px 0 rgba(77, 216, 255, 0.3);
+}
+html[data-theme="arcade"] input::placeholder,
+html[data-theme="arcade"] textarea::placeholder { color: #4b4f85; }
+html[data-theme="arcade"] .form-group > label {
+  color: var(--arc-cyan);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+html[data-theme="arcade"] select option { background: var(--arc-panel-solid); color: var(--arc-text); }
+
+/* ── Bảng: bảng SCORE ── */
+html[data-theme="arcade"] table.data-table { font-size: 1.02rem; }
+html[data-theme="arcade"] table.data-table th {
+  background: #1c1f42;
+  color: var(--arc-yellow);
+  border-bottom: 3px solid var(--arc-border);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+html[data-theme="arcade"] table.data-table td {
+  border-bottom: 2px solid #23264c;
+  color: var(--arc-text);
+}
+html[data-theme="arcade"] table.data-table tr:hover td {
+  background: rgba(255, 213, 74, 0.07);
+}
+
+/* ── Trang danh sách ── */
+html[data-theme="arcade"] .list-search input[type="search"] { background: #0a0b1c; }
+html[data-theme="arcade"] .list-toolbar__filter-toggle,
+html[data-theme="arcade"] .csv-exchange__trigger,
+html[data-theme="arcade"] .row-action-menu__trigger,
+html[data-theme="arcade"] .table-column-picker__trigger {
+  background: var(--arc-panel-solid);
+  border: 2px solid var(--arc-border);
+  border-radius: 0;
+  color: var(--arc-text);
+}
+html[data-theme="arcade"] .list-toolbar__filter-toggle:hover,
+html[data-theme="arcade"] .csv-exchange__trigger:hover,
+html[data-theme="arcade"] .row-action-menu__trigger:hover {
+  border-color: var(--arc-cyan);
+  color: var(--arc-cyan);
+}
+html[data-theme="arcade"] .list-filters-panel,
+html[data-theme="arcade"] .row-action-menu__panel,
+html[data-theme="arcade"] .csv-exchange__panel,
+html[data-theme="arcade"] .table-column-picker__panel {
+  background: var(--arc-panel-solid);
+  border: 3px solid var(--arc-border);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 rgba(5, 6, 15, 0.6);
+  color: var(--arc-text);
+}
+html[data-theme="arcade"] .row-action-menu__item { color: var(--arc-text); }
+html[data-theme="arcade"] .row-action-menu__item:hover {
+  background: rgba(77, 216, 255, 0.1);
+  color: var(--arc-cyan);
+}
+html[data-theme="arcade"] .filter-chip {
+  background: rgba(255, 213, 74, 0.1);
+  border: 2px solid var(--arc-yellow);
+  border-radius: 0;
+  color: var(--arc-yellow);
+}
+html[data-theme="arcade"] .empty-state { color: var(--arc-dim); }
+html[data-theme="arcade"] .list-table-footer__summary,
+html[data-theme="arcade"] .list-table-footer { color: var(--arc-dim); }
+html[data-theme="arcade"] .session-pin-badge {
+  background: var(--arc-black);
+  border: 2px solid var(--arc-green);
+  border-radius: 0;
+  color: var(--arc-green);
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 8px rgba(109, 255, 124, 0.7);
+}
+
+/* ── Game cards: hộp băng game ── */
+html[data-theme="arcade"] .game-card {
+  background: var(--arc-panel-solid);
+  border: 3px solid var(--arc-border);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 rgba(5, 6, 15, 0.6);
+}
+html[data-theme="arcade"] .game-card:hover {
+  transform: translate(-2px, -2px);
+  border-color: var(--arc-yellow);
+  box-shadow: 7px 7px 0 rgba(5, 6, 15, 0.6);
+}
+html[data-theme="arcade"] .game-card__cover { border-bottom: 3px solid var(--arc-border); }
+html[data-theme="arcade"] .game-card__meta,
+html[data-theme="arcade"] .game-card__desc { color: var(--arc-dim); }
+
+/* ── Thanh cuộn khối vuông ── */
+html[data-theme="arcade"] ::-webkit-scrollbar { width: 14px; height: 14px; }
+html[data-theme="arcade"] ::-webkit-scrollbar-track {
+  background: #0a0b1c;
+  border-left: 2px solid var(--arc-border);
+}
+html[data-theme="arcade"] ::-webkit-scrollbar-thumb {
+  background: var(--arc-border);
+  border: 3px solid #0a0b1c;
+}
+html[data-theme="arcade"] ::-webkit-scrollbar-thumb:hover { background: var(--arc-yellow); }
+
+html[data-theme="arcade"] .field-error { color: var(--arc-magenta); }
+
+/* ── Trang chọn giao diện ── */
+html[data-theme="arcade"] .theme-pick-card {
+  background: var(--arc-panel-solid);
+  border: 3px solid var(--arc-border);
+  border-radius: 0;
+}
+html[data-theme="arcade"] .theme-pick-card.is-active {
+  border-color: var(--arc-yellow);
+  box-shadow: 6px 6px 0 rgba(5, 6, 15, 0.6);
+}
+html[data-theme="arcade"] .theme-pick-body p { color: var(--arc-dim); }

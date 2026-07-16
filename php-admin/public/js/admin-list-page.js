@@ -125,6 +125,33 @@
     });
   }
 
+  // Panel dropdown dùng position:fixed + tọa độ tính bằng JS để thoát khỏi
+  // overflow:hidden/auto của card/table-wrap cha (bảng nhiều dòng hay bị che khung).
+  function positionActionPanel(trigger, panel) {
+    panel.style.position = 'fixed';
+    panel.style.left = 'auto';
+    panel.style.right = '-9999px';
+    panel.style.top = '0px';
+    panel.hidden = false;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const viewportW = document.documentElement.clientWidth;
+    const viewportH = document.documentElement.clientHeight;
+
+    let top = triggerRect.bottom + 6;
+    if (top + panelRect.height > viewportH - 8) {
+      top = triggerRect.top - panelRect.height - 6;
+    }
+    top = Math.max(8, top);
+
+    let right = viewportW - triggerRect.right;
+    right = Math.min(Math.max(right, 8), viewportW - panelRect.width - 8);
+
+    panel.style.top = `${top}px`;
+    panel.style.right = `${right}px`;
+  }
+
   function initRowActionMenus() {
     document.querySelectorAll('[data-row-action-menu]').forEach((menu) => {
       const trigger = menu.querySelector('[data-row-action-trigger]');
@@ -135,7 +162,11 @@
         e.stopPropagation();
         const willOpen = panel.hidden;
         closeAllActionMenus(menu);
-        panel.hidden = !willOpen;
+        if (willOpen) {
+          positionActionPanel(trigger, panel);
+        } else {
+          panel.hidden = true;
+        }
         trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       });
 
@@ -153,6 +184,8 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeAllActionMenus();
     });
+    // Cuộn trang/table-wrap khi menu đang mở → đóng lại (fixed panel không tự bám theo trigger).
+    document.addEventListener('scroll', () => closeAllActionMenus(), true);
   }
 
   function initBulkSelectAll(selectAllId, rowCheckClass) {
