@@ -24,6 +24,7 @@ class Tag extends Model
         'name',
         'slug',
         'color',
+        'scope',
     ];
 
     public function quizzes(): BelongsToMany
@@ -36,7 +37,12 @@ class Tag extends Model
         return $this->belongsToMany(QuestionBankItem::class, 'question_bank_tag');
     }
 
-    public static function findOrCreateFromName(string $name, ?string $color = null): self
+    public function imageCropSources(): BelongsToMany
+    {
+        return $this->belongsToMany(ImageCropSource::class, 'image_crop_source_tag');
+    }
+
+    public static function findOrCreateFromName(string $name, ?string $color = null, string $scope = 'content'): self
     {
         $trimmed = trim($name);
         $slug = Str::slug($trimmed);
@@ -45,17 +51,17 @@ class Tag extends Model
         }
 
         return static::firstOrCreate(
-            ['slug' => $slug],
+            ['slug' => $slug, 'scope' => $scope],
             [
                 'name' => $trimmed,
-                'color' => $color ?? self::nextDefaultColor(),
+                'color' => $color ?? self::nextDefaultColor($scope),
             ]
         );
     }
 
-    public static function nextDefaultColor(): string
+    public static function nextDefaultColor(string $scope = 'content'): string
     {
-        $count = static::query()->count();
+        $count = static::query()->where('scope', $scope)->count();
 
         return self::PRESET_COLORS[$count % count(self::PRESET_COLORS)];
     }

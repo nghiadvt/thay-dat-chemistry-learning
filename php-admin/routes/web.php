@@ -13,7 +13,8 @@ use App\Http\Controllers\Admin\SessionController as AdminSessionController;
 use App\Http\Controllers\Admin\TagController as AdminTagController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\GameSessionController;
-use App\Http\Controllers\Api\ImageCropController;
+use App\Http\Controllers\Api\ImageCropRegionController;
+use App\Http\Controllers\Api\ImageCropSourceController;
 use App\Http\Controllers\Api\KeyboardController;
 use App\Http\Controllers\Api\PracticeController;
 use App\Http\Controllers\Api\QuestionController;
@@ -79,7 +80,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('dashboard/export', [AdminDashboardController::class, 'export'])->name('dashboard.export');
         Route::view('appearance', 'admin.appearance.index')->name('appearance');
-        Route::get('image-cropper', [AdminImageCropperController::class, 'index'])->name('image-cropper');
+        Route::get('image-cropper', [AdminImageCropperController::class, 'index'])->name('image-cropper.index');
+        Route::get('image-cropper/create', [AdminImageCropperController::class, 'create'])->name('image-cropper.create');
+        Route::get('image-cropper/{imageCropper}/edit', [AdminImageCropperController::class, 'edit'])->name('image-cropper.edit');
+        Route::patch('image-cropper/{imageCropper}/groups', [AdminImageCropperController::class, 'updateGroups'])->name('image-cropper.update-groups');
+        Route::delete('image-cropper/{imageCropper}', [AdminImageCropperController::class, 'destroy'])->name('image-cropper.destroy');
 
         Route::resource('keyboards', AdminKeyboardController::class)->except(['show', 'update']);
         Route::get('keyboards/{keyboard}/editor', [AdminKeyboardController::class, 'editor'])->name('keyboards.editor');
@@ -103,6 +108,8 @@ Route::middleware('auth')->group(function () {
         Route::get('tags', [AdminTagController::class, 'index'])->name('tags.index');
         Route::post('tags', [AdminTagController::class, 'store'])->name('tags.store');
         Route::patch('tags/{tag}', [AdminTagController::class, 'update'])->name('tags.update');
+        Route::get('image-crop-groups', [AdminTagController::class, 'indexGroups'])->name('image-crop-groups.index');
+        Route::post('image-crop-groups', [AdminTagController::class, 'storeGroup'])->name('image-crop-groups.store');
 
         Route::get('quizzes/{quiz}/questions/create', [AdminQuestionController::class, 'create'])->name('questions.create');
         Route::post('quizzes/{quiz}/questions', [AdminQuestionController::class, 'store'])->name('questions.store');
@@ -144,7 +151,9 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('quizzes', QuizController::class);
 
         Route::post('question-content-images', [QuestionImageController::class, 'store'])->name('question-images.store');
-        Route::post('image-crops', [ImageCropController::class, 'store'])->name('image-crops.store');
+        Route::post('image-crop-sources', [ImageCropSourceController::class, 'store'])->name('image-crop-sources.store');
+        Route::post('image-crop-sources/{source}/regions', [ImageCropRegionController::class, 'sync'])->name('image-crop-sources.regions.sync');
+        Route::delete('image-crop-sources/{source}/regions/{region}', [ImageCropRegionController::class, 'destroy'])->name('image-crop-sources.regions.destroy');
 
         Route::post('site-feedback', [SiteFeedbackController::class, 'store'])->name('site-feedback.store');
 

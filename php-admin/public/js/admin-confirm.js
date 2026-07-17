@@ -2,6 +2,9 @@
  * AdminConfirm — modal xác nhận dùng chung, thay thế window.confirm().
  *
  *   AdminConfirm.show({ title, message, confirmText, cancelText, danger }) → Promise<boolean>
+ *   AdminConfirm.show({ ..., checkbox: { label, checked } }) → Promise<{ confirmed, checked }>
+ *     (chỉ đổi sang trả object khi có truyền `checkbox` — mọi lời gọi cũ không truyền checkbox
+ *     vẫn nhận về boolean như trước, không cần sửa gì).
  *
  * Kèm interceptor cho form Blade: <form data-confirm="Thông điệp" data-confirm-danger="1">
  * (thay cho onsubmit="return confirm(...)").
@@ -20,6 +23,10 @@ window.AdminConfirm = (function () {
       '<div class="admin-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">' +
       '  <h3 class="admin-confirm-title" id="adminConfirmTitle"></h3>' +
       '  <p class="admin-confirm-message"></p>' +
+      '  <label class="admin-confirm-checkbox-row" hidden>' +
+      '    <input type="checkbox" class="admin-confirm-checkbox">' +
+      '    <span class="admin-confirm-checkbox-label"></span>' +
+      '  </label>' +
       '  <div class="admin-confirm-actions">' +
       '    <button type="button" class="btn btn-secondary admin-confirm-cancel"></button>' +
       '    <button type="button" class="btn admin-confirm-ok"></button>' +
@@ -47,15 +54,18 @@ window.AdminConfirm = (function () {
     return overlay;
   }
 
-  function settle(result) {
+  function settle(confirmed) {
     if (!overlay || overlay.hidden) return;
+    const checkboxRow = overlay.querySelector('.admin-confirm-checkbox-row');
+    const hasCheckbox = !checkboxRow.hidden;
+    const checked = hasCheckbox ? overlay.querySelector('.admin-confirm-checkbox').checked : false;
     overlay.hidden = true;
     document.body.classList.remove('admin-confirm-open');
     const resolve = activeResolve;
     activeResolve = null;
     lastFocused?.focus?.();
     lastFocused = null;
-    if (resolve) resolve(result);
+    if (resolve) resolve(hasCheckbox ? { confirmed, checked } : confirmed);
   }
 
   function show(opts = {}) {
@@ -69,6 +79,17 @@ window.AdminConfirm = (function () {
     const ok = overlay.querySelector('.admin-confirm-ok');
     ok.textContent = opts.confirmText || 'Đồng ý';
     ok.className = 'btn admin-confirm-ok ' + (opts.danger ? 'btn-danger' : 'btn-primary');
+
+    const checkboxRow = overlay.querySelector('.admin-confirm-checkbox-row');
+    const checkboxInput = overlay.querySelector('.admin-confirm-checkbox');
+    if (opts.checkbox) {
+      checkboxRow.hidden = false;
+      overlay.querySelector('.admin-confirm-checkbox-label').textContent = opts.checkbox.label || '';
+      checkboxInput.checked = !!opts.checkbox.checked;
+    } else {
+      checkboxRow.hidden = true;
+      checkboxInput.checked = false;
+    }
 
     lastFocused = document.activeElement;
     overlay.hidden = false;

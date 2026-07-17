@@ -6,7 +6,8 @@
       "Read(///wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning/prototype/**)",
       "Bash(php -v)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Bash(curl -s -c cookies.txt -b cookies.txt -H 'X-CSRF-TOKEN: __TRACKED_VAR__' -H 'Accept: application/json' -X DELETE -w '\\\\nHTTP_STATUS:%{http_code}\\\\n' __TRACKED_VAR__/api/image-crop-sources/6/regions/12)"
     ]
   }
 }

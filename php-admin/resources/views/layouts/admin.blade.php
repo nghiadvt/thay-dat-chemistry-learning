@@ -19,8 +19,8 @@
     @stack('head')
 </head>
 <body class="admin-body @yield('body-class')"
-      data-tags-index-url="{{ route('admin.tags.index') }}"
-      data-tags-store-url="{{ route('admin.tags.store') }}"
+      data-tags-index-url="{{ request()->routeIs('admin.image-cropper.*') ? route('admin.image-crop-groups.index') : route('admin.tags.index') }}"
+      data-tags-store-url="{{ request()->routeIs('admin.image-cropper.*') ? route('admin.image-crop-groups.store') : route('admin.tags.store') }}"
       data-tags-update-url="{{ url('/admin/tags') }}">
 @include('admin.partials.tag-create-modal')
 
@@ -36,7 +36,7 @@
             <a href="{{ route('admin.games.index') }}" class="{{ request()->routeIs('admin.games.*') ? 'active' : '' }}">Game</a>
             <a href="{{ route('admin.quizzes.index') }}" class="{{ request()->routeIs('admin.quizzes.*') || request()->routeIs('admin.questions.*') ? 'active' : '' }}">Quiz</a>
             <a href="{{ route('admin.question-bank.index') }}" class="{{ request()->routeIs('admin.question-bank.*') ? 'active' : '' }}">Bộ câu hỏi</a>
-            <a href="{{ route('admin.image-cropper') }}" class="{{ request()->routeIs('admin.image-cropper') ? 'active' : '' }}">Cắt ảnh</a>
+            <a href="{{ route('admin.image-cropper.index') }}" class="{{ request()->routeIs('admin.image-cropper.*') ? 'active' : '' }}">Cắt ảnh</a>
             <a href="{{ route('admin.sessions.index') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Báo cáo</a>
             <a href="{{ route('admin.feedback.index') }}" class="{{ request()->routeIs('admin.feedback.*') ? 'active' : '' }}">Góp ý</a>

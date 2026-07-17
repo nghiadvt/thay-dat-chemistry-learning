@@ -39,6 +39,25 @@
   color: #475569;
   white-space: pre-line;
 }
+.admin-confirm-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.admin-confirm-checkbox-row[hidden] { display: none; }
+.admin-confirm-checkbox-row .admin-confirm-checkbox { margin-top: 2px; }
+.admin-confirm-checkbox-label {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+
 .admin-confirm-actions {
   display: flex;
   justify-content: flex-end;
