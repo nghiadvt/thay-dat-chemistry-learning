@@ -173,16 +173,6 @@ a { color: #2D46D6; }
   min-width: 0;
 }
 
-.admin-page-header {
-  padding-bottom: 16px;
-  margin-bottom: 8px;
-}
-
-.admin-page-title {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
 .admin-sidebar-toggle {
   flex-shrink: 0;
   width: 36px;

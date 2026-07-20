@@ -116,11 +116,6 @@
 
     <div class="admin-main">
         <main class="admin-content @yield('content-class')">
-            @unless(request()->routeIs('admin.keyboards.editor', 'admin.questions.create', 'admin.questions.edit', 'admin.question-bank.create', 'admin.question-bank.edit'))
-            <div class="admin-page-header">
-                <h2 class="admin-page-title">@yield('page-title', 'Admin')</h2>
-            </div>
-            @endunless
             @yield('content')
         </main>
     </div>

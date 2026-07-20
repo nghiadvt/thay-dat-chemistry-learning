@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Công cụ mật khẩu học sinh — Hóa Thầy Đạt')
-@section('page-title', 'Công cụ mật khẩu học sinh')
 
 @section('content')
 @php $result = session('tool_result'); @endphp

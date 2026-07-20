@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Tổng quan — Hóa Thầy Đạt')
-@section('page-title', 'Tổng quan')
 
 @php
     $statusLabels = \App\Support\StatusLabels::SESSION;

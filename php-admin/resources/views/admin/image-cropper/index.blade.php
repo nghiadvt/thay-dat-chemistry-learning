@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Cắt ảnh — Hóa Thầy Đạt')
-@section('page-title', 'Cắt ảnh')
 
 @push('head')
 <link rel="stylesheet" href="@vasset('css/admin-image-cropper.css')">

@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', ($question ? 'Sửa' : 'Thêm').' câu hỏi — Hóa Thầy Đạt')
-@section('page-title', ($question ? 'Sửa' : 'Thêm').' câu hỏi')
 @section('body-class', 'admin-body--question-editor')
 
 @php

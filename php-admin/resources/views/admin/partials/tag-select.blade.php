@@ -55,6 +55,7 @@
     @endif
 
     <button type="button" class="tag-select-trigger" id="{{ $selectId }}-trigger" aria-haspopup="listbox" aria-expanded="false">
+        <span class="tag-select-dot" data-trigger-dot hidden></span>
         <span class="tag-select-trigger-label" data-trigger-label>—</span>
         <span class="tag-select-chevron" aria-hidden="true">▾</span>
     </button>

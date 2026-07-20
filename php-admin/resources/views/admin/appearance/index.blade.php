@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Giao diện — Hóa Thầy Đạt')
-@section('page-title', 'Giao diện')
 
 @push('head')
 <link rel="stylesheet" href="@vasset('css/admin-appearance.css')">

@@ -1083,3 +1083,84 @@ html[data-theme="chalk"] .stu-avatar {
   background: hsl(var(--hue) 55% 24% / 0.9);
   color: hsl(var(--hue) 85% 78%);
 }
+
+/* ── In phiếu tài khoản: chọn mẫu + xem trước ─────────────────── */
+.print-cards { display: flex; flex-direction: column; gap: 20px; }
+.print-cards__layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.print-cards__templates {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.template-card {
+  position: relative;
+  display: block;
+  background: var(--stu-surface);
+  border: 1.5px solid var(--stu-line);
+  border-radius: var(--stu-radius-sm);
+  padding: 14px 16px;
+  cursor: pointer;
+  box-shadow: var(--stu-shadow-sm);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+}
+.template-card:hover { border-color: var(--stu-accent); transform: translateY(-1px); }
+.template-card.is-selected {
+  border-color: var(--stu-accent);
+  background: var(--stu-accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--stu-accent) 16%, transparent);
+}
+.template-card input[type="radio"] { position: absolute; top: 14px; right: 14px; accent-color: var(--stu-accent); }
+.template-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-right: 22px; }
+.template-card__name { font-weight: 700; font-size: 0.95rem; color: var(--stu-text); }
+.template-card__badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--stu-accent);
+  background: var(--stu-accent-soft);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.template-card__desc { margin: 6px 0 0; font-size: 0.82rem; color: var(--stu-dim); line-height: 1.4; }
+
+.print-cards__preview {
+  background: var(--stu-surface-2);
+  border: 1px solid var(--stu-line);
+  border-radius: var(--stu-radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.print-cards__preview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--stu-dim);
+}
+.print-cards__preview-head strong { color: var(--stu-text); font-size: 0.95rem; }
+.print-cards__frame {
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  max-height: 72vh;
+  border: 1px solid var(--stu-line-strong);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.print-cards__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 860px) {
+  .print-cards__layout { grid-template-columns: 1fr; }
+  .print-cards__frame { max-height: 60vh; }
+}

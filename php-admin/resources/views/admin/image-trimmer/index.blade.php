@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Xóa khoảng trắng — Hóa Thầy Đạt')
-@section('page-title', 'Xóa khoảng trắng')
 @section('body-class', 'admin-body--editor-tool')
 @section('content-class', 'admin-content--tool')
 

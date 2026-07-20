@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Bài làm — '.$student->display_name)
-@section('page-title', 'Chi tiết bài làm')
 
 @php
     // 30 câu -> 6 cột x 5 hàng. Luôn cố gắng giữ khoảng 5 hàng.

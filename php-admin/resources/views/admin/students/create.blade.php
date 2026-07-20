@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Thêm học sinh — Hóa Thầy Đạt')
-@section('page-title', 'Thêm học sinh')
 
 @section('content')
 <div class="stu-panel" style="max-width:640px">

@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', ($game ? 'Sửa' : 'Tạo').' game — Hóa Thầy Đạt')
-@section('page-title', $game ? 'Sửa game' : 'Tạo game')
 
 @push('head')
 <link rel="stylesheet" href="@vasset('css/duck-race-game-config.css')">

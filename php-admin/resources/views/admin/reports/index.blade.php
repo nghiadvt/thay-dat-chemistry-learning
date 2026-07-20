@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Báo cáo — Hóa Thầy Đạt')
-@section('page-title', 'Báo cáo')
 
 @php
     $columns = [

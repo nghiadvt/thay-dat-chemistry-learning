@@ -34,6 +34,7 @@ use App\Http\Controllers\Admin\StudentController as AdminStudentController;
 use App\Http\Controllers\Admin\StudentEntitlementController as AdminStudentEntitlementController;
 use App\Http\Controllers\Admin\StudentReportController as AdminStudentReportController;
 use App\Http\Controllers\Admin\StudentPasswordToolController as AdminStudentPasswordToolController;
+use App\Http\Controllers\Admin\StudentPrintCardController as AdminStudentPrintCardController;
 use App\Http\Controllers\Auth\ConfirmPasswordController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\StudentLoginController;
@@ -147,6 +148,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('quizzes', AdminQuizController::class);
         Route::patch('quizzes/{quiz}/active', [AdminQuizController::class, 'toggleActive'])->name('quizzes.toggle-active');
         Route::patch('quizzes/{quiz}/move-game', [AdminQuizController::class, 'moveGame'])->name('quizzes.move-game');
+        Route::patch('quizzes/{quiz}/move-group', [AdminQuizController::class, 'moveGroup'])->name('quizzes.move-group');
 
         Route::get('question-bank/group-rows', [AdminQuestionBankController::class, 'groupRows'])->name('question-bank.group-rows');
         Route::get('question-bank/export-csv', [AdminQuestionBankController::class, 'exportCsv'])->name('question-bank.export-csv');
@@ -203,6 +205,9 @@ Route::middleware('auth')->group(function () {
         Route::put('students/classes/{class}', [AdminStudentClassController::class, 'update'])->name('students.classes.update');
         Route::delete('students/classes/{class}', [AdminStudentClassController::class, 'destroy'])->name('students.classes.destroy');
         Route::get('students/classes/{class}/credentials', [AdminStudentController::class, 'credentialsSheet'])->name('students.credentials-sheet');
+        Route::get('students/classes/{class}/print-cards', [AdminStudentPrintCardController::class, 'index'])->name('students.print-cards');
+        Route::get('students/classes/{class}/print-cards/preview', [AdminStudentPrintCardController::class, 'preview'])->name('students.print-cards.preview');
+        Route::post('students/classes/{class}/print-cards/export', [AdminStudentPrintCardController::class, 'export'])->name('students.print-cards.export');
         Route::post('students/bulk-generate', [AdminStudentController::class, 'bulkGenerate'])->name('students.bulk-generate');
         Route::post('students/{student}/reset-password', [AdminStudentController::class, 'resetPassword'])->name('students.reset-password');
         Route::post('students/{student}/unlock', [AdminStudentController::class, 'unlock'])->name('students.unlock');

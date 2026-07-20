@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Quyền truy cập — '.$student->display_name)
-@section('page-title', 'Quyền truy cập')
 
 @php
     $accessLabels = ['none' => 'Đang khóa', 'free' => 'Dùng thử', 'full' => 'Full (Pro)'];

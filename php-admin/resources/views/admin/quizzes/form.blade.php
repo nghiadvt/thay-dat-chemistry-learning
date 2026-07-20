@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Tạo quiz — Hóa Thầy Đạt')
-@section('page-title', 'Tạo quiz')
 
 @section('content')
 <div class="page-header">

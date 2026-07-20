@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Báo cáo PIN '.$session->pin)
-@section('page-title', 'Chi tiết báo cáo')
 
 @section('content')
 <div class="page-header">

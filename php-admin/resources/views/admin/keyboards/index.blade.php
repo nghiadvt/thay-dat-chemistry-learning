@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Bàn phím — Hóa Thầy Đạt')
-@section('page-title', 'Bàn phím')
 
 @php
     $columns = [

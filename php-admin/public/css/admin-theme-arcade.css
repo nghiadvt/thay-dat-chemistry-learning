@@ -165,16 +165,6 @@ html[data-theme="arcade"] .admin-nav a.active::before {
 }
 
 /* ── Topbar: thanh HUD ── */
-html[data-theme="arcade"] .admin-page-title {
-  font-size: 1.35rem;
-  color: var(--arc-cyan);
-  text-shadow: 2px 2px 0 rgba(255, 93, 177, 0.55);
-}
-html[data-theme="arcade"] .admin-page-title::after {
-  content: '_';
-  color: var(--arc-yellow);
-  animation: arcBlink 1s steps(2) infinite;
-}
 html[data-theme="arcade"] .admin-user { color: var(--arc-dim); }
 html[data-theme="arcade"] .admin-sidebar-toggle {
   background: var(--arc-panel-solid);

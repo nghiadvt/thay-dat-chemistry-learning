@@ -16,7 +16,22 @@
 .admin-list-card,
 .sessions-list-card {
   padding: 0;
-  overflow: hidden;
+}
+
+/* overflow:hidden on the card (or overflow-x:auto inherited from .table-wrap
+   below) would establish a scroll container between <thead> and the page,
+   which breaks position:sticky on the table header — so corners are rounded
+   on the edge children instead of clipped via overflow. */
+.admin-list-card > :first-child,
+.sessions-list-card > :first-child {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.admin-list-card > :last-child,
+.sessions-list-card > :last-child {
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
 .admin-list-card > .empty-state,
@@ -142,49 +157,130 @@
   border-radius: 10px;
 }
 
-/* Filter panel */
+/* Filter panel — a single horizontal row that only wraps when the viewport
+   is too narrow to fit everything, so the panel stays as short as possible. */
 .list-filters-panel {
-  padding: 16px 20px 18px;
+  padding: 14px 20px;
   border-bottom: 1px solid #e5e7eb;
-  background: #fff;
+  background: #f8fafc;
 }
 
 .list-filters-panel[hidden] {
   display: none !important;
 }
 
-.list-filters-panel__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+.list-filters-panel__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 12px 16px;
 }
 
+/* Both wrappers keep their semantic markup but hand their children straight
+   to the flex row above, so fields and action buttons sit on one line. */
+.list-filters-panel__grid,
+.list-filters-panel__actions {
+  display: contents;
+}
+
 .list-filters-panel__grid .form-group {
+  flex: 0 1 190px;
+  min-width: 150px;
   margin-bottom: 0;
 }
 
 .list-filters-panel__grid label {
+  display: block;
+  margin-bottom: 6px;
   font-size: 0.8125rem;
+  font-weight: 600;
   color: #475569;
 }
 
 .list-filters-panel__wide {
-  grid-column: 1 / -1;
+  flex-basis: 260px;
 }
 
+.list-filters-panel__wide .tag-select-wrap {
+  max-width: none;
+}
+
+/* Base look shared by every filter field (native <select>, date inputs). */
 .list-filter-control {
   width: 100%;
-  padding: 9px 11px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
+  background-color: #fff;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
 
-.list-filters-panel__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px dashed #e2e8f0;
+.list-filter-control:hover { border-color: #9ca3af; }
+
+.list-filter-control:focus {
+  outline: none;
+  border-color: #2d46d6;
+  box-shadow: 0 0 0 3px rgba(45, 70, 214, 0.12);
+}
+
+/* Selects only: match the flat, borderless-chevron look already used by
+   .list-toolbar__filter-toggle and .tag-select-trigger. A background-image
+   chevron would collide with the native calendar icon on date inputs. */
+select.list-filter-control {
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath d='M5.25 7.5 10 12.25 14.75 7.5H5.25Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Colored dot for the currently selected Nhóm, mirroring the dots already
+   used inside the Chủ đề dropdown/trigger (both use the Group/Tag `color`
+   column) — reserve the space always so picking a group doesn't shift text. */
+.group-select__control {
+  position: relative;
+}
+
+.group-select__control select.list-filter-control {
+  padding-left: 30px;
+}
+
+.group-select__control .tag-select-dot {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.list-filters-panel__grid .tag-select-trigger {
+  min-height: 40px;
+}
+
+.inline-row-select-form {
+  margin: 0;
+}
+
+.inline-row-select {
+  width: auto;
+  max-width: 180px;
+  padding: 5px 8px;
+  font-size: 0.8125rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+}
+
+.list-filters-panel__actions .btn {
+  flex: 0 0 auto;
 }
 
 /* Active filter chips */
@@ -226,6 +322,16 @@
 .admin-list-table-wrap,
 .sessions-table-wrap {
   padding: 0 4px;
+}
+
+/* .table-wrap sets overflow-x:auto (admin.css) for pages with genuinely wide
+   tables, but that also forces overflow-y to a non-visible computed value,
+   turning this wrap into a scroll container that breaks the sticky <thead>
+   below. These list pages are desktop-only (body has min-width:1024px), so
+   the sticky header is worth more than the horizontal-scroll safety net. */
+.table-wrap.admin-list-table-wrap,
+.table-wrap.sessions-table-wrap {
+  overflow: visible;
 }
 
 .admin-list-table thead th,

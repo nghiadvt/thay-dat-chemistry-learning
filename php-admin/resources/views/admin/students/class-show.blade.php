@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', $class->name.' — Hóa Thầy Đạt')
-@section('page-title', 'Lớp '.$class->name)
 
 @php
     $hue = crc32($class->name) % 360;
@@ -31,7 +30,7 @@
     </div>
     <div class="stu-hero__actions">
         @if ($students->isNotEmpty())
-            <a class="btn" href="{{ route('admin.students.credentials-sheet', $class) }}" target="_blank">
+            <a class="btn" href="{{ route('admin.students.print-cards', $class) }}">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2m-12-3h12v6H6z"/></svg>
                 In phiếu tài khoản
             </a>

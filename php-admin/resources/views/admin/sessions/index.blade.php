@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Phòng chơi — Hóa Thầy Đạt')
-@section('page-title', 'Phòng chơi')
 
 @php
     $sessionColumns = [

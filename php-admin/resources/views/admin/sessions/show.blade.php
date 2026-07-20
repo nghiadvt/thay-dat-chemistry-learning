@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', ($session->name ?? 'Phòng '.$session->pin).' — Hóa Thầy Đạt')
-@section('page-title', $session->name ?? 'Phòng chơi')
 @section('body-class', 'admin-body--session-host')
 @section('content-class', 'admin-content--session-host')
 

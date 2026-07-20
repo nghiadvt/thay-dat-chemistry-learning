@@ -15,18 +15,30 @@
 
 <div class="group-select" data-group-select>
     <label for="{{ $selectId }}">{{ $labelText }}</label>
-    <select id="{{ $selectId }}"
-            name="group_id"
-            class="{{ $isFilter ? 'list-filter-control' : '' }}"
-            data-group-select-input>
-        <option value="">{{ $isFilter ? 'Tất cả nhóm' : '— Chưa phân nhóm —' }}</option>
-        @if ($isFilter)
-            <option value="none" @selected($selectedValue === 'none')>Chưa phân nhóm</option>
-        @endif
-        @foreach ($groups as $group)
-            <option value="{{ $group->id }}" @selected($selectedValue === (string) $group->id)>{{ $group->name }}</option>
-        @endforeach
-    </select>
+    @if ($isFilter)
+        <div class="group-select__control">
+            <span class="tag-select-dot" data-group-dot hidden></span>
+            <select id="{{ $selectId }}"
+                    name="group_id"
+                    class="list-filter-control"
+                    data-group-select-input>
+                <option value="">Tất cả nhóm</option>
+                <option value="none" @selected($selectedValue === 'none')>Chưa phân nhóm</option>
+                @foreach ($groups as $group)
+                    <option value="{{ $group->id }}" data-color="{{ $group->color }}" @selected($selectedValue === (string) $group->id)>{{ $group->name }}</option>
+                @endforeach
+            </select>
+        </div>
+    @else
+        <select id="{{ $selectId }}"
+                name="group_id"
+                data-group-select-input>
+            <option value="">— Chưa phân nhóm —</option>
+            @foreach ($groups as $group)
+                <option value="{{ $group->id }}" @selected($selectedValue === (string) $group->id)>{{ $group->name }}</option>
+            @endforeach
+        </select>
+    @endif
 
     @unless ($isFilter)
         <div class="group-select__new" data-group-new hidden>

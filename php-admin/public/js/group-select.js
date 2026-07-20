@@ -5,6 +5,22 @@
 (function () {
   'use strict';
 
+  function setupDot(wrap) {
+    var select = wrap.querySelector('[data-group-select-input]');
+    var dot = wrap.querySelector('[data-group-dot]');
+    if (!select || !dot) return;
+
+    function sync() {
+      var option = select.options[select.selectedIndex];
+      var color = option && option.dataset.color;
+      dot.hidden = !color;
+      if (color) dot.style.background = color;
+    }
+
+    select.addEventListener('change', sync);
+    sync();
+  }
+
   function setup(wrap) {
     var select = wrap.querySelector('[data-group-select-input]');
     var newBox = wrap.querySelector('[data-group-new]');
@@ -43,6 +59,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('[data-group-select]').forEach(setup);
+    document.querySelectorAll('[data-group-select]').forEach(function (wrap) {
+      setup(wrap);
+      setupDot(wrap);
+    });
   });
 })();

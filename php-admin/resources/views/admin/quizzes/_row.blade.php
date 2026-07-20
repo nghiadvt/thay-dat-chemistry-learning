@@ -2,10 +2,16 @@
 <tr class="{{ $quiz->is_active ? '' : 'row-inactive' }}">
     <td data-col="name"><strong>{{ $quiz->name }}</strong></td>
     <td data-col="group">
-        @include('admin.partials.group-chip', [
-            'group' => $quiz->group,
-            'link' => $quiz->group ? route('admin.quizzes.index', ['group_id' => $quiz->group_id]) : null,
-        ])
+        <form method="POST" action="{{ route('admin.quizzes.move-group', $quiz) }}" class="inline-row-select-form">
+            @csrf
+            @method('PATCH')
+            <select name="group_id" class="inline-row-select" onchange="this.form.submit()" aria-label="Đổi nhóm cho quiz «{{ $quiz->name }}»">
+                <option value="" @selected(! $quiz->group_id)>— Chưa phân nhóm —</option>
+                @foreach ($groups as $group)
+                    <option value="{{ $group->id }}" @selected($quiz->group_id === $group->id)>{{ $group->name }}</option>
+                @endforeach
+            </select>
+        </form>
     </td>
     <td data-col="tags">
         @if ($quiz->tags->isEmpty())
@@ -21,7 +27,18 @@
             </div>
         @endif
     </td>
-    <td data-col="game">{{ $quiz->game?->name }}</td>
+    <td data-col="game">
+        <form method="POST" action="{{ route('admin.quizzes.move-game', $quiz) }}" class="inline-row-select-form">
+            @csrf
+            @method('PATCH')
+            <select name="game_id" class="inline-row-select" onchange="this.form.submit()" aria-label="Đổi game cho quiz «{{ $quiz->name }}»">
+                <option value="" @selected(! $quiz->game_id)>— Chưa gán —</option>
+                @foreach ($games as $game)
+                    <option value="{{ $game->id }}" @selected($quiz->game_id === $game->id)>{{ $game->name }}</option>
+                @endforeach
+            </select>
+        </form>
+    </td>
     <td data-col="keyboard">{{ $quiz->keyboard?->name }}</td>
     <td data-col="grade">{{ $quiz->grade ?: '—' }}</td>
     <td data-col="questions">{{ $quiz->questions_count }}</td>

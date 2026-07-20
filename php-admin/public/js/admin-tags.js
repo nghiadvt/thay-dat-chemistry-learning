@@ -150,9 +150,31 @@
     return `${ids.length} chủ đề`;
   }
 
+  function getTriggerColor(wrap) {
+    const mode = wrap.dataset.mode;
+    let ids;
+    if (mode === 'filter') {
+      const val = wrap.querySelector('input[type="hidden"]')?.value ?? '';
+      ids = val && val !== 'none' ? [val] : [];
+    } else if (mode === 'filter-multi') {
+      ids = JSON.parse(wrap.dataset.selected || '[]');
+    } else {
+      ids = JSON.parse(wrap.dataset.selected || '[]');
+    }
+    if (ids.length !== 1) return null;
+    const row = wrap.querySelector(`[data-tag-options] [data-value="${ids[0]}"]`);
+    return row?.dataset.color || null;
+  }
+
   function updateTrigger(wrap) {
     const label = wrap.querySelector('[data-trigger-label]');
     if (label) label.textContent = getTriggerLabel(wrap);
+    const dot = wrap.querySelector('[data-trigger-dot]');
+    if (dot) {
+      const color = getTriggerColor(wrap);
+      dot.hidden = !color;
+      if (color) dot.style.background = color;
+    }
   }
 
   function syncActiveStates(wrap, filterValue, multiIds) {

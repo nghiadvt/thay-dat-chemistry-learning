@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Đấu Trường Hóa Học — Demo game mới')
-@section('page-title', 'Game mới: Đấu Trường Hóa Học')
 
 @push('head')
 <link rel="stylesheet" href="@vasset('css/battle-arena-demo.css')">

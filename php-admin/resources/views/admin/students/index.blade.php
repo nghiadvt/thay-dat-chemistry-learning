@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Học sinh — Hóa Thầy Đạt')
-@section('page-title', 'Học sinh')
 
 @php
     // Màu ổn định theo tên lớp để mỗi lớp có một nhận diện riêng.
@@ -14,6 +13,15 @@
 @endphp
 
 @section('content')
+<div class="page-header">
+    <div class="page-header__text">
+        <h2>Học sinh</h2>
+        @if ($results === null)
+            <p class="page-subtitle">{{ $classes->count() }} lớp{{ $unassigned->isNotEmpty() ? ' · '.$unassigned->count().' học sinh chưa xếp lớp' : '' }}</p>
+        @endif
+    </div>
+</div>
+
 @include('admin.students.partials.generated-credentials')
 
 {{-- Tìm nhanh một học sinh khi không nhớ em đó ở lớp nào --}}

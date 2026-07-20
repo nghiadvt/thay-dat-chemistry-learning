@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Săn Rồng Hóa Học — Demo game mới')
-@section('page-title', 'Game mới: Săn Rồng Hóa Học')
 
 @push('head')
 <link rel="stylesheet" href="@vasset('css/dragon-hunt-demo.css')">

@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', $quiz->name.' — Quiz')
-@section('page-title', 'Chi tiết quiz')
 
 
 @section('content')

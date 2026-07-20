@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Game — Hóa Thầy Đạt')
-@section('page-title', 'Game')
 
 @php
     $searchValue = trim((string) ($search ?? ''));

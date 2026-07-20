@@ -165,12 +165,6 @@ html[data-theme="lab"] .admin-nav a.active::after {
 }
 
 /* ── Topbar: kính mờ ── */
-html[data-theme="lab"] .admin-page-title {
-  background: linear-gradient(90deg, #eaf6ff, #6ee7f9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
 html[data-theme="lab"] .admin-user { color: var(--lab-text-dim); }
 html[data-theme="lab"] .admin-sidebar-toggle {
   background: rgba(13, 30, 50, 0.8);

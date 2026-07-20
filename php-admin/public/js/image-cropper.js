@@ -112,6 +112,8 @@
 
     const fileInput = document.getElementById('icFileInput');
     const uploadHint = document.getElementById('icUploadHint');
+    const uploadZone = document.getElementById('icUploadZone');
+    const uploadCard = document.getElementById('icUploadCard');
     const workspace = document.getElementById('icWorkspace');
     const canvas = document.getElementById('icCanvas');
     const ctx = canvas.getContext('2d');
@@ -154,6 +156,14 @@
 
     const autoDetectBtn = document.getElementById('icAutoDetect');
     const clickDetectToggleBtn = document.getElementById('icClickDetectToggle');
+    const autoDetectFilterToggleBtn = document.getElementById('icAutoDetectFilterToggle');
+    const autoDetectFilterPanel = document.getElementById('icAutoDetectFilterPanel');
+    const filterEnabledInput = document.getElementById('icFilterEnabled');
+    const filterWMinInput = document.getElementById('icFilterWMin');
+    const filterWMaxInput = document.getElementById('icFilterWMax');
+    const filterHMinInput = document.getElementById('icFilterHMin');
+    const filterHMaxInput = document.getElementById('icFilterHMax');
+    const filterModeSelect = document.getElementById('icFilterMode');
     const createByDimsBtn = document.getElementById('icCreateByDims');
     const createDimsPanel = document.getElementById('icCreateDimsPanel');
     const dimsXInput = document.getElementById('icDimsX');
@@ -172,6 +182,10 @@
     const exportDpiInput = document.getElementById('icExportDpi');
     const exportCancelBtn = document.getElementById('icExportCancel');
     const exportConfirmBtn = document.getElementById('icExportConfirm');
+    const exportTrimInput = document.getElementById('icExportTrim');
+    const exportTrimToleranceGroup = document.getElementById('icExportTrimToleranceGroup');
+    const exportTrimToleranceInput = document.getElementById('icExportTrimTolerance');
+    const exportTrimToleranceValueEl = document.getElementById('icExportTrimToleranceValue');
 
     let img = null;
     // Kích thước ảnh gốc (px thật) — hệ tọa độ chuẩn cho MỌI phép tính box/
@@ -187,6 +201,12 @@
     const positionRefs = new Map();
 
     let zoomLevel = 1;
+    // Lệch tâm khi ảnh (ở zoom hiện tại) nhỏ hơn khung nhìn — để ảnh luôn nằm
+    // giữa thay vì dính góc trên-trái. Ruler dùng chung 2 biến này để vẽ vạch
+    // đúng vị trí; các phép tính tọa độ chuột (pointFromEvent) không cần biết
+    // vì luôn đo theo canvas.getBoundingClientRect() thực tế trên màn hình.
+    let stageOffsetX = 0;
+    let stageOffsetY = 0;
     let guides = { h: [], v: [] };
     let guideSeq = 0;
     let guideColor = guideColorInput ? guideColorInput.value : '#f97316';
@@ -510,6 +530,61 @@
 
     function cropToDataUrl(box) {
       return renderRegionCanvas(box).toDataURL('image/png');
+    }
+
+    // Cắt bỏ viền "nền" (trong suốt hoặc gần trắng) quanh 1 canvas vùng đã cắt.
+    // Cùng thuật toán với image-trimmer: mỗi pixel được hòa với nền trắng theo
+    // alpha của nó, nếu kết quả gần trắng trong ngưỡng `tolerance` (0–255 sau
+    // khi quy đổi) thì coi là nền. Trả về canvas mới đã cắt sát nội dung; nếu
+    // cả canvas đều là nền (vùng trống hoàn toàn) hoặc không có gì để cắt thì
+    // trả về nguyên canvas gốc để tránh tạo ảnh rỗng / thao tác thừa.
+    function trimCanvasBackground(srcCanvas, tolerance) {
+      const w = srcCanvas.width;
+      const h = srcCanvas.height;
+      if (!w || !h) return srcCanvas;
+      let data;
+      try {
+        data = srcCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+      } catch (e) {
+        return srcCanvas;
+      }
+      const threshold = 255 - tolerance;
+      const isBg = (idx) => {
+        const a = data[idx + 3] / 255;
+        const r = data[idx] * a + 255 * (1 - a);
+        const g = data[idx + 1] * a + 255 * (1 - a);
+        const b = data[idx + 2] * a + 255 * (1 - a);
+        return r >= threshold && g >= threshold && b >= threshold;
+      };
+      const rowHasContent = (y) => {
+        const rowStart = y * w * 4;
+        for (let x = 0; x < w; x += 1) if (!isBg(rowStart + x * 4)) return true;
+        return false;
+      };
+      const colHasContent = (x, top, bottom) => {
+        for (let y = top; y <= bottom; y += 1) if (!isBg((y * w + x) * 4)) return true;
+        return false;
+      };
+
+      let top = 0;
+      while (top < h && !rowHasContent(top)) top += 1;
+      if (top === h) return srcCanvas; // toàn bộ là nền — giữ nguyên, không cắt
+      let bottom = h - 1;
+      while (bottom > top && !rowHasContent(bottom)) bottom -= 1;
+      let left = 0;
+      while (left < w && !colHasContent(left, top, bottom)) left += 1;
+      let right = w - 1;
+      while (right > left && !colHasContent(right, top, bottom)) right -= 1;
+
+      const bw = right - left + 1;
+      const bh = bottom - top + 1;
+      if (left === 0 && top === 0 && bw === w && bh === h) return srcCanvas; // không có viền để cắt
+
+      const out = document.createElement('canvas');
+      out.width = bw;
+      out.height = bh;
+      out.getContext('2d').drawImage(srcCanvas, left, top, bw, bh, 0, 0, bw, bh);
+      return out;
     }
 
     // Ảnh gốc + khung đã khoanh vẽ đè lên — dùng làm thumbnail ở trang quản
@@ -1013,6 +1088,18 @@
     // renderScale() để không vỡ nét, canvas.style.width/height giữ kích
     // thước hiển thị theo zoomLevel. Đổi canvas.width/height luôn xóa nội
     // dung cũ (theo spec) nên luôn phải drawScene() lại sau đó. ──
+    function centerStage() {
+      if (!canvasStageEl || !canvasWrapEl || !imgW || !imgH) return;
+      const viewW = canvasWrapEl.clientWidth;
+      const viewH = canvasWrapEl.clientHeight;
+      const contentW = imgW * zoomLevel;
+      const contentH = imgH * zoomLevel;
+      stageOffsetX = contentW < viewW ? Math.round((viewW - contentW) / 2) : 0;
+      stageOffsetY = contentH < viewH ? Math.round((viewH - contentH) / 2) : 0;
+      canvasStageEl.style.marginLeft = stageOffsetX + 'px';
+      canvasStageEl.style.marginTop = stageOffsetY + 'px';
+    }
+
     function applyZoom() {
       if (!img || !imgW || !imgH) return;
       zoomLevel = clamp(zoomLevel, ZOOM_MIN, ZOOM_MAX);
@@ -1022,6 +1109,7 @@
       canvas.style.width = Math.round(imgW * zoomLevel) + 'px';
       canvas.style.height = Math.round(imgH * zoomLevel) + 'px';
       if (zoomResetBtn) zoomResetBtn.textContent = Math.round(zoomLevel * 100) + '%';
+      centerStage();
       drawScene();
       drawRulers();
       renderGuides();
@@ -1131,10 +1219,10 @@
       hCtx.fillStyle = '#4b5563';
       hCtx.font = '9px system-ui, sans-serif';
       hCtx.textBaseline = 'top';
-      const startV = Math.max(0, Math.floor(scrollL / zoomLevel / interval) * interval);
-      const endV = Math.min(imgW, Math.ceil((scrollL + viewW) / zoomLevel / interval) * interval);
+      const startV = Math.max(0, Math.floor((scrollL - stageOffsetX) / zoomLevel / interval) * interval);
+      const endV = Math.min(imgW, Math.ceil((scrollL - stageOffsetX + viewW) / zoomLevel / interval) * interval);
       for (let v = startV; v <= endV; v += interval) {
-        const screenX = v * zoomLevel - scrollL;
+        const screenX = v * zoomLevel - scrollL + stageOffsetX;
         hCtx.beginPath();
         hCtx.moveTo(screenX + 0.5, RULER_SIZE - 8);
         hCtx.lineTo(screenX + 0.5, RULER_SIZE);
@@ -1152,10 +1240,10 @@
       vCtx.fillStyle = '#4b5563';
       vCtx.font = '9px system-ui, sans-serif';
       vCtx.textBaseline = 'top';
-      const startVv = Math.max(0, Math.floor(scrollT / zoomLevel / interval) * interval);
-      const endVv = Math.min(imgH, Math.ceil((scrollT + viewH) / zoomLevel / interval) * interval);
+      const startVv = Math.max(0, Math.floor((scrollT - stageOffsetY) / zoomLevel / interval) * interval);
+      const endVv = Math.min(imgH, Math.ceil((scrollT - stageOffsetY + viewH) / zoomLevel / interval) * interval);
       for (let v = startVv; v <= endVv; v += interval) {
-        const screenY = v * zoomLevel - scrollT;
+        const screenY = v * zoomLevel - scrollT + stageOffsetY;
         vCtx.beginPath();
         vCtx.moveTo(RULER_SIZE - 8, screenY + 0.5);
         vCtx.lineTo(RULER_SIZE, screenY + 0.5);
@@ -1165,7 +1253,12 @@
     }
 
     if (canvasWrapEl) canvasWrapEl.addEventListener('scroll', drawRulers);
-    window.addEventListener('resize', () => { if (img) drawRulers(); });
+    window.addEventListener('resize', () => { if (img) { centerStage(); drawRulers(); } });
+    // Sidebar thu gọn/mở rộng cũng đổi bề rộng canvasWrap nhưng không bắn
+    // window 'resize' — theo dõi trực tiếp bằng ResizeObserver cho chắc.
+    if (canvasWrapEl && typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => { if (img) { centerStage(); drawRulers(); } }).observe(canvasWrapEl);
+    }
 
     // ── Guide: đường kẻ đo kéo từ ruler vào, không thuộc dữ liệu ảnh, chỉ
     // là overlay DOM để đo — không lưu server. ──
@@ -1447,12 +1540,55 @@
       }
 
       const invScale = 1 / scale;
-      const regions = clusters
+      const sizeFilter = getSizeFilter();
+      const all = clusters
         .map((c) => clusterToRect(c, invScale))
-        .filter(Boolean)
+        .filter(Boolean);
+      const regions = all
+        .filter((rect) => matchesSizeFilter(rect, sizeFilter))
         .sort((a, b) => (a.y - b.y) || (a.x - b.x));
 
-      return { regions, fullyOpaque };
+      return { regions, fullyOpaque, filteredOut: all.length - regions.length };
+    }
+
+    // ── Lọc theo kích thước — đọc từ panel "Lọc kích thước". Mỗi ô để trống =
+    // không giới hạn; khi có cả điều kiện width lẫn height thì kết hợp theo
+    // chế độ AND/OR do người dùng chọn. ──
+    function readOptionalNum(input) {
+      if (!input) return null;
+      const v = input.value.trim();
+      if (v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    }
+
+    function getSizeFilter() {
+      if (!filterEnabledInput || !filterEnabledInput.checked) return null;
+      const wMin = readOptionalNum(filterWMinInput);
+      const wMax = readOptionalNum(filterWMaxInput);
+      const hMin = readOptionalNum(filterHMinInput);
+      const hMax = readOptionalNum(filterHMaxInput);
+      const hasW = wMin !== null || wMax !== null;
+      const hasH = hMin !== null || hMax !== null;
+      if (!hasW && !hasH) return null;
+      const mode = filterModeSelect ? filterModeSelect.value : 'and';
+      return { wMin, wMax, hMin, hMax, hasW, hasH, mode };
+    }
+
+    function inRange(value, min, max) {
+      if (min !== null && value < min) return false;
+      if (max !== null && value > max) return false;
+      return true;
+    }
+
+    function matchesSizeFilter(rect, filter) {
+      if (!filter) return true;
+      const wOk = filter.hasW ? inRange(rect.w, filter.wMin, filter.wMax) : true;
+      const hOk = filter.hasH ? inRange(rect.h, filter.hMin, filter.hMax) : true;
+      // Chỉ 1 điều kiện được bật → chỉ xét điều kiện đó (bỏ qua mode).
+      if (filter.hasW && !filter.hasH) return wOk;
+      if (filter.hasH && !filter.hasW) return hOk;
+      return filter.mode === 'or' ? (wOk || hOk) : (wOk && hOk);
     }
 
     function autoDetectRegions() {
@@ -1467,14 +1603,18 @@
       // khi chạy vòng lặp đồng bộ (có thể mất vài trăm ms với ảnh lớn).
       setTimeout(() => {
         try {
-          const { regions, fullyOpaque } = detectObjectRegions();
+          const { regions, fullyOpaque, filteredOut } = detectObjectRegions();
 
           if (fullyOpaque) {
             toast('Ảnh gần như không có vùng trong suốt — chức năng này chỉ nhận diện tốt trên ảnh đã xóa nền.', 'error');
           }
 
           if (regions.length === 0) {
-            toast('Không tìm thấy object nào trên ảnh. Kiểm tra ảnh đã xóa nền (có kênh alpha) chưa.', 'error');
+            if (filteredOut > 0) {
+              toast(`Có ${filteredOut} object nhưng không object nào lọt khoảng kích thước đã đặt. Chỉnh lại điều kiện lọc.`, 'error');
+            } else {
+              toast('Không tìm thấy object nào trên ảnh. Kiểm tra ảnh đã xóa nền (có kênh alpha) chưa.', 'error');
+            }
             return;
           }
 
@@ -1497,7 +1637,8 @@
           });
           drawScene();
           renderBoxList();
-          toast(`Đã tự động khoanh ${regions.length} vùng.`, 'success');
+          const filterNote = filteredOut > 0 ? ` (bỏ qua ${filteredOut} object ngoài khoảng kích thước)` : '';
+          toast(`Đã tự động khoanh ${regions.length} vùng${filterNote}.`, 'success');
         } catch (err) {
           toast('Có lỗi khi tự động khoanh vùng.', 'error');
         } finally {
@@ -1510,6 +1651,26 @@
     }
 
     if (autoDetectBtn) autoDetectBtn.addEventListener('click', autoDetectRegions);
+
+    // ── Panel "Lọc kích thước" — bật/tắt hiển thị và cập nhật trạng thái mờ
+    // các ô nhập khi tắt checkbox lọc. ──
+    function syncFilterInputsDisabled() {
+      if (!autoDetectFilterPanel || !filterEnabledInput) return;
+      autoDetectFilterPanel.classList.toggle('ic-filter-disabled', !filterEnabledInput.checked);
+    }
+
+    if (autoDetectFilterToggleBtn && autoDetectFilterPanel) {
+      autoDetectFilterToggleBtn.addEventListener('click', () => {
+        const willShow = autoDetectFilterPanel.hasAttribute('hidden');
+        autoDetectFilterPanel.toggleAttribute('hidden', !willShow);
+        autoDetectFilterToggleBtn.classList.toggle('is-active', willShow);
+      });
+    }
+
+    if (filterEnabledInput) {
+      filterEnabledInput.addEventListener('change', syncFilterInputsDisabled);
+      syncFilterInputsDisabled();
+    }
 
     // ── Chế độ "Click để khoanh vùng" — bật lên thì mỗi click trên ảnh chạy
     // flood-fill riêng từ điểm click, không đụng tới các vùng đã khoanh sẵn. ──
@@ -1632,6 +1793,7 @@
       img = image;
       imgW = image.naturalWidth || image.width;
       imgH = image.naturalHeight || image.height;
+      if (uploadCard) uploadCard.hidden = true;
       workspace.hidden = false;
       resetWorkspace();
       applyZoom();
@@ -1690,8 +1852,49 @@
       fileInput.addEventListener('change', () => {
         const file = fileInput.files && fileInput.files[0];
         if (file) loadImageFile(file);
+        fileInput.value = '';
       });
     }
+
+    // Ô chọn ảnh hỗ trợ thêm kéo-thả và dán (Ctrl+V) ảnh trực tiếp, giống
+    // image-trimmer — chỉ lấy ảnh đầu tiên vì cropper chỉ làm việc với 1 ảnh gốc.
+    function imageFileFromDataTransfer(dataTransfer) {
+      if (!dataTransfer) return null;
+      const fromItems = Array.prototype.find.call(dataTransfer.items || [], (item) => (
+        item.kind === 'file' && item.type.indexOf('image/') === 0
+      ));
+      if (fromItems) return fromItems.getAsFile();
+      return Array.prototype.find.call(dataTransfer.files || [], (f) => f.type.indexOf('image/') === 0) || null;
+    }
+
+    if (uploadZone) {
+      ['dragenter', 'dragover'].forEach((evt) => {
+        uploadZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          uploadZone.classList.add('is-dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach((evt) => {
+        uploadZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          uploadZone.classList.remove('is-dragover');
+        });
+      });
+      uploadZone.addEventListener('drop', (e) => {
+        const file = imageFileFromDataTransfer(e.dataTransfer);
+        if (file) loadImageFile(file);
+      });
+    }
+
+    document.addEventListener('paste', (e) => {
+      if (!uploadZone) return;
+      const file = imageFileFromDataTransfer(e.clipboardData);
+      if (!file) return;
+      e.preventDefault();
+      loadImageFile(file);
+      uploadZone.classList.add('is-pasted');
+      setTimeout(() => uploadZone.classList.remove('is-pasted'), 600);
+    });
 
     if (changeImageBtn) {
       changeImageBtn.addEventListener('click', () => {
@@ -1978,6 +2181,16 @@
         exportDpiInput.value = String(DPI_PRESETS[exportPresetSelect.value] ?? 96);
       });
     }
+    if (exportTrimInput && exportTrimToleranceGroup) {
+      exportTrimInput.addEventListener('change', () => {
+        exportTrimToleranceGroup.toggleAttribute('hidden', !exportTrimInput.checked);
+      });
+    }
+    if (exportTrimToleranceInput && exportTrimToleranceValueEl) {
+      exportTrimToleranceInput.addEventListener('input', () => {
+        exportTrimToleranceValueEl.textContent = exportTrimToleranceInput.value;
+      });
+    }
     if (exportModal) {
       exportModal.querySelector('.ic-export-modal-close').addEventListener('click', closeExportModal);
       exportModal.querySelector('.ic-export-modal-backdrop').addEventListener('click', closeExportModal);
@@ -1991,7 +2204,11 @@
     // này kiểm tra bằng chính tiền tố "data:image/..." trả về (không tin vào
     // lựa chọn của người dùng) để biết có cần báo cho họ hay không.
     function exportBoxDataUrl(box, exportOptions) {
-      const off = renderRegionCanvas(box);
+      let off = renderRegionCanvas(box);
+
+      if (exportOptions.trim) {
+        off = trimCanvasBackground(off, exportOptions.trimTolerance);
+      }
 
       if (exportOptions.format === 'svg') {
         const pngUrl = off.toDataURL('image/png');
@@ -2018,6 +2235,8 @@
           format: exportFormatSelect.value,
           quality: clamp(Number(exportQualityInput.value) / 100 || 0.92, 0.5, 1),
           dpi: Math.max(1, Number(exportDpiInput.value) || 96),
+          trim: !!(exportTrimInput && exportTrimInput.checked),
+          trimTolerance: exportTrimToleranceInput ? (parseInt(exportTrimToleranceInput.value, 10) || 0) : 12,
         };
 
         exportConfirmBtn.disabled = true;

@@ -92,7 +92,6 @@
                     ])
                 </div>
                 <div class="form-group list-filters-panel__wide">
-                    <label>Chủ đề</label>
                     @include('admin.partials.tag-select', [
                         'mode' => 'filter-multi',
                         'tags' => $tags,

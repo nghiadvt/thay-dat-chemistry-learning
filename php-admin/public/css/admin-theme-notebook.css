@@ -150,10 +150,6 @@ html[data-theme="notebook"] .admin-nav a.active::after {
 }
 
 /* ── Topbar: mép giấy có lề đỏ ── */
-html[data-theme="notebook"] .admin-page-title {
-  text-decoration: underline wavy rgba(245, 158, 11, 0.75) 2px;
-  text-underline-offset: 6px;
-}
 html[data-theme="notebook"] .admin-user { color: var(--nb-dim); }
 html[data-theme="notebook"] .admin-sidebar-toggle {
   background: var(--nb-card);

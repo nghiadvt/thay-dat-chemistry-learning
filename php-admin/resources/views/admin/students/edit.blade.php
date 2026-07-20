@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Sửa học sinh — Hóa Thầy Đạt')
-@section('page-title', 'Sửa học sinh')
 
 @section('content')
 @include('admin.students.partials.generated-credentials')

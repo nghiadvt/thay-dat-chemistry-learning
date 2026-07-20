@@ -169,12 +169,6 @@ html[data-theme="galaxy"] .admin-nav a.active::after {
 }
 
 /* ── Topbar ── */
-html[data-theme="galaxy"] .admin-page-title {
-  background: linear-gradient(90deg, #f5f1ff, #c4b5fd 60%, #f9a8d4);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
 html[data-theme="galaxy"] .admin-user { color: var(--gal-dim); }
 html[data-theme="galaxy"] .admin-sidebar-toggle {
   background: rgba(22, 12, 54, 0.8);

@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('title', 'Nhóm — Hóa Thầy Đạt')
-@section('page-title', 'Nhóm')
 
 @php
     $scopeLabels = \App\Models\Group::SCOPE_LABELS;

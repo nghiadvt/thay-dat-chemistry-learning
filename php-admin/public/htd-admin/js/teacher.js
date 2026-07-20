@@ -195,6 +195,38 @@ function joinExistingRoomFromAdmin(pin, params) {
   const sessionId = parseInt(params.get('session_id'), 10) || null;
   const boot = window.ADMIN_BOOT?.session || {};
 
+  // Backend đã tự đồng bộ status='ended' khi Redis room hết TTL (xem
+  // SessionController::syncSessionStatusFromRedis). Trong trường hợp đó
+  // đừng gọi checkPin/joinRoom nữa — Redis không còn gì để join, và cứ gọi
+  // sẽ luôn 404 rồi bật alert + đẩy về màn 'setup' như thể chưa từng có
+  // phòng, dù đây là một phòng hợp lệ đã kết thúc.
+  if (boot.status === 'ended') {
+    HTD.setRoom({
+      pin,
+      name: boot.roomName || 'PHÒNG QUIZ',
+      roomName: boot.roomName || null,
+      quizName: boot.quizName || null,
+      gameName: boot.gameName || null,
+      playModeSlug: boot.playModeSlug || 'kahoot_sync',
+      modeConfig: boot.modeConfig || null,
+      joinUrl: boot.joinUrl || null,
+      qrUrl: boot.qrUrl || null,
+      teacher: boot.hostName || 'Giáo viên',
+      status: 'ended',
+      backendMode: true,
+      sessionId: sessionId || boot.sessionId,
+      gameId: gameId || boot.gameId,
+      createdAt: Date.now(),
+    });
+    HTD.setPlayers([]);
+    const room = HTD.getRoom();
+    const game = ensureTeacherGameState(room);
+    game.phase = 'final';
+    HTD.setRoom(room);
+    showTeacherScreen('dashboard');
+    return;
+  }
+
   HTDBridge.init()
     .then(() => HTDApi.checkPin(pin))
     .then(data => {

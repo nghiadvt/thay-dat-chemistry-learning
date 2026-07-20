@@ -73,9 +73,14 @@ class QuizController extends Controller
     {
         $page = $this->groupRowsPage($this->baseQuery(), $request);
 
+        $rowData = [
+            'games' => Game::orderBy('name')->get(),
+            'groups' => $this->groupsForScope(Group::SCOPE_QUIZ),
+        ];
+
         $html = '';
         foreach ($page['items'] as $quiz) {
-            $html .= view('admin.quizzes._row', ['quiz' => $quiz])->render();
+            $html .= view('admin.quizzes._row', [...$rowData, 'quiz' => $quiz])->render();
         }
 
         return response()->json([
@@ -225,22 +230,32 @@ class QuizController extends Controller
     }
 
     /**
-     * Chuyển nhanh quiz sang game khác (dùng trong modal quiz ở trang danh sách game).
+     * Chuyển nhanh quiz sang game khác. Dùng cho cả modal quiz ở trang danh sách
+     * game (AJAX, trả JSON) lẫn ô chọn nhanh ở cột "Game" trên trang danh sách quiz
+     * (form thường, quay lại trang cũ kèm thông báo).
      */
-    public function moveGame(Request $request, Quiz $quiz): JsonResponse
+    public function moveGame(Request $request, Quiz $quiz): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
-            'game_id' => ['required', 'integer', Rule::exists('games', 'id')],
+            'game_id' => ['nullable', 'integer', Rule::exists('games', 'id')],
         ]);
 
         $fromGameId = $quiz->game_id;
-        $toGameId = (int) $validated['game_id'];
+        $toGameId = $validated['game_id'] !== null ? (int) $validated['game_id'] : null;
 
         if ($fromGameId === $toGameId) {
-            return response()->json(['message' => 'Quiz đã thuộc game này.'], 422);
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Quiz đã thuộc game này.'], 422);
+            }
+
+            return back();
         }
 
         $quiz->update(['game_id' => $toGameId]);
+
+        if (! $request->wantsJson()) {
+            return back()->with('success', 'Đã chuyển quiz «'.$quiz->name.'» sang game mới.');
+        }
 
         return response()->json([
             'message' => 'Đã chuyển quiz «'.$quiz->name.'» sang game mới.',
@@ -250,9 +265,26 @@ class QuizController extends Controller
             ],
             'to' => [
                 'id' => $toGameId,
-                'quiz_count' => Quiz::where('game_id', $toGameId)->count(),
+                'quiz_count' => $toGameId ? Quiz::where('game_id', $toGameId)->count() : 0,
             ],
         ]);
+    }
+
+    /**
+     * Chuyển nhanh quiz sang nhóm khác từ ô chọn ở cột "Nhóm" trên trang danh sách quiz.
+     */
+    public function moveGroup(Request $request, Quiz $quiz): RedirectResponse
+    {
+        $validated = $request->validate([
+            'group_id' => [
+                'nullable',
+                Rule::exists('content_groups', 'id')->where('scope', Group::SCOPE_QUIZ),
+            ],
+        ]);
+
+        $quiz->update(['group_id' => $validated['group_id'] ?? null]);
+
+        return back()->with('success', 'Đã cập nhật nhóm cho quiz «'.$quiz->name.'».');
     }
 
     public function toggleActive(Quiz $quiz): RedirectResponse
