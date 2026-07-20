@@ -147,7 +147,7 @@ class SessionController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'quiz_id' => ['required', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)],
+            'quiz_id' => ['required', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)->whereNull('deleted_at')],
             ...$this->groupValidationRules(Group::SCOPE_SESSION),
         ]);
 
@@ -236,7 +236,7 @@ class SessionController extends Controller
         ];
 
         if ($canChangeQuiz) {
-            $rules['quiz_id'] = ['required', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)];
+            $rules['quiz_id'] = ['required', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)->whereNull('deleted_at')];
         }
 
         $validated = $request->validate($rules);

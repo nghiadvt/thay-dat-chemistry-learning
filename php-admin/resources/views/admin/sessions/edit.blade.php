@@ -98,7 +98,7 @@
                     </select>
                     <p class="hint">Đổi quiz khi phòng còn <strong>waiting</strong>. Redis room được cập nhật theo quiz mới.</p>
                 @else
-                    <input type="text" value="{{ $session->quiz?->name ?? '—' }} ({{ $session->game?->name }})" disabled>
+                    <input type="text" value="{{ $session->quiz?->name ?? '—' }} ({{ $session->gameName() }})" disabled>
                     <p class="hint">Không đổi quiz khi phòng đang <strong>{{ $session->status }}</strong> (tránh lệch state realtime). Có thể đổi tên.</p>
                 @endif
                 @error('quiz_id')<div class="field-error">{{ $message }}</div>@enderror

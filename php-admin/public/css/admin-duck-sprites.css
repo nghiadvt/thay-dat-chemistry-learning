@@ -562,3 +562,230 @@
 }
 
 .dsm-toast.is-error { background: #dc2626; }
+
+/* ===== Nguồn frame: upload hoặc chọn ảnh đã cắt sẵn ===== */
+.dsm-source-sep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dsm-source-sep::before,
+.dsm-source-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.dsm-pick-btn { width: 100%; }
+
+/* ===== Picker modal (chọn ảnh đã cắt sẵn) ===== */
+.dsm-picker-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.dsm-picker-modal__panel {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: min(92vh, 780px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+
+.dsm-picker-modal__body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .dsm-picker-modal__body { grid-template-columns: 1fr; }
+}
+
+.dsm-picker-modal__sources {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-right: 1px solid #e2e8f0;
+  overflow-y: auto;
+}
+
+.dsm-picker-modal__regions {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.dsm-picker-search {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.dsm-picker-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dsm-picker-source-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12.5px;
+  color: #0f172a;
+}
+
+.dsm-picker-source-item:hover { background: #f1f5f9; }
+.dsm-picker-source-item.is-active { background: #eff6ff; border-color: #93c5fd; }
+
+.dsm-picker-source-item__thumb {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dsm-picker-source-item__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.dsm-picker-source-item__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dsm-picker-source-item__count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.dsm-picker-loading,
+.dsm-picker-empty,
+.dsm-picker-hint {
+  font-size: 12.5px;
+  color: #64748b;
+  margin: 4px 0;
+}
+
+.dsm-picker-regions-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dsm-picker-regions-toolbar__hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.dsm-picker-regions-toolbar .btn { flex: 0 0 auto; white-space: nowrap; }
+
+.dsm-picker-region-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.dsm-picker-region-grid:empty { display: none; }
+
+.dsm-picker-region-item {
+  position: relative;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  background: #f8fafc;
+  cursor: pointer;
+  padding: 0;
+}
+
+.dsm-picker-region-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.dsm-picker-region-item.is-selected { border-color: #2563eb; }
+
+.dsm-picker-region-item__check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: rgba(15, 23, 42, 0.35);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.dsm-picker-region-item.is-selected .dsm-picker-region-item__check {
+  background: #2563eb;
+  border-color: #2563eb;
+  opacity: 1;
+}
+
+.dsm-picker-region-item__label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 6px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  font-size: 10px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

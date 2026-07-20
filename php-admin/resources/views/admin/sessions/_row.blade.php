@@ -39,7 +39,7 @@
         <span class="session-pin-badge">{{ $session->pin }}</span>
     </td>
     <td data-col="quiz" title="{{ $session->quiz?->name }}">{{ $session->quiz?->name ?? '—' }}</td>
-    <td data-col="game" title="{{ $session->game?->name }}">{{ $session->game?->name ?? '—' }}</td>
+    <td data-col="game" title="{{ $session->gameName() }}">{{ $session->gameName() ?? '—' }}</td>
     <td data-col="host">{{ $session->host?->name ?? '—' }}</td>
     <td data-col="status">
         <span class="badge badge-{{ $session->status }}">

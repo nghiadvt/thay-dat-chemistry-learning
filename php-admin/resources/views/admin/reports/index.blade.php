@@ -117,7 +117,7 @@
                     <tr>
                         <td data-col="pin"><span class="session-pin-badge">{{ $session->pin }}</span></td>
                         <td data-col="name">{{ $session->name ?? '—' }}</td>
-                        <td data-col="game">{{ $session->game?->name }}</td>
+                        <td data-col="game">{{ $session->gameName() }}</td>
                         <td data-col="host">{{ $session->host?->name }}</td>
                         <td data-col="ended">{{ $session->ended_at?->format('d/m/Y H:i') }}</td>
                         <td data-col="actions" class="actions-cell">

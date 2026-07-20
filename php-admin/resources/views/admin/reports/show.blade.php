@@ -8,7 +8,7 @@
     <div>
         <h2>Session PIN {{ $session->pin }}</h2>
         <p style="margin:4px 0 0;color:#6b7280;">
-            {{ $session->game?->name }} · Kết thúc {{ $session->ended_at?->format('d/m/Y H:i') }}
+            {{ $session->gameName() }} · Kết thúc {{ $session->ended_at?->format('d/m/Y H:i') }}
         </p>
     </div>
     <div class="actions">

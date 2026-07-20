@@ -71,7 +71,7 @@ class ReportController extends Controller
             fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
 
             fputcsv($out, ['PIN', $session->pin]);
-            fputcsv($out, ['Game', $session->game?->name]);
+            fputcsv($out, ['Game', $session->gameName()]);
             fputcsv($out, ['Kết thúc', $session->ended_at?->format('Y-m-d H:i:s')]);
             fputcsv($out, []);
 

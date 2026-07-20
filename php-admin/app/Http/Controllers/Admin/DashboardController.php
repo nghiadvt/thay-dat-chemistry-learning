@@ -155,7 +155,7 @@ class DashboardController extends Controller
                 fputcsv($out, [
                     $session->pin,
                     $session->name ?? '',
-                    $session->game?->name ?? '',
+                    $session->gameName() ?? '',
                     $session->host?->name ?? '',
                     $session->ended_at?->format('Y-m-d H:i:s') ?? '',
                     $session->results_count,

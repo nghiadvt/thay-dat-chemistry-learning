@@ -139,7 +139,7 @@
                         <tr>
                             <td><strong>{{ $session->name ?? 'Phòng '.$session->pin }}</strong></td>
                             <td><span class="session-pin-badge">{{ $session->pin }}</span></td>
-                            <td>{{ $session->quiz?->name ?? $session->game?->name ?? '—' }}</td>
+                            <td>{{ $session->quiz?->name ?? $session->gameName() ?? '—' }}</td>
                             @if ($isAdmin)<td>{{ $session->host?->name ?? '—' }}</td>@endif
                             <td><span class="badge badge-{{ $session->status }}">{{ $statusLabels[$session->status] ?? $session->status }}</span></td>
                             <td class="session-created-cell">{{ $session->created_at?->format('d/m/Y H:i') }}</td>
@@ -181,7 +181,7 @@
                     <tr>
                         <td><span class="session-pin-badge">{{ $session->pin }}</span></td>
                         <td>{{ $session->name ?? '—' }}</td>
-                        <td>{{ $session->game?->name ?? '—' }}</td>
+                        <td>{{ $session->gameName() ?? '—' }}</td>
                         <td class="session-created-cell">{{ $session->ended_at?->format('d/m/Y H:i') }}</td>
                         <td class="actions-cell">
                             @include('admin.partials.row-action-menu', [

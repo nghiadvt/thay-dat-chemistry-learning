@@ -26,7 +26,7 @@ class GameSessionController extends Controller
     {
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'quiz_id' => ['required_without:game_id', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)],
+            'quiz_id' => ['required_without:game_id', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)->whereNull('deleted_at')],
             'game_id' => ['required_without:quiz_id', 'integer', Rule::exists('games', 'id')],
         ]);
 

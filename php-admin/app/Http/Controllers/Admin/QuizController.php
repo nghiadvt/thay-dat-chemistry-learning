@@ -203,12 +203,56 @@ class QuizController extends Controller
             ->with('success', 'Đã cập nhật quiz.');
     }
 
-    public function destroy(Quiz $quiz): RedirectResponse
+    public function destroy(Request $request, Quiz $quiz): RedirectResponse|JsonResponse
     {
+        $gameId = $quiz->game_id;
+
+        // Xóa mềm — model tự chụp lại tên + id game vào deleted_game_* trước khi gỡ FK.
         $quiz->delete();
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => 'Đã xóa quiz «'.$quiz->name.'».',
+                'game' => [
+                    'id' => $gameId,
+                    'quiz_count' => $gameId ? Quiz::where('game_id', $gameId)->count() : 0,
+                ],
+            ]);
+        }
+
         return redirect()->route('admin.quizzes.index')
-            ->with('success', 'Đã xóa quiz và các câu hỏi liên quan.');
+            ->with('success', 'Đã xóa quiz.');
+    }
+
+    /**
+     * Chuyển nhanh quiz sang game khác (dùng trong modal quiz ở trang danh sách game).
+     */
+    public function moveGame(Request $request, Quiz $quiz): JsonResponse
+    {
+        $validated = $request->validate([
+            'game_id' => ['required', 'integer', Rule::exists('games', 'id')],
+        ]);
+
+        $fromGameId = $quiz->game_id;
+        $toGameId = (int) $validated['game_id'];
+
+        if ($fromGameId === $toGameId) {
+            return response()->json(['message' => 'Quiz đã thuộc game này.'], 422);
+        }
+
+        $quiz->update(['game_id' => $toGameId]);
+
+        return response()->json([
+            'message' => 'Đã chuyển quiz «'.$quiz->name.'» sang game mới.',
+            'from' => [
+                'id' => $fromGameId,
+                'quiz_count' => $fromGameId ? Quiz::where('game_id', $fromGameId)->count() : 0,
+            ],
+            'to' => [
+                'id' => $toGameId,
+                'quiz_count' => Quiz::where('game_id', $toGameId)->count(),
+            ],
+        ]);
     }
 
     public function toggleActive(Quiz $quiz): RedirectResponse

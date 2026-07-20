@@ -14,6 +14,7 @@
 
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
   const apiBase = root.dataset.apiBase;
+  const imageCropApiBase = root.dataset.imageCropApi;
   const MAX_FRAMES = 20;
   const MAX_TICK_MS = 100;
 
@@ -44,6 +45,21 @@
   const framesBox = $('frames', modal);
   const statusBox = $('status', modal);
   const saveBtn = $('save', modal);
+  const pickBtn = $('pick-cropped', modal);
+
+  // --- Picker modal elements (chọn ảnh đã cắt sẵn từ image-cropper) ---
+  const pickerModal = document.getElementById('dsmPickerModal');
+  const $p = (name, scope) => (scope || pickerModal).querySelector('[data-dsmp="' + name + '"]');
+  const pickerSearch = pickerModal ? $p('search') : null;
+  const pickerSourceList = pickerModal ? $p('source-list') : null;
+  const pickerSourceLoading = pickerModal ? $p('source-loading') : null;
+  const pickerSourceEmpty = pickerModal ? $p('source-empty') : null;
+  const pickerRegionsHint = pickerModal ? $p('regions-hint') : null;
+  const pickerRegionGrid = pickerModal ? $p('region-grid') : null;
+  const pickerRegionsToolbar = pickerModal ? $p('regions-toolbar') : null;
+  const pickerSelectAllBtn = pickerModal ? $p('select-all') : null;
+  const pickerStatus = pickerModal ? $p('status') : null;
+  const pickerAddBtn = pickerModal ? $p('add') : null;
 
   // --- State ---
   let ducks = [];
@@ -61,6 +77,16 @@
     saving: false,
     thumbEls: [],
   };
+
+  const picker = {
+    open: false,
+    sources: null,            // cache danh sách ảnh gốc image-cropper
+    activeSourceId: null,
+    regionsCache: new Map(),  // sourceId -> regions[]
+    currentRegions: [],       // regions của ảnh gốc đang xem trong grid
+    selected: new Map(),      // regionId -> {id, url, label} — thứ tự Map = thứ tự bấm chọn
+  };
+  let closePicker = () => {}; // gán lại bên dưới nếu picker modal có mặt trên trang
 
   // ===== Helpers =====
 
@@ -104,6 +130,16 @@
 
   function preload(urls) {
     urls.forEach((u) => { const im = new Image(); im.src = u; });
+  }
+
+  async function urlToFile(url, label) {
+    const res = await fetch(url, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Không tải được ảnh đã chọn.');
+    const blob = await res.blob();
+    const extFromUrl = /\.([a-z0-9]+)(?:\?.*)?$/i.exec(url)?.[1];
+    const ext = (extFromUrl || blob.type.split('/')[1] || 'png').toLowerCase();
+    const safeLabel = (label || 'frame').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 40) || 'frame';
+    return new File([blob], safeLabel + '-' + Date.now() + '.' + ext, { type: blob.type || 'image/png' });
   }
 
   // ===== Grid (danh sách vịt) =====
@@ -260,7 +296,9 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && editor.open) closeEditor();
+    if (e.key !== 'Escape') return;
+    if (picker.open) { closePicker(); return; }
+    if (editor.open) closeEditor();
   });
 
   function setStatus(message, isError) {
@@ -544,6 +582,238 @@
   });
 
   createBtn.addEventListener('click', () => openEditor(null));
+
+  // ===== Picker: chọn ảnh đã cắt sẵn từ image-cropper =====
+
+  if (pickBtn && pickerModal && imageCropApiBase) {
+    let pickerRegionEls = new Map(); // regionId -> item element đang hiển thị trong grid
+
+    async function openPicker() {
+      picker.open = true;
+      picker.activeSourceId = null;
+      picker.currentRegions = [];
+      picker.selected.clear();
+      pickerRegionGrid.innerHTML = '';
+      pickerRegionEls = new Map();
+      pickerRegionsToolbar.classList.add('drc-hidden');
+      pickerRegionsHint.classList.remove('drc-hidden');
+      pickerRegionsHint.textContent = '← Chọn 1 ảnh gốc bên trái để xem "Ảnh đã lưu".';
+      pickerStatus.textContent = '';
+      updatePickerAddBtn();
+
+      pickerModal.classList.remove('drc-hidden');
+      document.body.style.overflow = 'hidden';
+
+      if (!picker.sources) {
+        pickerSourceLoading.classList.remove('drc-hidden');
+        pickerSourceEmpty.classList.add('drc-hidden');
+        try {
+          picker.sources = await api('GET', imageCropApiBase);
+        } catch (e) {
+          pickerSourceLoading.textContent = 'Không tải được danh sách ảnh: ' + e.message;
+          return;
+        }
+        pickerSourceLoading.classList.add('drc-hidden');
+      }
+      renderPickerSources();
+    }
+
+    closePicker = function () {
+      picker.open = false;
+      pickerModal.classList.add('drc-hidden');
+      document.body.style.overflow = editor.open ? 'hidden' : '';
+    };
+
+    function renderPickerSources() {
+      const q = pickerSearch.value.trim().toLowerCase();
+      const list = (picker.sources || []).filter((s) => !q || s.name.toLowerCase().includes(q));
+      pickerSourceList.innerHTML = '';
+      pickerSourceEmpty.classList.toggle('drc-hidden', list.length !== 0 || !picker.sources);
+
+      list.forEach((source) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'dsm-picker-source-item' + (source.id === picker.activeSourceId ? ' is-active' : '');
+
+        const thumb = document.createElement('span');
+        thumb.className = 'dsm-picker-source-item__thumb';
+        if (source.thumb_url) {
+          const img = document.createElement('img');
+          img.src = source.thumb_url;
+          img.alt = '';
+          thumb.appendChild(img);
+        }
+
+        const name = document.createElement('span');
+        name.className = 'dsm-picker-source-item__name';
+        name.textContent = source.name;
+
+        const count = document.createElement('span');
+        count.className = 'dsm-picker-source-item__count';
+        count.textContent = String(source.regions_count);
+
+        item.appendChild(thumb);
+        item.appendChild(name);
+        item.appendChild(count);
+        item.addEventListener('click', () => selectPickerSource(source));
+        pickerSourceList.appendChild(item);
+      });
+    }
+
+    async function selectPickerSource(source) {
+      picker.activeSourceId = source.id;
+      picker.currentRegions = [];
+      renderPickerSources();
+      pickerRegionsToolbar.classList.add('drc-hidden');
+      pickerRegionsHint.classList.remove('drc-hidden');
+      pickerRegionsHint.textContent = 'Đang tải "Ảnh đã lưu"…';
+      pickerRegionGrid.innerHTML = '';
+      pickerRegionEls = new Map();
+
+      let regions = picker.regionsCache.get(source.id);
+      if (!regions) {
+        try {
+          const detail = await api('GET', imageCropApiBase + '/' + source.id);
+          regions = detail.regions;
+          picker.regionsCache.set(source.id, regions);
+        } catch (e) {
+          pickerRegionsHint.textContent = 'Không tải được ảnh: ' + e.message;
+          return;
+        }
+      }
+      if (picker.activeSourceId !== source.id) return; // đã chuyển sang ảnh khác trong lúc chờ tải
+
+      if (!regions.length) {
+        pickerRegionsHint.textContent = 'Ảnh gốc này chưa có "Ảnh đã lưu" nào.';
+        return;
+      }
+      picker.currentRegions = regions;
+      pickerRegionsHint.classList.add('drc-hidden');
+      pickerRegionsToolbar.classList.remove('drc-hidden');
+      renderPickerRegions(regions);
+      updateSelectAllBtn();
+    }
+
+    function renderPickerRegions(regions) {
+      pickerRegionGrid.innerHTML = '';
+      pickerRegionEls = new Map();
+
+      regions.forEach((region) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'dsm-picker-region-item';
+
+        const img = document.createElement('img');
+        img.src = region.url;
+        img.alt = region.label || '';
+        item.appendChild(img);
+
+        const check = document.createElement('span');
+        check.className = 'dsm-picker-region-item__check';
+        item.appendChild(check);
+
+        if (region.label) {
+          const label = document.createElement('span');
+          label.className = 'dsm-picker-region-item__label';
+          label.textContent = region.label;
+          item.appendChild(label);
+        }
+
+        item.addEventListener('click', () => {
+          if (picker.selected.has(region.id)) picker.selected.delete(region.id);
+          else picker.selected.set(region.id, region);
+          updateSelectionBadges();
+          updatePickerAddBtn();
+          updateSelectAllBtn();
+        });
+
+        pickerRegionEls.set(region.id, item);
+        pickerRegionGrid.appendChild(item);
+      });
+
+      updateSelectionBadges();
+    }
+
+    // Đánh lại số thứ tự trên góc mỗi ảnh theo đúng thứ tự đã bấm chọn
+    // (Map giữ thứ tự chèn) — chạy lại sau mỗi lần chọn/bỏ chọn.
+    function updateSelectionBadges() {
+      const order = Array.from(picker.selected.keys());
+      pickerRegionEls.forEach((item, regionId) => {
+        const idx = order.indexOf(regionId);
+        const selected = idx !== -1;
+        item.classList.toggle('is-selected', selected);
+        const check = item.querySelector('.dsm-picker-region-item__check');
+        if (check) check.textContent = selected ? String(idx + 1) : '';
+      });
+    }
+
+    function updateSelectAllBtn() {
+      if (!picker.currentRegions.length) {
+        pickerSelectAllBtn.disabled = true;
+        pickerSelectAllBtn.textContent = 'Chọn tất cả';
+        return;
+      }
+      const allSelected = picker.currentRegions.every((r) => picker.selected.has(r.id));
+      pickerSelectAllBtn.disabled = false;
+      pickerSelectAllBtn.textContent = allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả (' + picker.currentRegions.length + ')';
+    }
+
+    function updatePickerAddBtn() {
+      const n = picker.selected.size;
+      pickerAddBtn.disabled = n === 0;
+      pickerAddBtn.textContent = n ? 'Thêm ' + n + ' ảnh đã chọn' : 'Thêm ảnh đã chọn';
+    }
+
+    pickBtn.addEventListener('click', openPicker);
+    pickerSearch.addEventListener('input', renderPickerSources);
+    pickerModal.querySelectorAll('[data-dsmp="close"]').forEach((btn) => btn.addEventListener('click', closePicker));
+
+    pickerSelectAllBtn.addEventListener('click', () => {
+      const allSelected = picker.currentRegions.length > 0 && picker.currentRegions.every((r) => picker.selected.has(r.id));
+      if (allSelected) {
+        picker.currentRegions.forEach((r) => picker.selected.delete(r.id));
+      } else {
+        // Thêm theo đúng thứ tự hiển thị trong grid, bỏ qua ảnh đã chọn từ trước.
+        picker.currentRegions.forEach((r) => { if (!picker.selected.has(r.id)) picker.selected.set(r.id, r); });
+      }
+      updateSelectionBadges();
+      updatePickerAddBtn();
+      updateSelectAllBtn();
+    });
+
+    pickerAddBtn.addEventListener('click', async () => {
+      if (!picker.selected.size) return;
+      const regions = Array.from(picker.selected.values());
+      const room = MAX_FRAMES - editor.frames.length;
+      if (room <= 0) {
+        toast('Tối đa ' + MAX_FRAMES + ' frame mỗi vịt.', true);
+        return;
+      }
+      const toAdd = regions.slice(0, room);
+      if (toAdd.length < regions.length) {
+        toast('Chỉ thêm được ' + toAdd.length + ' ảnh nữa (tối đa ' + MAX_FRAMES + ').', true);
+      }
+
+      pickerAddBtn.disabled = true;
+      pickerStatus.textContent = 'Đang tải ảnh đã chọn…';
+      try {
+        const wasEmpty = editor.frames.length === 0;
+        for (const region of toAdd) {
+          const file = await urlToFile(region.url, region.label);
+          editor.frames.push({ uid: ++uidSeq, id: null, url: URL.createObjectURL(file), file });
+        }
+        if (wasEmpty) editor.idx = 0;
+        renderFrames();
+        syncPlayer();
+        setStatus('Đã thêm ' + toAdd.length + ' frame từ ảnh đã cắt sẵn.');
+        closePicker();
+      } catch (e) {
+        pickerStatus.textContent = e.message;
+      } finally {
+        pickerAddBtn.disabled = picker.selected.size === 0;
+      }
+    });
+  }
 
   // ===== Animation loop chung (grid + editor preview) =====
 

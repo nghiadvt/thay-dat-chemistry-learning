@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\PlayMode;
 use App\Support\DuckRaceAssets;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -54,6 +55,33 @@ class GameController extends Controller
         return view('admin.games.dragon-demo');
     }
 
+    /**
+     * Danh sách quiz của một game cho modal thao tác nhanh ở trang danh sách game
+     * (xóa quiz / chuyển quiz sang game khác để gỡ quiz khỏi game).
+     */
+    public function quizPanel(Game $game): JsonResponse
+    {
+        $quizzes = $game->quizzes()
+            ->withCount('questions')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        $otherGames = Game::query()
+            ->whereKeyNot($game->id)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json([
+            'count' => $quizzes->count(),
+            'html' => view('admin.games._quiz-panel', [
+                'game' => $game,
+                'quizzes' => $quizzes,
+                'otherGames' => $otherGames,
+            ])->render(),
+        ]);
+    }
+
     public function create(): View
     {
         return view('admin.games.form', [
@@ -97,6 +125,12 @@ class GameController extends Controller
     {
         if ($game->quizzes()->exists()) {
             return back()->with('error', 'Không thể xóa game còn quiz. Xóa hoặc chuyển quiz trước.');
+        }
+
+        // Phòng đã kết thúc là lịch sử — được giữ lại kèm snapshot tên game (xem Game::booted).
+        // Chỉ chặn khi còn phòng đang chờ / đang chơi.
+        if ($game->sessions()->where('status', '!=', 'ended')->exists()) {
+            return back()->with('error', 'Không thể xóa game khi còn phòng đang chờ hoặc đang chơi. Kết thúc các phòng đó trước.');
         }
 
         $game->delete();

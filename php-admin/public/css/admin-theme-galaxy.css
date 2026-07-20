@@ -169,12 +169,7 @@ html[data-theme="galaxy"] .admin-nav a.active::after {
 }
 
 /* ── Topbar ── */
-html[data-theme="galaxy"] .admin-topbar {
-  background: rgba(12, 5, 36, 0.82);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--gal-line);
-}
-html[data-theme="galaxy"] .admin-topbar-left h2 {
+html[data-theme="galaxy"] .admin-page-title {
   background: linear-gradient(90deg, #f5f1ff, #c4b5fd 60%, #f9a8d4);
   -webkit-background-clip: text;
   background-clip: text;

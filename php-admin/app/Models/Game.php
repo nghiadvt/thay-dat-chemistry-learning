@@ -24,6 +24,19 @@ class Game extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Xóa game: chụp lại tên + id game vào các phòng chơi cũ rồi gỡ FK,
+        // để lịch sử phòng chơi giữ nguyên và vẫn biết từng chạy game nào.
+        static::deleting(function (self $game): void {
+            $game->sessions()->update([
+                'deleted_game_id' => $game->id,
+                'deleted_game_name' => $game->name,
+                'game_id' => null,
+            ]);
+        });
+    }
+
     public function playMode(): BelongsTo
     {
         return $this->belongsTo(PlayMode::class);

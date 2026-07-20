@@ -26,7 +26,7 @@ window.ADMIN_BOOT = {
         pin: @json($session->pin),
         roomName: @json($session->name ?? 'Phòng '.$session->pin),
         quizName: @json($session->quiz?->name),
-        gameName: @json($session->game?->name),
+        gameName: @json($session->gameName()),
         playModeSlug: @json($session->play_mode_slug ?? $session->game?->playMode?->slug ?? 'kahoot_sync'),
         modeConfig: @json($session->mode_config ?? $session->game?->resolvedModeConfig() ?? []),
         gameId: {{ (int) $session->game_id }},

@@ -64,6 +64,15 @@ class GameController extends Controller
             );
         }
 
+        // Chỉ chặn phòng đang chờ / đang chơi; phòng đã kết thúc giữ lại làm
+        // lịch sử kèm snapshot tên game (xem Game::booted).
+        if ($game->sessions()->where('status', '!=', 'ended')->exists()) {
+            return $this->jsonError(
+                'Không thể xóa game khi còn phòng đang chờ hoặc đang chơi. Kết thúc các phòng đó trước.',
+                409
+            );
+        }
+
         $game->delete();
 
         return $this->jsonSuccess(['deleted' => true]);

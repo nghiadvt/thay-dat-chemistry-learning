@@ -10,6 +10,46 @@ use Illuminate\Support\Str;
 
 class ImageCropSourceController extends Controller
 {
+    /**
+     * Danh sách ảnh gốc đã cắt — dùng cho các picker chọn ảnh có sẵn
+     * (VD: chọn frame vịt chuyển động từ ảnh đã cắt trong image-cropper).
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $search = trim((string) $request->input('q', ''));
+
+        $sources = ImageCropSource::query()
+            ->withCount('regions')
+            ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'))
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return $this->jsonSuccess(
+            $sources->map(fn (ImageCropSource $s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'thumb_url' => $s->preview_url ?? $s->image_url,
+                'regions_count' => $s->regions_count,
+            ])->values(),
+        );
+    }
+
+    /**
+     * Chi tiết 1 ảnh gốc kèm toàn bộ vùng đã cắt ("Ảnh đã lưu").
+     */
+    public function show(ImageCropSource $source): JsonResponse
+    {
+        return $this->jsonSuccess([
+            'id' => $source->id,
+            'name' => $source->name,
+            'regions' => $source->regions()->get()->map(fn ($region) => [
+                'id' => $region->id,
+                'label' => $region->label,
+                'url' => $region->cropped_url,
+            ])->values(),
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([

@@ -67,6 +67,15 @@ class GameSession extends Model
         return $this->belongsTo(Game::class);
     }
 
+    /**
+     * Tên game để hiển thị — ưu tiên game đang liên kết, nếu game đã bị xóa
+     * thì dùng snapshot đã chụp lúc xóa (deleted_game_name).
+     */
+    public function gameName(): ?string
+    {
+        return $this->game?->name ?? $this->deleted_game_name;
+    }
+
     public function group(): BelongsTo
     {
         return $this->belongsTo(Group::class);
@@ -74,7 +83,8 @@ class GameSession extends Model
 
     public function quiz(): BelongsTo
     {
-        return $this->belongsTo(Quiz::class);
+        // Lịch sử phòng chơi vẫn cần hiện tên quiz kể cả khi quiz đã xóa mềm.
+        return $this->belongsTo(Quiz::class)->withTrashed();
     }
 
     public function results(): HasMany

@@ -37,7 +37,7 @@ class RoomController extends Controller
             'pin' => $pin,
             'status' => $status,
             'game_id' => $gameId,
-            'game_name' => $session->game?->name,
+            'game_name' => $session->gameName(),
             'quiz_id' => $session->quiz_id,
             'quiz_name' => $session->quiz?->name,
             'session_id' => $session->id,

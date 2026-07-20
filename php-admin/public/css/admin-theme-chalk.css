@@ -164,12 +164,7 @@ html[data-theme="chalk"] .admin-nav a.active {
 }
 
 /* ── Topbar: mép bảng + khay phấn ── */
-html[data-theme="chalk"] .admin-topbar {
-  background: rgba(12, 36, 28, 0.82);
-  border-bottom: 6px solid;
-  border-image: linear-gradient(90deg, var(--ch-wood-1), #6d4522, var(--ch-wood-1)) 1;
-}
-html[data-theme="chalk"] .admin-topbar-left h2 {
+html[data-theme="chalk"] .admin-page-title {
   color: var(--ch-chalk);
   text-decoration: underline wavy rgba(255, 233, 168, 0.7) 2px;
   text-underline-offset: 7px;

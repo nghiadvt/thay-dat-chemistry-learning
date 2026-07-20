@@ -180,7 +180,7 @@
                 </div>
             </div>
 
-            <div class="drc-section dsm" id="duckSpriteManager" data-api-base="/api/duck-sprites">
+            <div class="drc-section dsm" id="duckSpriteManager" data-api-base="/api/duck-sprites" data-image-crop-api="/api/image-crop-sources">
                 <div class="dsm-head">
                     <div class="dsm-head__text">
                         <h4>🦆 Vịt chuyển động (frame animation)</h4>
@@ -250,6 +250,8 @@
                         <strong>📂 Kéo thả 8–10 ảnh frame vào đây</strong>
                         <span>hoặc bấm để chọn nhiều ảnh cùng lúc — tự xếp thứ tự theo tên file (frame-1, frame-2…)</span>
                     </div>
+                    <div class="dsm-source-sep"><span>hoặc</span></div>
+                    <button type="button" class="btn btn-secondary btn-sm dsm-pick-btn" data-dsm="pick-cropped">🖼️ Chọn từ ảnh đã cắt sẵn (image-cropper)</button>
                     <div class="dsm-frames" data-dsm="frames"></div>
                     <p class="dsm-frames-hint">💡 Kéo thả thumbnail để đổi thứ tự, hoặc sửa số trên góc ảnh. Bấm ảnh để xem frame đó. Tối đa 20 frame.</p>
                 </div>
@@ -259,6 +261,38 @@
             <span class="dsm-modal__status" data-dsm="status"></span>
             <button type="button" class="btn btn-secondary" data-dsm="close">Hủy</button>
             <button type="button" class="btn btn-primary" data-dsm="save">💾 Lưu vịt</button>
+        </div>
+    </div>
+</div>
+
+{{-- Modal chọn ảnh có sẵn từ image-cropper để làm frame vịt --}}
+<div class="dsm-picker-modal drc-hidden" id="dsmPickerModal" role="dialog" aria-modal="true" aria-labelledby="dsmPickerModalTitle">
+    <div class="dsm-modal__backdrop" data-dsmp="close"></div>
+    <div class="dsm-picker-modal__panel">
+        <div class="dsm-modal__head">
+            <h3 id="dsmPickerModalTitle">Chọn ảnh đã cắt sẵn</h3>
+            <button type="button" class="dsm-modal__x" data-dsmp="close" aria-label="Đóng">✕</button>
+        </div>
+        <div class="dsm-picker-modal__body">
+            <div class="dsm-picker-modal__sources">
+                <input type="text" class="dsm-picker-search" data-dsmp="search" placeholder="Tìm ảnh gốc theo tên…" autocomplete="off">
+                <div class="dsm-picker-source-list" data-dsmp="source-list"></div>
+                <p class="dsm-picker-loading" data-dsmp="source-loading">Đang tải danh sách ảnh…</p>
+                <p class="dsm-picker-empty drc-hidden" data-dsmp="source-empty">Không có ảnh nào phù hợp.</p>
+            </div>
+            <div class="dsm-picker-modal__regions">
+                <div class="dsm-picker-regions-toolbar drc-hidden" data-dsmp="regions-toolbar">
+                    <span class="dsm-picker-regions-toolbar__hint">Bấm ảnh theo đúng thứ tự bạn muốn — số trên góc ảnh là thứ tự sẽ thêm.</span>
+                    <button type="button" class="btn btn-secondary btn-sm" data-dsmp="select-all">Chọn tất cả</button>
+                </div>
+                <p class="dsm-picker-hint" data-dsmp="regions-hint">← Chọn 1 ảnh gốc bên trái để xem "Ảnh đã lưu".</p>
+                <div class="dsm-picker-region-grid" data-dsmp="region-grid"></div>
+            </div>
+        </div>
+        <div class="dsm-modal__foot">
+            <span class="dsm-modal__status" data-dsmp="status"></span>
+            <button type="button" class="btn btn-secondary" data-dsmp="close">Hủy</button>
+            <button type="button" class="btn btn-primary" data-dsmp="add" disabled>Thêm ảnh đã chọn</button>
         </div>
     </div>
 </div>

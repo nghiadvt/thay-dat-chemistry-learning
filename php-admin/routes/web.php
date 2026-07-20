@@ -139,12 +139,14 @@ Route::middleware('auth')->group(function () {
         Route::get('games/battle-arena-demo', [AdminGameController::class, 'battleDemo'])->name('games.battle-demo');
         Route::get('games/dragon-hunt-demo', [AdminGameController::class, 'dragonDemo'])->name('games.dragon-demo');
         Route::resource('games', AdminGameController::class)->except(['show']);
+        Route::get('games/{game}/quiz-panel', [AdminGameController::class, 'quizPanel'])->name('games.quiz-panel');
         Route::get('quizzes/group-rows', [AdminQuizController::class, 'groupRows'])->name('quizzes.group-rows');
         Route::get('quizzes/export-csv', [AdminQuizController::class, 'exportCsv'])->name('quizzes.export-csv');
         Route::get('quizzes/import-template', [AdminQuizController::class, 'importTemplate'])->name('quizzes.import-template');
         Route::post('quizzes/import-csv', [AdminQuizController::class, 'importCsv'])->name('quizzes.import-csv');
         Route::resource('quizzes', AdminQuizController::class);
         Route::patch('quizzes/{quiz}/active', [AdminQuizController::class, 'toggleActive'])->name('quizzes.toggle-active');
+        Route::patch('quizzes/{quiz}/move-game', [AdminQuizController::class, 'moveGame'])->name('quizzes.move-game');
 
         Route::get('question-bank/group-rows', [AdminQuestionBankController::class, 'groupRows'])->name('question-bank.group-rows');
         Route::get('question-bank/export-csv', [AdminQuestionBankController::class, 'exportCsv'])->name('question-bank.export-csv');
@@ -252,6 +254,8 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('quizzes', QuizController::class);
 
         Route::post('question-content-images', [QuestionImageController::class, 'store'])->name('question-images.store');
+        Route::get('image-crop-sources', [ImageCropSourceController::class, 'index'])->name('image-crop-sources.index');
+        Route::get('image-crop-sources/{source}', [ImageCropSourceController::class, 'show'])->name('image-crop-sources.show');
         Route::post('image-crop-sources', [ImageCropSourceController::class, 'store'])->name('image-crop-sources.store');
         Route::post('image-crop-sources/{source}/regions', [ImageCropRegionController::class, 'sync'])->name('image-crop-sources.regions.sync');
         Route::delete('image-crop-sources/{source}/regions/{region}', [ImageCropRegionController::class, 'destroy'])->name('image-crop-sources.regions.destroy');
