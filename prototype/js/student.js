@@ -245,6 +245,7 @@ const HOME_FEATURE_LABELS = {
 
 function goStudentHome() {
   stopQrScanner();
+  if (window.ElementsModule) ElementsModule.exitLandscape();
   window.location.href = '/home';
 }
 

@@ -97,6 +97,23 @@
 .st-swatch--arcade { background: linear-gradient(135deg, #0d0e21, #ffd54a); }
 .st-swatch--chalk { background: linear-gradient(135deg, #24443a, #f2f7f0); }
 
+/* ── Home hub: các theme nền tối vẫn cần trời + tiêu đề trắng ─── */
+html[data-student-theme] .home-screen { background: transparent; }
+html[data-student-theme] .home-bg-pattern {
+  opacity: 0.35;
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 85% 15%, rgba(255,255,255,0.45) 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 80%, rgba(255,255,255,0.35) 0 2px, transparent 3px);
+  background-size: 110px 110px;
+}
+html[data-student-theme] .home-title span {
+  color: #fff;
+  -webkit-text-stroke: 0;
+  text-shadow: 0 2px 0 rgba(38,35,92,0.35), 0 5px 0 rgba(38,35,92,0.18), 0 10px 22px rgba(38,35,92,0.35);
+}
+html[data-student-theme] .home-subtitle { color: rgba(255,255,255,0.82); }
+
 /* ═══════════════ 🧪 LAB — phòng thí nghiệm neon ═══════════════ */
 html[data-student-theme="lab"] {
   --sky-top: #071826;

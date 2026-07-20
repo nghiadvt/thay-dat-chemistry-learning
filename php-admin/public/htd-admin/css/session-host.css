@@ -1799,7 +1799,8 @@ body.teacher-resizing .teacher-main-resizer-grip {
 .teacher-podium-modal .teacher-final-podium-stage {
   width: 100%;
   max-width: none;
-  margin: 0;
+  /* margin: 16px 0 0; */
+  padding-top: 20vh;
   overflow: visible;
   aspect-ratio: auto;
   line-height: normal;
@@ -1821,7 +1822,7 @@ body.teacher-resizing .teacher-main-resizer-grip {
 
 .teacher-podium-modal .teacher-final-podium-slot.slot-1 {
   left: 50%;
-  bottom: 36%;
+  bottom: 48%;
 }
 
 .teacher-podium-modal .teacher-final-podium-slot.slot-2 {
@@ -1830,8 +1831,8 @@ body.teacher-resizing .teacher-main-resizer-grip {
 }
 
 .teacher-podium-modal .teacher-final-podium-slot.slot-3 {
-  left: 82%;
-  bottom: 20%;
+  left: 85%;
+  bottom: 26%;
 }
 
 .teacher-podium-modal .teacher-final-podium-figure {

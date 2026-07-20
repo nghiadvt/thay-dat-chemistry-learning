@@ -60,6 +60,7 @@
   <symbol id="i-medal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l2 6H6l2-6z"/><path d="M12 2l-1.5 6M12 2l1.5 6"/><circle cx="12" cy="14.5" r="5.5"/></symbol>
   <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM21 14v1M14 21h1M18 18h3v3h-3z"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 4.5v15a1 1 0 0 0 1.54.84l11.2-7.5a1 1 0 0 0 0-1.68L8.54 3.66A1 1 0 0 0 7 4.5z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
 </svg>
 
 <div id="app">
@@ -69,8 +70,11 @@
     <div class="home-bg-pattern"></div>
     <div class="home-account-slot" id="homeAccountChip"></div>
     <div class="home-inner">
-      <img src="assets/logo.png" alt="Hóa Thầy Đạt" class="home-logo">
-      <h1 class="home-title">Hóa Thầy Đạt</h1>
+      <h1 class="home-title"><span class="tt-a">Hóa học</span><br><span class="tt-b">không quạo</span></h1>
+      <p class="home-subtitle">Học vui – Hiểu chất – Không căng nào!</p>
+      <div class="home-hero">
+        <img src="assets/hoa-hoc-khong-quao.png" alt="" class="home-hero-img" aria-hidden="true">
+      </div>
       <div id="homeProBanner" hidden></div>
       <nav class="home-menu" aria-label="Chức năng học sinh">
         <button type="button" class="home-menu-item hm-play" onclick="openHomeFeature('play')">
@@ -78,7 +82,7 @@
           <span class="home-menu-label">Chơi game</span>
         </button>
         <button type="button" class="home-menu-item hm-elements" onclick="openHomeFeature('elements')">
-          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-speaker"/></svg></span>
+          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-book"/></svg></span>
           <span class="home-menu-label">Đọc nguyên tố</span>
         </button>
         <button type="button" class="home-menu-item hm-balance" onclick="openHomeFeature('balance')">
@@ -86,7 +90,7 @@
           <span class="home-menu-label">Cân bằng phương trình</span>
         </button>
         <button type="button" class="home-menu-item hm-quiz" onclick="openHomeFeature('quiz')">
-          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-book"/></svg></span>
+          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-trophy"/></svg></span>
           <span class="home-menu-label">Ôn trắc nghiệm</span>
         </button>
       </nav>
@@ -383,12 +387,23 @@
       </button>
     </div>
     <div class="el-toolbar">
-      <div class="el-filters" id="elFilters">
-        <button type="button" class="el-filter is-on" data-filter="all">Tất cả</button>
-        <button type="button" class="el-filter" data-filter="priority">⬤ Trọng tâm</button>
-        <button type="button" class="el-filter" data-filter="unlearned">Chưa thuộc</button>
-      </div>
+      <select class="el-filter-select" id="elFilterSelect" aria-label="Lọc nguyên tố">
+        <option value="all">Tất cả</option>
+        <option value="priority">⬤ Trọng tâm</option>
+        <option value="unlearned">Chưa thuộc</option>
+      </select>
       <p class="el-progress" id="elProgress"></p>
+    </div>
+    <!-- Màn ngang: loa/luyện tập/filter dồn vào menu trượt từ phải, chỉ hiện
+         nút mở menu + lớp phủ xám ở màn dọc/ngang tùy trạng thái (xem elements.css). -->
+    <button type="button" class="el-menu-fab" id="elMenuFab" aria-label="Mở menu chức năng">
+      <svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg>
+    </button>
+    <div class="el-menu-overlay" id="elMenuOverlay"></div>
+    <div class="el-menu-panel" id="elMenuPanel">
+      <button type="button" class="el-menu-close" id="elMenuClose" aria-label="Thu nhỏ menu">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
     </div>
     <div class="el-table-wrap" id="elTableWrap">
       <div class="el-table-scroll" id="elTableScroll">

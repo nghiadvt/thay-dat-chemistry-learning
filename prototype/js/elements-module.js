@@ -86,6 +86,8 @@ window.ElementsModule = (function () {
   /* ── Vào màn: dựng bảng + legend ────────────────────────────── */
   function enter() {
     closeDetail();
+    closeMenu();
+    lockLandscape();
     maybeShowRotateGate();
     if (built) return;
     built = true;
@@ -93,6 +95,41 @@ window.ElementsModule = (function () {
     buildTable();
     bindToolbar();
     applyFilter();
+  }
+
+  /* ── Menu trượt màn ngang: loa/luyện tập/filter dồn vào đây ────────
+   * Đóng/mở qua class trên <body> (không phải trên .elements-screen) vì
+   * #soundToggle nằm ngoài #app, cần chung 1 "cờ" để CSS đưa nó vào đúng
+   * chỗ trong menu. Luôn đóng menu khi rời màn hoặc vào lại màn (enter()),
+   * tránh kẹt trạng thái mở khi chuyển màn/xoay lại portrait. */
+  function openMenu() { document.body.classList.add('el-menu-open'); }
+  function closeMenu() { document.body.classList.remove('el-menu-open'); }
+  function toggleMenu() { document.body.classList.toggle('el-menu-open'); }
+
+  /* ── Tự xoay ngang khi vào màn, tự hết khi thoát ──────────────────
+   * screen.orientation.lock() chỉ hoạt động khi tài liệu đang fullscreen
+   * (trừ PWA cài đặt ở chế độ standalone) và KHÔNG được hỗ trợ trên iOS
+   * Safari — nên luôn bọc try/catch, coi rotate gate (toast mời xoay tay)
+   * là phương án dự phòng khi trình duyệt không cho tự xoay. */
+  function lockLandscape() {
+    if (!window.screen || !screen.orientation || !screen.orientation.lock) return;
+    var root = document.documentElement;
+    var goFullscreen = (!document.fullscreenElement && root.requestFullscreen)
+      ? root.requestFullscreen().catch(function () {})
+      : Promise.resolve();
+    goFullscreen.then(function () {
+      screen.orientation.lock('landscape').catch(function () {});
+    });
+  }
+
+  function exitLandscape() {
+    closeMenu();
+    if (window.screen && screen.orientation && screen.orientation.unlock) {
+      try { screen.orientation.unlock(); } catch (e) {}
+    }
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(function () {});
+    }
   }
 
   /* ── Bảng tuần hoàn đầy đủ ──────────────────────────────────────
@@ -183,16 +220,21 @@ window.ElementsModule = (function () {
 
   /* ── Toolbar: lọc ────────────────────────────────────────────── */
   function bindToolbar() {
-    document.querySelectorAll('.el-filter').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        filter = btn.dataset.filter;
-        document.querySelectorAll('.el-filter').forEach(function (b) {
-          b.classList.toggle('is-on', b === btn);
-        });
+    var select = document.getElementById('elFilterSelect');
+    if (select) {
+      select.addEventListener('change', function () {
+        filter = select.value;
         sfxLocal('tap');
         applyFilter();
       });
-    });
+    }
+    var fab = document.getElementById('elMenuFab');
+    if (fab) fab.addEventListener('click', function () { sfxLocal('tap'); toggleMenu(); });
+    var overlay = document.getElementById('elMenuOverlay');
+    if (overlay) overlay.addEventListener('click', closeMenu);
+    var closeBtn = document.getElementById('elMenuClose');
+    if (closeBtn) closeBtn.addEventListener('click', function () { sfxLocal('tap'); closeMenu(); });
+
     var dismiss = document.getElementById('elRotateDismiss');
     if (dismiss) {
       dismiss.addEventListener('click', function () {
@@ -262,6 +304,7 @@ window.ElementsModule = (function () {
             '<span class="el-card-z">' + el.z + '</span>' +
             '<span class="el-card-symbol">' + el.symbol + '</span>' +
             '<span class="el-card-mass">' + el.mass + '</span>' +
+            '<span class="el-card-cat-chip el-card-cat-chip-front">' + cat.label + '</span>' +
             '<span class="el-card-hint">Chạm để lật thẻ ↻</span>' +
           '</div>' +
           '<div class="el-card-face el-card-back">' +
@@ -485,5 +528,6 @@ window.ElementsModule = (function () {
     closeDetail: closeDetail,
     startPractice: startPractice,
     exitPractice: exitPractice,
+    exitLandscape: exitLandscape,
   };
 })();

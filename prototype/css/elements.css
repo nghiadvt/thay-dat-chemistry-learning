@@ -115,27 +115,20 @@
   padding: 0 14px 8px;
   flex-shrink: 0;
 }
-.el-filters {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.el-filter {
+.el-filter-select {
+  appearance: none;
+  -webkit-appearance: none;
   border: 2px solid rgba(255,255,255,0.4);
-  background: rgba(255,255,255,0.12);
-  color: #fff;
-  font-size: 11.5px;
+  background: rgba(255,255,255,0.95) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2326235C'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%2326235C' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  background-size: 14px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
   font-weight: 800;
-  padding: 6px 12px;
+  padding: 8px 30px 8px 14px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.el-filter.is-on {
-  background: rgba(255,255,255,0.95);
-  border-color: rgba(255,255,255,0.95);
-  color: var(--ink);
+  max-width: 100%;
 }
 .el-progress {
   font-size: 11.5px;
@@ -398,32 +391,180 @@ button.el-pt-cell:active { transform: scale(0.94); }
   .el-rotate-gate { animation: none; }
 }
 
-/* Màn ngang: đã đủ rộng để nhét cả 18 cột, nên co theo CẢ bề ngang lẫn bề
- * cao (không cuộn) — trái với màn dọc (chỉ co theo chiều cao rồi cuộn ngang,
- * xem .el-table ở trên). Đây là hướng dùng chính của màn này (có gate mời
- * xoay ngang), nên phải thấy trọn bảng trong 1 màn hình. */
+/* Màn ngang: bảng tuần hoàn chiếm TRỌN màn hình — cả bề ngang lẫn chiều cao,
+ * thoát hẳn khung #app (max-width:480px) bằng position:fixed;inset:0 nên
+ * không bị cắt bớt bởi khung app nữa. Ưu tiên số 1 là thấy trọn 118 ô, không
+ * cuộn dọc lẫn ngang. Chỉ 2 thứ luôn nổi trên bảng: quay lại + 1 icon menu
+ * (☰) — bấm icon mới mở menu trượt từ mép phải chứa loa/luyện tập/filter,
+ * kèm lớp phủ xám mờ đè lên bảng (chặn tay chạm bảng + bấm ra ngoài để tự
+ * đóng); trong menu có thêm 1 nút thu nhỏ (✕) đóng menu tương đương. */
+.el-menu-fab,
+.el-menu-overlay,
+.el-menu-panel,
+.el-menu-close { display: none; }
+
 @media (orientation: landscape) {
-  .el-table {
-    --el-cell: min(
-      calc((min(100vw, 480px) - 40px - 20px - 19 * var(--el-gap)) / 18),
-      calc((100vh - 122px) / 9.8)
-    );
+  .el-table-wrap {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    border-radius: 0;
+    z-index: 1;
   }
-}
-/* Màn ngang thấp (điện thoại): header/toolbar co lại hết mức để nhường thêm
- * chiều cao cho bảng — hụt bớt 122px xuống 72px nên phải hạ lại mốc trừ. */
-@media (orientation: landscape) and (max-height: 560px) {
-  .el-header { padding-top: 4px; padding-bottom: 2px; gap: 8px; }
-  .el-back { width: 34px; height: 34px; }
-  .el-title { font-size: 15px; }
-  .el-practice-btn { font-size: 12px; padding: 7px 12px; }
-  .el-toolbar { flex-direction: row; align-items: center; gap: 10px; padding-bottom: 4px; }
-  .el-filter { font-size: 10.5px; padding: 4px 10px; }
-  .el-progress { margin-left: auto; }
+  .el-title,
+  .el-progress { display: none; }
+
+  /* .el-header/.el-toolbar giờ rỗng (con đã tách ra fixed riêng) nhưng vẫn
+   * còn hộp padding vô hình nằm trong luồng bình thường của #app (bị giới
+   * hạn 480px, không phải full-viewport như bảng) — tắt pointer-events để
+   * khỏi lỡ chặn tay chạm vào ô bảng nằm đè phía dưới, rồi bật lại ở từng
+   * nút con vì pointer-events là thuộc tính kế thừa. */
+  .el-header,
+  .el-toolbar { pointer-events: none; padding: 0; }
+
+  .el-back {
+    position: fixed;
+    pointer-events: auto;
+    z-index: 22;
+    top: calc(10px + env(safe-area-inset-top));
+    right: 10px;
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Nút mở menu: gộp cả loa/luyện tập/filter thành 1 icon, bấm mới hiện —
+   * chỉ còn 2 thứ luôn nổi trên bảng: quay lại + icon menu này. */
+  .el-menu-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    pointer-events: auto;
+    z-index: 22;
+    top: calc(54px + env(safe-area-inset-top));
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.92);
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 0 4px 0 rgba(38,35,92,0.22);
+  }
+  .el-menu-fab .icon { width: 18px; height: 18px; }
+  .el-menu-fab:active { transform: translateY(2px); }
+
+  /* Lớp phủ xám mờ đè lên bảng khi menu mở — chỉ để chặn tay chạm ô bảng
+   * và bấm ra ngoài (bất kỳ đâu trên lớp phủ) để tự đóng menu. */
+  .el-menu-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    background: rgba(10,8,30,0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+  }
+  body.el-menu-open .el-menu-overlay { opacity: 1; pointer-events: auto; }
+
+  /* Panel chỉ là nền trang trí dính mép phải, trượt vào/ra cùng lúc với
+   * loa/luyện tập/filter — 4 thứ đó KHÔNG nằm trong panel này về mặt DOM
+   * (loa ở ngoài #app, luyện tập/filter vẫn ở header/toolbar cũ để màn dọc
+   * không bị ảnh hưởng) nên phải chỉnh top/right khớp tay để trông như 1
+   * khối, và dùng chung transition/thời lượng trượt để đồng bộ. */
+  .el-menu-panel {
+    display: block;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 180px;
+    z-index: 18;
+    background: rgba(20,16,50,0.94);
+    box-shadow: -6px 0 28px rgba(0,0,0,0.4);
+    border-radius: 18px 0 0 18px;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.34, 0.94, 0.4, 1);
+  }
+  body.el-menu-open .el-menu-panel { transform: translateX(0); }
+
+  .el-menu-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    pointer-events: auto;
+    z-index: 20;
+    top: calc(16px + env(safe-area-inset-top));
+    right: 24px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    cursor: pointer;
+    transform: translateX(160%);
+    transition: transform 0.3s cubic-bezier(0.34, 0.94, 0.4, 1);
+  }
+  .el-menu-close .icon { width: 15px; height: 15px; }
+  body.el-menu-open .el-menu-close { transform: translateX(0); }
+
+  /* Loa vốn fixed sẵn ở góc phải-trên toàn app (shared.css) — khi đang ở
+   * màn bảng tuần hoàn dạng ngang thì kéo nó vào đúng vị trí trong panel
+   * luôn, đỡ phải làm nút loa riêng rồi tự đồng bộ trạng thái mute/icon. */
+  body:has(.elements-screen.active) #soundToggle {
+    top: calc(64px + env(safe-area-inset-top));
+    right: 20px;
+    z-index: 20;
+    transform: translateX(160%);
+    transition: transform 0.3s cubic-bezier(0.34, 0.94, 0.4, 1);
+  }
+  body.el-menu-open:has(.elements-screen.active) #soundToggle {
+    transform: translateX(0);
+  }
+
+  .el-practice-btn {
+    position: fixed;
+    pointer-events: auto;
+    z-index: 20;
+    top: calc(120px + env(safe-area-inset-top));
+    right: 20px;
+    width: 140px;
+    justify-content: center;
+    font-size: 12px;
+    padding: 8px 10px;
+    transform: translateX(160%);
+    transition: transform 0.3s cubic-bezier(0.34, 0.94, 0.4, 1);
+  }
+  body.el-menu-open .el-practice-btn { transform: translateX(0); }
+
+  .el-filter-select {
+    position: fixed;
+    pointer-events: auto;
+    z-index: 20;
+    top: calc(168px + env(safe-area-inset-top));
+    right: 20px;
+    width: 140px;
+    font-size: 12px;
+    padding: 7px 26px 7px 12px;
+    transform: translateX(160%);
+    transition: transform 0.3s cubic-bezier(0.34, 0.94, 0.4, 1);
+  }
+  body.el-menu-open .el-filter-select { transform: translateX(0); }
+
+  /* Cỡ ô tính theo CẢ chiều cao lẫn bề ngang của TOÀN màn hình (100vh/100vw,
+   * không phải khung #app đã bị escape ở trên) — bình thường chiều cao luôn
+   * là ngưỡng chặn trước (tỉ lệ 18 cột : 9.34 hàng ~ 1.9, hẹp hơn hầu hết màn
+   * hình điện thoại ngang ~2.1+), nên bề ngang thường dư, không cần cuộn ngang.
+   * Trừ dư thêm vài px (60 thay vì 52 tính đúng) làm khoảng đệm chống lệch
+   * subpixel gây lộ thanh cuộn dọc 1px. */
   .el-table {
     --el-cell: min(
-      calc((min(100vw, 480px) - 40px - 20px - 19 * var(--el-gap)) / 18),
-      calc((100vh - 72px) / 9.8)
+      calc((100vh - 60px) / 9.34),
+      calc((100vw - 76px) / 18)
     );
   }
 }
@@ -555,6 +696,15 @@ button.el-pt-cell:active { transform: scale(0.94); }
   border-radius: var(--radius-pill);
   padding: 5px 12px;
   box-shadow: 0 2px 0 var(--el-d, var(--grape-deep));
+}
+/* Trên mặt trước, nền đã là màu nhóm (gradient --el-c/--el-d) nên chip kiểu
+ * mặt sau (cùng tông màu) sẽ chìm mất — đổi thành nền trắng, chữ màu nhóm
+ * đậm để nổi bật ngay từ lúc mới bấm, không cần lật thẻ mới biết nhóm gì. */
+.el-card-cat-chip-front {
+  margin-top: 2px;
+  color: var(--el-d, var(--grape-deep));
+  background: rgba(255,255,255,0.95);
+  box-shadow: none;
 }
 
 .el-speak-row {

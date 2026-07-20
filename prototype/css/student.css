@@ -15,7 +15,7 @@ body.student-app {
 /* ─── Home hub ─── */
 .home-screen {
   padding: 0 !important;
-  background: transparent;
+  background: linear-gradient(180deg, #FBF2FF 0%, #FFF9F0 55%, #FFFFFF 100%);
   position: relative;
   overflow-x: hidden;
   overflow-y: auto;
@@ -23,13 +23,15 @@ body.student-app {
 .home-bg-pattern {
   position: absolute;
   inset: 0;
-  opacity: 0.35;
+  opacity: 0.5;
   pointer-events: none;
   background-image:
-    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.55) 0 2px, transparent 3px),
-    radial-gradient(circle at 85% 15%, rgba(255,255,255,0.45) 0 1px, transparent 2px),
-    radial-gradient(circle at 70% 80%, rgba(255,255,255,0.35) 0 2px, transparent 3px);
-  background-size: 110px 110px;
+    radial-gradient(circle at 15% 12%, rgba(139,92,246,0.16) 0 3px, transparent 4px),
+    radial-gradient(circle at 88% 10%, rgba(255,201,60,0.22) 0 2px, transparent 3px),
+    radial-gradient(circle at 90% 30%, rgba(255,93,162,0.16) 0 2px, transparent 3px),
+    radial-gradient(circle at 8% 60%, rgba(56,198,255,0.16) 0 2px, transparent 3px),
+    radial-gradient(circle at 75% 78%, rgba(139,92,246,0.14) 0 2px, transparent 3px);
+  background-size: 130px 130px;
 }
 .home-inner {
   position: relative;
@@ -39,74 +41,104 @@ body.student-app {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+  justify-content: center;
+  padding: max(58px, env(safe-area-inset-top) + 50px) 20px max(28px, env(safe-area-inset-bottom));
 }
-.home-logo {
-  width: min(130px, 34vw);
+.home-hero {
+  width: min(260px, 68vw);
+  margin: 0 auto 18px;
+}
+.home-hero-img {
+  display: block;
+  width: 100%;
   height: auto;
-  margin-bottom: 12px;
-  filter: drop-shadow(0 6px 14px rgba(38,35,92,0.3));
+  filter: drop-shadow(0 12px 18px rgba(38,35,92,0.22));
+  -webkit-mask-image: radial-gradient(ellipse 66% 70% at 50% 46%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 66% 70% at 50% 46%, #000 55%, transparent 100%);
   animation: mascot-bob 3.2s ease-in-out infinite;
 }
 .home-title {
   font-family: var(--font-display);
-  font-size: clamp(26px, 7vw, 34px);
+  font-size: clamp(26px, 8.4vw, 36px);
   font-weight: 800;
   letter-spacing: 0.5px;
-  margin: 0 0 30px;
+  line-height: 1.2;
+  margin: 0 0 4px;
   text-align: center;
-  color: #fff;
-  text-shadow:
-    0 2px 0 rgba(38,35,92,0.35),
-    0 5px 0 rgba(38,35,92,0.18),
-    0 10px 22px rgba(38,35,92,0.35);
+  text-transform: uppercase;
+}
+.home-title span {
+  display: inline-block;
+  -webkit-text-stroke: 5px #FFFDF6;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 rgba(38,35,92,0.18);
+}
+.home-title .tt-a { color: var(--grape); }
+.home-title .tt-b { color: var(--bubblegum); }
+.home-subtitle {
+  margin: 0 0 18px;
+  text-align: center;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
 }
 .home-menu {
   width: 100%;
-  max-width: 360px;
-  display: flex;
-  flex-direction: column;
+  max-width: 380px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
 }
 .home-menu-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
-  padding: 16px 18px;
+  aspect-ratio: 1 / 0.78;
+  padding: 14px 10px;
   border: none;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  color: var(--ink);
+  border-radius: 26px;
+  color: #fff;
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 15.5px;
   font-weight: 700;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
-  box-shadow: 0 var(--press-depth) 0 rgba(38,35,92,0.28), 0 12px 20px rgba(38,35,92,0.14);
+  box-shadow: 0 var(--press-depth) 0 rgba(38,35,92,0.2), 0 12px 20px rgba(38,35,92,0.12);
   transition: transform 0.1s, box-shadow 0.1s;
 }
 .home-menu-item:active {
   transform: translateY(5px);
-  box-shadow: 0 1px 0 rgba(38,35,92,0.28);
+  box-shadow: 0 1px 0 rgba(38,35,92,0.2);
 }
 .home-menu-icon {
   flex-shrink: 0;
   width: 48px;
   height: 48px;
   border-radius: 16px;
+  background: rgba(255,255,255,0.94);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  box-shadow: 0 3px 0 rgba(38,35,92,0.1);
 }
-.home-menu-icon .icon { width: 26px; height: 26px; }
+.home-menu-icon .icon { width: 24px; height: 24px; }
 /* mỗi chức năng một màu kẹo + bóng cứng riêng */
-.hm-play .home-menu-icon      { background: var(--sun);       box-shadow: 0 3px 0 var(--sun-deep); color: var(--ink); }
-.hm-elements .home-menu-icon  { background: var(--bubblegum); box-shadow: 0 3px 0 var(--bubblegum-deep); }
-.hm-balance .home-menu-icon   { background: var(--sky-btn);   box-shadow: 0 3px 0 var(--sky-btn-deep); }
-.hm-quiz .home-menu-icon      { background: var(--grape);     box-shadow: 0 3px 0 var(--grape-deep); }
-.home-menu-label { flex: 1; }
+.hm-play     { background: var(--lime);      box-shadow: 0 var(--press-depth) 0 var(--lime-deep), 0 12px 20px rgba(38,35,92,0.12); }
+.hm-play:active     { box-shadow: 0 1px 0 var(--lime-deep); }
+.hm-play .home-menu-icon     { color: var(--lime-deep); }
+.hm-elements { background: var(--grape);     box-shadow: 0 var(--press-depth) 0 var(--grape-deep), 0 12px 20px rgba(38,35,92,0.12); }
+.hm-elements:active { box-shadow: 0 1px 0 var(--grape-deep); }
+.hm-elements .home-menu-icon { color: var(--grape-deep); }
+.hm-balance  { background: var(--sun);       box-shadow: 0 var(--press-depth) 0 var(--sun-deep), 0 12px 20px rgba(38,35,92,0.12); color: var(--ink); }
+.hm-balance:active  { box-shadow: 0 1px 0 var(--sun-deep); }
+.hm-balance .home-menu-icon  { color: var(--sun-deep); }
+.hm-quiz     { background: var(--bubblegum); box-shadow: 0 var(--press-depth) 0 var(--bubblegum-deep), 0 12px 20px rgba(38,35,92,0.12); }
+.hm-quiz:active     { box-shadow: 0 1px 0 var(--bubblegum-deep); }
+.hm-quiz .home-menu-icon     { color: var(--bubblegum-deep); }
+.home-menu-label { flex: 1; display: flex; align-items: center; }
 
 /* ─── Join ─── */
 .join-screen {
@@ -1312,9 +1344,10 @@ body.student-app {
   position: relative;
   width: 100%;
   max-width: 100%;
-  margin: 0 auto 12px;
+  /* margin: 0 auto 12px; */
   line-height: normal;
   overflow: visible;
+  margin-top: 35%;
 }
 
 .student-final-podium-bg {
@@ -1337,9 +1370,9 @@ body.student-app {
   text-align: center;
 }
 
-.student-final-podium-slot.slot-1 { left: 50%; bottom: 60%; z-index: 3; }
-.student-final-podium-slot.slot-2 { left: 18%; bottom: 26%; z-index: 2; }
-.student-final-podium-slot.slot-3 { left: 82%; bottom: 20%; z-index: 2; }
+.student-final-podium-slot.slot-1 { left: 35%; bottom: 60%; z-index: 3; }
+.student-final-podium-slot.slot-2 { left: 0%; bottom: 26%; z-index: 2; }
+.student-final-podium-slot.slot-3 { left: 69%; bottom: 20%; z-index: 2; }
 
 /* nghi lễ: bậc hiện dần theo thứ tự 3 → 2 → 1 (class thêm từ JS) */
 .student-final-podium-slot { opacity: 0; }
@@ -1362,13 +1395,13 @@ body.student-app {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-height: 88px;
+  min-height: auto;
   margin-top: 2px;
 }
 
 .student-final-podium-duck {
   width: 84px;
-  height: 84px;
+  height: auto;
   object-fit: contain;
   object-position: center bottom;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
@@ -1558,8 +1591,8 @@ body.student-app {
 /* ─── Tài khoản học sinh ─────────────────────────────────────────────── */
 .home-account-slot {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: max(12px, env(safe-area-inset-top));
+  left: 12px;
   z-index: 5;
 }
 .account-chip {
@@ -1567,7 +1600,7 @@ body.student-app {
   align-items: center;
   gap: 8px;
   padding: 6px 12px 6px 6px;
-  border: 0;
+  border: 1.5px solid rgba(38, 35, 92, 0.08);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 2px 0 rgba(38, 35, 92, 0.18);
