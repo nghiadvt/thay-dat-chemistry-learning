@@ -53,7 +53,9 @@ services:
         condition: service_healthy
 
   php-admin:
-    build: ./php-admin
+    build:
+      context: .
+      dockerfile: php-admin/Dockerfile
     restart: unless-stopped
     user: "0:0"
     entrypoint: ["/bin/bash", "-c", "cd /var/www/html && mkdir -p storage/app/public/keyboards && chown -R www-data:www-data storage/app/public && chmod -R ug+rwX storage/app/public && php artisan storage:link --force >/dev/null 2>&1 || true; exec docker-php-serversideup-entrypoint /init"]

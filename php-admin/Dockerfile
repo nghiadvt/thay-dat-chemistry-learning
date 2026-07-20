@@ -2,10 +2,11 @@ FROM serversideup/php:8.2-fpm-nginx
 
 WORKDIR /var/www/html
 
-COPY --chown=www-data:www-data composer.json composer.lock ./
+COPY --chown=www-data:www-data php-admin/composer.json php-admin/composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
-COPY --chown=www-data:www-data . .
+COPY --chown=www-data:www-data php-admin/. .
+COPY --chown=www-data:www-data prototype/. ./public/app/
 
 RUN composer install --no-dev --optimize-autoloader --no-interaction \
     && php artisan package:discover --ansi \
