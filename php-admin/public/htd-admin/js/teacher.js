@@ -969,10 +969,39 @@ const TEACHER_FINAL_ASSETS = {
   leaderboard: '/htd-admin/assets/Leaderboard.png',
 };
 
+/** Vịt chuyển động quản lý trong DB — resolve token "db:{id}" thành frame[0] (tĩnh).
+ * Được tải trước lúc ván đấu bắt đầu (xem setupTeacherBackendBridge's gameStarted handler)
+ * để lúc podium cuối ván hiện ra thì danh sách đã sẵn sàng. */
+const teacherDuckSpriteRegistry = { loaded: false, loading: false, byToken: {} };
+
+function ensureTeacherDuckSpriteRegistry() {
+  if (teacherDuckSpriteRegistry.loaded || teacherDuckSpriteRegistry.loading) return;
+  teacherDuckSpriteRegistry.loading = true;
+  fetch('/api/duck-sprites/public')
+    .then((res) => res.json())
+    .then((json) => {
+      (json?.data || []).forEach((duck) => {
+        teacherDuckSpriteRegistry.byToken[`db:${duck.id}`] = {
+          fps: Number(duck.fps) || 10,
+          frames: (duck.frames || []).map((f) => f.url),
+        };
+      });
+    })
+    .catch(() => {})
+    .finally(() => {
+      teacherDuckSpriteRegistry.loaded = true;
+      teacherDuckSpriteRegistry.loading = false;
+    });
+}
+
 function teacherDuckImgUrl(sprite) {
   const base = '/htd-admin/assets/duck-race/';
   const fallback = `${base}ducks/duck-blue.gif`;
   if (!sprite) return fallback;
+  if (String(sprite).startsWith('db:')) {
+    ensureTeacherDuckSpriteRegistry();
+    return teacherDuckSpriteRegistry.byToken[sprite]?.frames[0] || fallback;
+  }
   const path = String(sprite).replace(/^\//, '');
   return path.startsWith('htd-admin/') ? `/${path}` : `${base}${path}`;
 }
@@ -2188,6 +2217,8 @@ function setupTeacherBackendBridge() {
     }
 
     if (data?.play_mode === 'duck_race' || (typeof DuckRaceHost !== 'undefined' && DuckRaceHost.isDuckRaceMode())) {
+      // Tải trước danh sách vịt DB ngay khi ván bắt đầu, để lúc hiện podium cuối ván không bị fallback.
+      ensureTeacherDuckSpriteRegistry();
       const game = ensureTeacherGameState(room);
       game.phase = 'duck_race';
       room.startedAt = Date.now();

@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class QuestionBankItem extends Model
 {
     protected $fillable = [
+        'group_id',
         'content',
         'explanation',
         'answer_type',
@@ -31,6 +33,11 @@ class QuestionBankItem extends Model
             'correct_answer' => 'array',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(Group::class);
     }
 
     public function tags(): BelongsToMany

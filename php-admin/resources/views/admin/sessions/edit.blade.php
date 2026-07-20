@@ -61,6 +61,14 @@
             @error('name')<div class="field-error">{{ $message }}</div>@enderror
         </div>
 
+        <div class="form-group">
+            @include('admin.partials.group-select', [
+                'id' => 'sessionGroup',
+                'groups' => $groups,
+                'selected' => $selectedGroupId ?? '',
+            ])
+        </div>
+
         <div class="form-row">
             <div class="form-group">
                 <label for="filter_game_id">Lọc theo game</label>

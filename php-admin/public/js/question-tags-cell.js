@@ -175,6 +175,10 @@
 
   function initQuestionTagsCells() {
     document.querySelectorAll('[data-question-tags-cell]').forEach((cell) => {
+      // Gọi lại được sau khi nạp thêm hàng mà không gắn trùng listener.
+      if (cell.dataset.tagsCellBound === '1') return;
+      cell.dataset.tagsCellBound = '1';
+
       const kebab = cell.querySelector('[data-tags-kebab]');
       const editor = cell.querySelector('[data-tags-editor]');
       const checklist = editor?.querySelector('[data-tag-checklist]');
@@ -247,6 +251,9 @@
     const checklist = root?.querySelector('[data-tag-checklist]');
     return { tag_ids: getChecklistSelection(checklist) };
   }
+
+  // Hàng nạp thêm khi mở nhóm cần được gắn lại ô sửa chủ đề.
+  document.addEventListener('admin:rows-added', initQuestionTagsCells);
 
   window.QuestionTagsCell = {
     getBulkTagSelection,

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\QuestionBankItem;
 use App\Models\Tag;
+use App\Services\EntitlementResolver;
+use App\Support\FeatureRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,7 +64,13 @@ class PracticeController extends Controller
 
     public function questions(Request $request): JsonResponse
     {
-        $count = max(1, min(self::MAX_QUESTIONS, (int) $request->query('count', 10)));
+        $cap = $this->questionCap($request);
+
+        if ($cap === 0) {
+            return $this->jsonError('Tính năng này chưa được mở cho tài khoản của em. Hãy liên hệ giáo viên.', 403);
+        }
+
+        $count = max(1, min($cap, (int) $request->query('count', 10)));
         $gradeSlug = trim((string) $request->query('grade', ''));
         $topicSlug = trim((string) $request->query('topic', ''));
 
@@ -91,6 +99,36 @@ class PracticeController extends Controller
         }
 
         return $this->jsonSuccess(['questions' => $questions]);
+    }
+
+    /**
+     * Trần số câu mỗi lượt theo quyền của học sinh.
+     *
+     * Chặn thật phải nằm ở đây chứ không chỉ ở giao diện, vì client sửa được.
+     * Khách chưa đăng nhập hưởng đúng mức miễn phí mặc định — nếu không, học
+     * sinh chỉ cần đăng xuất là lách được giới hạn.
+     */
+    private function questionCap(Request $request): int
+    {
+        $student = $request->user('student');
+
+        if ($student === null) {
+            $scope = FeatureRegistry::freeScope('quiz');
+        } else {
+            $resolved = app(EntitlementResolver::class)->for($student, 'quiz');
+
+            if ($resolved['access_level'] === FeatureRegistry::ACCESS_NONE) {
+                return 0;
+            }
+
+            $scope = $resolved['scope'];
+        }
+
+        $max = $scope['max_questions'] ?? null;
+
+        return $max === null
+            ? self::MAX_QUESTIONS
+            : max(0, min(self::MAX_QUESTIONS, (int) $max));
     }
 
     private function baseQuery(): Builder

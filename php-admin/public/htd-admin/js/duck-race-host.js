@@ -4,6 +4,10 @@
 const DuckRaceHost = (function () {
   const DUCK_ASSET_BASE = '/htd-admin/assets/duck-race/';
   const DUCK_FALLBACK = `${DUCK_ASSET_BASE}ducks/duck-blue.gif`;
+  /** Vịt chuyển động quản lý trong DB — resolve token "db:{id}" thành danh sách frame + fps. */
+  const duckSpriteRegistry = { loaded: false, loading: false, byToken: {} };
+  /** playerName -> {img, token, urls, fps, idx, acc} — animate qua rAF, cùng thuật toán duck-sprite-manager.js. */
+  const duckAnimByName = new Map();
   let lastPlayers = [];
   let targetScore = 30;
   let trackLayoutObserver = null;
@@ -98,8 +102,33 @@ const DuckRaceHost = (function () {
     return Math.max(min, Math.min(max, n));
   }
 
+  function ensureDuckSpriteRegistry() {
+    if (duckSpriteRegistry.loaded || duckSpriteRegistry.loading) return;
+    duckSpriteRegistry.loading = true;
+    fetch('/api/duck-sprites/public')
+      .then((res) => res.json())
+      .then((json) => {
+        (json?.data || []).forEach((duck) => {
+          duckSpriteRegistry.byToken[`db:${duck.id}`] = {
+            fps: Number(duck.fps) || 10,
+            frames: (duck.frames || []).map((f) => f.url),
+          };
+        });
+      })
+      .catch(() => {})
+      .finally(() => {
+        duckSpriteRegistry.loaded = true;
+        duckSpriteRegistry.loading = false;
+        renderDucks(); // vẽ lại với ảnh vịt thật thay vì fallback sau khi tải xong
+      });
+  }
+
   function duckImgUrl(sprite) {
     if (!sprite) return DUCK_FALLBACK;
+    if (String(sprite).startsWith('db:')) {
+      ensureDuckSpriteRegistry();
+      return duckSpriteRegistry.byToken[sprite]?.frames[0] || DUCK_FALLBACK;
+    }
     const path = String(sprite).replace(/^\//, '');
     return path.startsWith('htd-admin/') ? `/${path}` : `${DUCK_ASSET_BASE}${path}`;
   }
@@ -260,8 +289,30 @@ const DuckRaceHost = (function () {
     }
 
     const spriteEl = wrap.querySelector('.duck-race-duck-sprite');
-    const src = duckImgUrl(p.duck_sprite);
-    if (spriteEl) spriteEl.src = src;
+    if (spriteEl) {
+      syncDuckAnim(p.name, spriteEl, p.duck_sprite);
+      if (!duckAnimByName.has(p.name)) spriteEl.src = duckImgUrl(p.duck_sprite);
+    }
+  }
+
+  /** Đăng ký/cập nhật animation frame cho 1 con vịt; xóa khỏi registry nếu sprite không phải db: hoặc chỉ có 1 frame. */
+  function syncDuckAnim(name, spriteEl, sprite) {
+    const token = String(sprite || '');
+    if (!token.startsWith('db:')) {
+      duckAnimByName.delete(name);
+      return;
+    }
+    const entry = duckSpriteRegistry.byToken[token];
+    if (!entry || entry.frames.length < 2) {
+      duckAnimByName.delete(name);
+      return;
+    }
+    const existing = duckAnimByName.get(name);
+    if (existing && existing.token === token) {
+      existing.img = spriteEl;
+      return;
+    }
+    duckAnimByName.set(name, { img: spriteEl, token, urls: entry.frames, fps: entry.fps, idx: 0, acc: 0 });
   }
 
   function createDuckElement(p, bottomPct) {
@@ -315,7 +366,28 @@ const DuckRaceHost = (function () {
     for (const [name, el] of existing) {
       if (!nextNames.has(name)) el.remove();
     }
+    for (const name of [...duckAnimByName.keys()]) {
+      if (!nextNames.has(name)) duckAnimByName.delete(name);
+    }
   }
+
+  let duckAnimLastTs = 0;
+  function tickDuckAnim(ts) {
+    const dt = duckAnimLastTs ? ts - duckAnimLastTs : 0;
+    duckAnimLastTs = ts;
+    duckAnimByName.forEach((anim) => {
+      if (!anim.img?.isConnected) return;
+      anim.acc += dt;
+      const frameMs = 1000 / anim.fps;
+      if (anim.acc >= frameMs) {
+        anim.idx = (anim.idx + Math.floor(anim.acc / frameMs)) % anim.urls.length;
+        anim.acc %= frameMs;
+        anim.img.src = anim.urls[anim.idx];
+      }
+    });
+    requestAnimationFrame(tickDuckAnim);
+  }
+  requestAnimationFrame(tickDuckAnim);
 
   function renderPodium() {
     const el = document.getElementById('duckRacePodium');

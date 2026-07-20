@@ -102,12 +102,15 @@ async function getKeyboardConfig(keyboardId) {
   return typeof config === 'string' ? JSON.parse(config) : config;
 }
 
-async function saveSessionAnswer({ sessionId, questionId, studentName, answerSubmitted, isCorrect, scoreEarned, answeredAt }) {
+// studentId chỉ có khi HS vào phòng lúc đã đăng nhập (xem resolvePlayToken ở
+// room.js). Lượt chơi ẩn danh vẫn ghi bình thường với student_id = NULL.
+async function saveSessionAnswer({ sessionId, questionId, studentName, studentId, answerSubmitted, isCorrect, scoreEarned, answeredAt }) {
   await getPool().execute(
     `INSERT INTO session_answers
-       (session_id, question_id, student_name, answer_submitted, is_correct, score_earned, answered_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+       (session_id, student_id, question_id, student_name, answer_submitted, is_correct, score_earned, answered_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
      ON DUPLICATE KEY UPDATE
+       student_id = VALUES(student_id),
        answer_submitted = VALUES(answer_submitted),
        is_correct = VALUES(is_correct),
        score_earned = VALUES(score_earned),
@@ -115,6 +118,7 @@ async function saveSessionAnswer({ sessionId, questionId, studentName, answerSub
        updated_at = NOW()`,
     [
       sessionId,
+      studentId ?? null,
       questionId,
       studentName,
       JSON.stringify(answerSubmitted),
@@ -136,10 +140,11 @@ async function saveGameResults(sessionId, leaderboardEntries) {
       const finishedAt = entry.finished_at ? new Date(entry.finished_at) : null;
       await conn.execute(
         `INSERT INTO game_results
-           (session_id, student_name, player_token, score, \`rank\`, finish_rank, finished_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+           (session_id, student_id, student_name, player_token, score, \`rank\`, finish_rank, finished_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           sessionId,
+          entry.student_id ?? null,
           entry.name,
           entry.player_token || null,
           entry.score,

@@ -20,8 +20,10 @@ window.HTDApi = (function () {
   }
 
   async function request(path, options = {}) {
+    // FormData tự đặt Content-Type kèm boundary — ép JSON sẽ làm hỏng upload.
+    const isForm = options.body instanceof FormData;
     const headers = Object.assign(
-      { Accept: 'application/json', 'Content-Type': 'application/json' },
+      isForm ? { Accept: 'application/json' } : { Accept: 'application/json', 'Content-Type': 'application/json' },
       options.headers || {}
     );
     const token = readCookie('XSRF-TOKEN');
@@ -29,11 +31,16 @@ window.HTDApi = (function () {
       headers['X-XSRF-TOKEN'] = token;
     }
 
+    let body;
+    if (options.body) {
+      body = isForm ? options.body : JSON.stringify(options.body);
+    }
+
     const res = await fetch(apiUrl(path), {
       method: options.method || 'GET',
       credentials: 'include',
       headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body,
     });
 
     let json;
@@ -95,6 +102,83 @@ window.HTDApi = (function () {
         body,
       });
       return data.keyboard || data;
+    },
+    // ─── Tài khoản học sinh ───
+    /** Trả về hồ sơ học sinh đang đăng nhập, hoặc null nếu chưa đăng nhập. */
+    async studentMe() {
+      try {
+        return await request('/api/student/me', { skipCsrf: true });
+      } catch {
+        return null;
+      }
+    },
+    /** Token ngắn hạn để ws-server xác định tài khoản học sinh khi vào phòng. */
+    async studentPlayToken() {
+      await ensureCsrf();
+      return request('/api/student/play-token', { method: 'POST' });
+    },
+    /** Mở một lượt tự luyện; trả về attempt_id để nộp bài sau. */
+    async studentStartAttempt({ featureKey, label, topicSlug, gradeSlug, questionIds }) {
+      await ensureCsrf();
+      return request('/api/student/practice-attempts', {
+        method: 'POST',
+        body: {
+          feature_key: featureKey,
+          label,
+          topic_slug: topicSlug,
+          grade_slug: gradeSlug,
+          question_ids: questionIds,
+        },
+      });
+    },
+    /** Nộp bài lượt tự luyện; server tự chấm lại. */
+    async studentFinishAttempt(attemptId, { answers, durationMs }) {
+      await ensureCsrf();
+      return request(`/api/student/practice-attempts/${attemptId}/finish`, {
+        method: 'POST',
+        body: { answers, duration_ms: durationMs },
+      });
+    },
+    /** Quyền tính năng của học sinh đang đăng nhập. */
+    async studentEntitlements() {
+      return request('/api/student/entitlements', { skipCsrf: true });
+    },
+    async studentUpdateProfile({ displayName, currentPassword }) {
+      await ensureCsrf();
+      return request('/api/student/profile', {
+        method: 'PATCH',
+        body: { display_name: displayName, current_password: currentPassword },
+      });
+    },
+    async studentUpdatePassword({ currentPassword, password, passwordConfirmation }) {
+      await ensureCsrf();
+      return request('/api/student/password', {
+        method: 'PUT',
+        body: {
+          current_password: currentPassword,
+          password,
+          password_confirmation: passwordConfirmation,
+        },
+      });
+    },
+    async studentUploadAvatar({ file, currentPassword }) {
+      await ensureCsrf();
+      const form = new FormData();
+      form.append('avatar', file);
+      form.append('current_password', currentPassword);
+      return request('/api/student/avatar', { method: 'POST', body: form });
+    },
+    studentLoginUrl() {
+      return apiUrl('/student/login');
+    },
+    /** Route logout trả redirect chứ không phải JSON nên gọi fetch trực tiếp. */
+    async studentLogout() {
+      await ensureCsrf();
+      await fetch(apiUrl('/student/logout'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json', 'X-XSRF-TOKEN': readCookie('XSRF-TOKEN') },
+      });
     },
     loginUrl(redirectPath) {
       const redirect = encodeURIComponent(redirectPath || location.pathname);

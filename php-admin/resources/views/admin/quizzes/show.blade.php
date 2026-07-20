@@ -67,6 +67,14 @@
         </div>
 
         <div class="form-group">
+            @include('admin.partials.group-select', [
+                'id' => 'quizGroup',
+                'groups' => $groups,
+                'selected' => $selectedGroupId ?? '',
+            ])
+        </div>
+
+        <div class="form-group">
             @include('admin.partials.tag-select', [
                 'mode' => 'multi',
                 'tags' => $bankTags,

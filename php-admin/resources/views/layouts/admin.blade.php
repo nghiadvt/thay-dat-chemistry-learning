@@ -16,6 +16,13 @@
     <link rel="stylesheet" href="@vasset('css/admin-list.css')">
     <link rel="stylesheet" href="@vasset('css/admin-confirm.css')">
     <link rel="stylesheet" href="@vasset('css/feedback-widget.css')">
+    @if (request()->routeIs('admin.students.*'))
+        {{-- Khu học sinh có bộ giao diện riêng; font rơi về system-ui nếu offline --}}
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="@vasset('css/admin-students.css')">
+    @endif
     @stack('head')
 </head>
 <body class="admin-body @yield('body-class')"
@@ -36,7 +43,17 @@
             <a href="{{ route('admin.games.index') }}" class="{{ request()->routeIs('admin.games.*') ? 'active' : '' }}">Game</a>
             <a href="{{ route('admin.quizzes.index') }}" class="{{ request()->routeIs('admin.quizzes.*') || request()->routeIs('admin.questions.*') ? 'active' : '' }}">Quiz</a>
             <a href="{{ route('admin.question-bank.index') }}" class="{{ request()->routeIs('admin.question-bank.*') ? 'active' : '' }}">Bộ câu hỏi</a>
-            <a href="{{ route('admin.image-cropper.index') }}" class="{{ request()->routeIs('admin.image-cropper.*') ? 'active' : '' }}">Cắt ảnh</a>
+            <details class="admin-nav-group" @if(request()->routeIs('admin.image-cropper.*', 'admin.image-trimmer')) open @endif>
+                <summary class="{{ request()->routeIs('admin.image-cropper.*', 'admin.image-trimmer') ? 'has-active-child' : '' }}">
+                    <span class="admin-nav-group__label">Thao tác hình ảnh</span>
+                    <span class="admin-nav-group__chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="admin-nav-group__children">
+                    <a href="{{ route('admin.image-cropper.index') }}" class="{{ request()->routeIs('admin.image-cropper.*') ? 'active' : '' }}">Cắt ảnh</a>
+                    <a href="{{ route('admin.image-trimmer') }}" class="{{ request()->routeIs('admin.image-trimmer') ? 'active' : '' }}">Xóa khoảng trắng</a>
+                </div>
+            </details>
+            <a href="{{ route('admin.students.index') }}" class="{{ request()->routeIs('admin.students.*') ? 'active' : '' }}">Học sinh</a>
             <a href="{{ route('admin.sessions.index') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}">Phòng chơi</a>
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">Báo cáo</a>
             <a href="{{ route('admin.feedback.index') }}" class="{{ request()->routeIs('admin.feedback.*') ? 'active' : '' }}">Góp ý</a>
@@ -96,6 +113,7 @@ window.__ADMIN_FLASH__ = @json(array_filter([
 <script src="@vasset('js/admin-sidebar.js')"></script>
 <script>window.TAG_PRESET_COLORS = @json(\App\Models\Tag::PRESET_COLORS);</script>
 <script src="@vasset('js/admin-tags.js')"></script>
+<script src="@vasset('js/group-select.js')"></script>
 @if (session('success') || session('error') || session('warning'))
 <script>
 document.addEventListener('DOMContentLoaded', function () {

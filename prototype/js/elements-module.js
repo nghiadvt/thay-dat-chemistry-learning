@@ -1,9 +1,10 @@
-/* ElementsModule — «🔊 Đọc nguyên tố»
+/* ElementsModule — «Đọc nguyên tố»
  *
- * - Lưới nguyên tố màu theo nhóm → chạm mở thẻ chi tiết lật 3D
- * - Nút 🔊 đọc tên tiếng Việt (giọng vi-VN) / tên IUPAC (giọng en) qua Web Speech API
- *   · Không có giọng vi → đọc chuỗi phonetic bằng giọng mặc định
- *   · Không có speechSynthesis → ẩn nút đọc
+ * - Bảng tuần hoàn đầy đủ 118 ô (7 chu kỳ + 2 hàng Lanthanide/Actinide).
+ *   45 nguyên tố trong chương trình = ô sáng, bấm được → mở thẻ chi tiết lật 3D.
+ *   73 ô còn lại chỉ hiển thị mờ để HS thấy đúng vị trí nhóm/chu kỳ.
+ * - Chỉ đọc tên IUPAC tiếng Anh qua Web Speech API. KHÔNG đọc tên tiếng Việt:
+ *   giọng vi-VN trên thiết bị HS phát âm tên hóa chất sai nhiều hơn là giúp.
  * - Chế độ luyện tập «Nghe & đoán»: máy đọc tên IUPAC → chọn 1 trong 4 nguyên tố, 10 vòng,
  *   tổng kết 1–3 sao, best score lưu localStorage.
  */
@@ -12,21 +13,50 @@ window.ElementsModule = (function () {
 
   var ELS = window.HTD_ELEMENTS || [];
   var CATS = window.HTD_ELEMENT_CATEGORIES || {};
+  var LAYOUT = window.HTD_PERIODIC_TABLE || [];
   var BEST_KEY = 'htd_elements_best';
+  var MASTERY_KEY = 'htd_el_mastery';
   var PRACTICE_ROUNDS = 10;
+  var MASTERY_FULL = 3; // trả lời đúng 3 lần = coi như đã thuộc
 
-  var gridBuilt = false;
+  var built = false;
   var detailIdx = 0;
+  var filter = 'all';     // 'all' | 'priority' | 'unlearned'
 
-  /* ── Speech ─────────────────────────────────────────────────── */
+  /* Tra ngược từ số hiệu về nguyên tố trong chương trình (nếu có dạy). */
+  var idxByZ = {};
+  ELS.forEach(function (el, i) { idxByZ[el.z] = i; });
+
+  /* ── Mức thuộc bài (localStorage, tách khỏi điểm luyện tập) ─── */
+  var mastery = {};
+  try { mastery = JSON.parse(localStorage.getItem(MASTERY_KEY) || '{}') || {}; } catch (e) { mastery = {}; }
+
+  function masteryOf(z) { return Number(mastery[z] || 0); }
+  function isLearned(z) { return masteryOf(z) >= MASTERY_FULL; }
+
+  function bumpMastery(z) {
+    mastery[z] = Math.min(masteryOf(z) + 1, MASTERY_FULL);
+    try { localStorage.setItem(MASTERY_KEY, JSON.stringify(mastery)); } catch (e) {}
+  }
+
+  function matchesFilter(el) {
+    if (filter === 'priority') return el.priority === 1;
+    if (filter === 'unlearned') return !isLearned(el.z);
+    return true;
+  }
+
+  function masteryBar(z) {
+    var pct = Math.round((masteryOf(z) / MASTERY_FULL) * 100);
+    return '<span class="el-mastery"><i style="width:' + pct + '%"></i></span>';
+  }
+
+  /* ── Speech: chỉ tên IUPAC tiếng Anh ────────────────────────── */
   var hasSpeech = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
-  var viVoice = null;
   var enVoice = null;
 
   function pickVoices() {
     if (!hasSpeech) return;
     var voices = window.speechSynthesis.getVoices() || [];
-    viVoice = voices.find(function (v) { return /^vi([-_]|$)/i.test(v.lang); }) || null;
     enVoice = voices.find(function (v) { return /^en[-_](US|GB)/i.test(v.lang); })
       || voices.find(function (v) { return /^en([-_]|$)/i.test(v.lang); })
       || null;
@@ -39,67 +69,175 @@ window.ElementsModule = (function () {
     }
   }
 
-  function speak(text, lang) {
-    if (!hasSpeech || !text) return;
+  function speakElement(el) {
+    if (!hasSpeech || !el || !el.nameEn) return;
     window.speechSynthesis.cancel(); // Android Chrome hay kẹt queue
-    var u = new SpeechSynthesisUtterance(text);
+    var u = new SpeechSynthesisUtterance(el.nameEn);
     u.rate = 0.9;
-    if (lang === 'vi') {
-      if (viVoice) { u.voice = viVoice; u.lang = viVoice.lang; }
-      // không có giọng vi: text đã là phonetic, đọc bằng giọng mặc định
-    } else {
-      if (enVoice) { u.voice = enVoice; }
-      u.lang = enVoice ? enVoice.lang : 'en-US';
-    }
+    if (enVoice) u.voice = enVoice;
+    u.lang = enVoice ? enVoice.lang : 'en-US';
     window.speechSynthesis.speak(u);
-  }
-
-  function speakElement(el, which) {
-    if (which === 'en') {
-      speak(el.nameEn, 'en');
-    } else {
-      speak(viVoice ? el.nameVi : el.phonetic, 'vi');
-    }
   }
 
   function sfxLocal(name) {
     if (window.HTDSound) HTDSound.play(name);
   }
 
-  /* ── Lưới + legend ──────────────────────────────────────────── */
-  function enterGrid() {
+  /* ── Vào màn: dựng bảng + legend ────────────────────────────── */
+  function enter() {
     closeDetail();
-    if (gridBuilt) return;
-    gridBuilt = true;
+    maybeShowRotateGate();
+    if (built) return;
+    built = true;
 
-    var legend = document.getElementById('elLegend');
-    if (legend) {
-      legend.innerHTML = Object.keys(CATS).map(function (key) {
-        return '<span class="el-legend-chip"><i style="background:' + CATS[key].color + '"></i>' + CATS[key].label + '</span>';
-      }).join('');
+    buildTable();
+    bindToolbar();
+    applyFilter();
+  }
+
+  /* ── Bảng tuần hoàn đầy đủ ──────────────────────────────────────
+   * 18 cột × 7 chu kỳ + 2 hàng f-block (Lanthanide/Actinide) tách dưới, đúng
+   * cách bảng chuẩn vẫn in. Ô nào có trong chương trình (HTD_ELEMENTS) thì sáng
+   * và bấm được; ô còn lại mờ, không bấm — HS vẫn thấy đúng vị trí nhóm/chu kỳ.
+   * Hàng lưới: 1 = header nhóm, 2–8 = chu kỳ 1–7, 9 = khoảng đệm, 10–11 = f-block. */
+  var ROW_OF = { 'La': 10, 'Ac': 11 };
+
+  function buildTable() {
+    var table = document.getElementById('elTable');
+    if (!table) return;
+
+    var html = '<span class="el-pt-corner" aria-hidden="true"></span>';
+    for (var g = 1; g <= 18; g++) {
+      html += '<span class="el-pt-group" style="grid-column:' + (g + 1) + ';grid-row:1">' + g + '</span>';
     }
+    for (var p = 1; p <= 7; p++) {
+      html += '<span class="el-pt-period" style="grid-column:1;grid-row:' + (p + 1) + '">' + p + '</span>';
+    }
+    html += '<span class="el-pt-frow" style="grid-column:1;grid-row:10">La</span>';
+    html += '<span class="el-pt-frow" style="grid-column:1;grid-row:11">Ac</span>';
 
-    var grid = document.getElementById('elGrid');
-    if (!grid) return;
-    grid.innerHTML = ELS.map(function (el, i) {
-      var cat = CATS[el.category] || { color: '#8B5CF6', deep: '#6D28D9' };
-      return '<button type="button" class="el-tile opt-pop" ' +
-        'style="--el-c:' + cat.color + ';--el-d:' + cat.deep + ';animation-delay:' + Math.min(i * 22, 700) + 'ms" ' +
-        'data-idx="' + i + '">' +
-        '<span class="el-tile-z">' + el.z + '</span>' +
-        '<span class="el-tile-symbol">' + el.symbol + '</span>' +
-        '<span class="el-tile-name">' + el.nameVi + '</span>' +
+    // Ô dẫn 57–71 / 89–103 ở nhóm 3 chu kỳ 6, 7 — trỏ xuống hai hàng f-block.
+    html += '<span class="el-pt-fref" style="grid-column:4;grid-row:7">57–71</span>';
+    html += '<span class="el-pt-fref" style="grid-column:4;grid-row:8">89–103</span>';
+
+    // Chú giải màu nhóm nhét vào khoảng trống nhóm 3–12, chu kỳ 1–3 (luôn
+    // rỗng vì các nguyên tố đó là kim loại chuyển tiếp, chưa xuất hiện tới
+    // chu kỳ 4) — đỡ tốn thêm hàng riêng phía trên, nhường chiều cao cho bảng.
+    html += '<div class="el-table-legend" style="grid-column:4/14;grid-row:2/5">' +
+      Object.keys(CATS).map(function (key) {
+        return '<span class="el-legend-chip"><i style="background:' + CATS[key].color + '"></i>' + CATS[key].label + '</span>';
+      }).join('') +
+      '</div>';
+
+    LAYOUT.forEach(function (row) {
+      var z = row[0], symbol = row[1], nameEn = row[2], mass = row[3];
+      var cat = CATS[row[4]] || { color: '#8B5CF6', deep: '#6D28D9' };
+      var gridRow = ROW_OF[row[6]] || (Number(row[6]) + 1);
+      var style = 'grid-column:' + (row[5] + 1) + ';grid-row:' + gridRow +
+        ';--el-c:' + cat.color + ';--el-d:' + cat.deep;
+
+      var idx = idxByZ[z];
+      var taught = idx !== undefined;
+      var label = taught ? ELS[idx].nameVi : nameEn;
+
+      if (!taught) {
+        html += '<span class="el-pt-cell is-untaught" style="' + style + '" ' +
+          'aria-label="' + symbol + ' — ' + nameEn + ', số hiệu ' + z + ' (ngoài chương trình)">' +
+          '<span class="el-pt-z">' + z + '</span>' +
+          '<span class="el-pt-symbol">' + symbol + '</span>' +
+          '<span class="el-pt-name">' + nameEn + '</span>' +
+          '<span class="el-pt-mass">' + mass + '</span>' +
+          '</span>';
+        return;
+      }
+
+      var el = ELS[idx];
+      html += '<button type="button" class="el-pt-cell' + (el.priority === 1 ? ' is-priority' : '') + '" ' +
+        'style="' + style + '" data-idx="' + idx + '" data-z="' + z + '" ' +
+        'aria-label="' + symbol + ' — ' + label + ', số hiệu ' + z + '">' +
+        '<span class="el-pt-z">' + z + '</span>' +
+        '<span class="el-pt-symbol">' + symbol + '</span>' +
+        '<span class="el-pt-name">' + label + '</span>' +
+        '<span class="el-pt-mass">' + mass + '</span>' +
+        masteryBar(z) +
         '</button>';
-    }).join('');
-    grid.querySelectorAll('.el-tile').forEach(function (tile) {
-      tile.addEventListener('animationend', function () {
-        tile.classList.remove('opt-pop');
-        tile.style.animationDelay = '';
-      }, { once: true });
-      tile.addEventListener('click', function () {
-        openDetail(Number(tile.dataset.idx));
+    });
+
+    table.innerHTML = html;
+    table.querySelectorAll('button.el-pt-cell').forEach(function (cell) {
+      cell.addEventListener('click', function () { tapCell(cell); });
+    });
+  }
+
+  /* Chạm ô = mở thẻ chi tiết luôn. Trước đây chạm lần 1 chỉ để đọc tên tiếng
+   * Việt, giờ bỏ giọng vi nên không còn lý do bắt HS chạm hai lần. */
+  function tapCell(cell) {
+    var table = document.getElementById('elTable');
+    if (table) {
+      table.querySelectorAll('.el-pt-cell.is-selected').forEach(function (c) { c.classList.remove('is-selected'); });
+    }
+    cell.classList.add('is-selected');
+    sfxLocal('tap');
+    openDetail(Number(cell.dataset.idx));
+  }
+
+  /* ── Toolbar: lọc ────────────────────────────────────────────── */
+  function bindToolbar() {
+    document.querySelectorAll('.el-filter').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        filter = btn.dataset.filter;
+        document.querySelectorAll('.el-filter').forEach(function (b) {
+          b.classList.toggle('is-on', b === btn);
+        });
+        sfxLocal('tap');
+        applyFilter();
       });
     });
+    var dismiss = document.getElementById('elRotateDismiss');
+    if (dismiss) {
+      dismiss.addEventListener('click', function () {
+        rotateDismissed = true;
+        updateRotateGate();
+      });
+    }
+  }
+
+  /* ── Cổng xoay ngang ────────────────────────────────────────────
+   * Bảng 18 cột không thể đọc được ở màn dọc, nên vào màn là che toàn màn hình
+   * và mời HS xoay ngang. Vẫn cho bỏ qua (điện thoại khóa xoay, máy tính bảng
+   * dựng đứng…) — che thì che, đừng nhốt HS lại. */
+  var rotateDismissed = false;
+
+  function isPortrait() {
+    return window.matchMedia('(orientation: portrait)').matches;
+  }
+
+  function maybeShowRotateGate() {
+    rotateDismissed = false; // mỗi lần vào lại màn thì nhắc lại
+    updateRotateGate();
+  }
+
+  function updateRotateGate() {
+    var gate = document.getElementById('elRotateGate');
+    if (!gate) return;
+    gate.hidden = rotateDismissed || !isPortrait();
+  }
+
+  function applyFilter() {
+    // Làm mờ thay vì ẩn — ẩn đi sẽ phá vỡ hình dáng bảng tuần hoàn.
+    document.querySelectorAll('button.el-pt-cell').forEach(function (cell) {
+      var el = ELS[Number(cell.dataset.idx)];
+      cell.classList.toggle('is-dim', !matchesFilter(el));
+    });
+    updateProgress();
+  }
+
+  function updateProgress() {
+    var out = document.getElementById('elProgress');
+    if (!out) return;
+    var core = ELS.filter(function (el) { return el.priority === 1; });
+    var done = core.filter(function (el) { return isLearned(el.z); }).length;
+    out.textContent = 'Đã thuộc ' + done + '/' + core.length + ' nguyên tố trọng tâm';
   }
 
   /* ── Thẻ chi tiết lật 3D ────────────────────────────────────── */
@@ -113,7 +251,6 @@ window.ElementsModule = (function () {
 
     var speakBtns = hasSpeech
       ? '<div class="el-speak-row">' +
-          '<button type="button" class="el-speak-btn el-speak-vi">🔊 Tiếng Việt</button>' +
           '<button type="button" class="el-speak-btn el-speak-en">🔊 ' + el.nameEn + '</button>' +
         '</div>'
       : '<p class="el-no-speech">Thiết bị không hỗ trợ đọc to 😢</p>';
@@ -154,29 +291,22 @@ window.ElementsModule = (function () {
       card.classList.toggle('flipped');
       sfxLocal('flip');
     });
-    inner.querySelector('.el-speak-vi')?.addEventListener('click', function (e) {
-      e.stopPropagation();
-      sfxLocal('tap');
-      speakElement(el, 'vi');
-    });
     inner.querySelector('.el-speak-en')?.addEventListener('click', function (e) {
       e.stopPropagation();
       sfxLocal('tap');
-      speakElement(el, 'en');
+      speakElement(el);
     });
     inner.querySelector('.el-nav-prev').addEventListener('click', function () { sfxLocal('tap'); openDetail(detailIdx - 1); });
     inner.querySelector('.el-nav-next').addEventListener('click', function () { sfxLocal('tap'); openDetail(detailIdx + 1); });
     inner.querySelector('.el-nav-close').addEventListener('click', function () { sfxLocal('pop'); closeDetail(); });
     overlay.onclick = function (e) { if (e.target === overlay) closeDetail(); };
-
-    // đọc luôn tên tiếng Việt khi mở thẻ (đã có cử chỉ chạm)
-    setTimeout(function () { speakElement(el, 'vi'); }, 350);
   }
 
   function closeDetail() {
     var overlay = document.getElementById('elDetailOverlay');
     if (overlay) overlay.hidden = true;
     if (hasSpeech) window.speechSynthesis.cancel();
+    // Ô vẫn giữ viền sáng sau khi đóng thẻ để HS không mất dấu vị trí vừa xem.
   }
 
   /* ── Luyện tập «Nghe & đoán» ────────────────────────────────── */
@@ -252,13 +382,13 @@ window.ElementsModule = (function () {
 
     document.getElementById('prSpeaker').addEventListener('click', function () {
       sfxLocal('tap');
-      speakElement(answer, 'en');
+      speakElement(answer);
     });
     body.querySelectorAll('.pr-choice').forEach(function (btn) {
       btn.addEventListener('click', function () { pickChoice(btn); });
     });
 
-    setTimeout(function () { speakElement(answer, 'en'); }, 450);
+    setTimeout(function () { speakElement(answer); }, 450);
   }
 
   function pickChoice(btn) {
@@ -276,6 +406,7 @@ window.ElementsModule = (function () {
 
     if (correct) {
       pr.score += 1;
+      bumpMastery(pr.answer.z);
       btn.classList.add('is-correct');
       sfxLocal('correct');
       if (window.HTDFx) HTDFx.burstAtElement(btn, { count: 16 });
@@ -331,11 +462,25 @@ window.ElementsModule = (function () {
   function exitPractice() {
     if (hasSpeech) window.speechSynthesis.cancel();
     pr = null;
+    refreshMastery();
     showScreen('elements');
   }
 
+  /* Luyện tập vừa làm thay đổi mức thuộc bài → vẽ lại thanh tiến độ trên bảng. */
+  function refreshMastery() {
+    document.querySelectorAll('button.el-pt-cell').forEach(function (cell) {
+      var bar = cell.querySelector('.el-mastery i');
+      if (!bar) return;
+      var z = Number(cell.dataset.z);
+      bar.style.width = Math.round((masteryOf(z) / MASTERY_FULL) * 100) + '%';
+    });
+    applyFilter();
+  }
+
+  window.matchMedia('(orientation: portrait)').addEventListener?.('change', updateRotateGate);
+
   return {
-    enterGrid: enterGrid,
+    enter: enter,
     openDetail: openDetail,
     closeDetail: closeDetail,
     startPractice: startPractice,

@@ -7,7 +7,8 @@
     "start": "node index.js",
     "test:smoke": "node scripts/ws-smoke-test.js",
     "test:phase4": "node scripts/phase4-test.js",
-    "test:phase4:load": "node scripts/phase4-test.js --load"
+    "test:phase4:load": "node scripts/phase4-test.js --load",
+    "test:duck-pick": "node scripts/duck-pick-test.js"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",

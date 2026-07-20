@@ -6,6 +6,7 @@
 @php
     $pickerColumns = [
         ['key' => 'type', 'label' => 'Loại'],
+        ['key' => 'group', 'label' => 'Nhóm'],
         ['key' => 'tags', 'label' => 'Chủ đề'],
         ['key' => 'content', 'label' => 'Nội dung'],
         ['key' => 'points', 'label' => 'Điểm'],
@@ -14,10 +15,14 @@
     ];
     $searchValue = trim((string) ($filterQuery ?? ''));
     $hasSearch = $searchValue !== '';
-    $hasFilters = ($filterTagIds ?? []) !== [] || ($filterTagNone ?? false) || ($filterTagMatch ?? 'and') !== 'and' || $filterAnswerType || $hasSearch;
-    $activeFilterCount = count($filterTagIds ?? []) + (($filterTagNone ?? false) ? 1 : 0) + (($filterTagMatch ?? 'and') !== 'and' ? 1 : 0) + ($filterAnswerType ? 1 : 0);
+    $hasFilters = ($filterTagIds ?? []) !== [] || ($filterTagNone ?? false) || ($filterTagMatch ?? 'and') !== 'and' || $filterAnswerType || $hasSearch || ($filterGroupId ?? null);
+    $activeFilterCount = count($filterTagIds ?? []) + (($filterTagNone ?? false) ? 1 : 0) + (($filterTagMatch ?? 'and') !== 'and' ? 1 : 0) + ($filterAnswerType ? 1 : 0) + (($filterGroupId ?? null) ? 1 : 0);
     $typeLabels = ['mc' => 'Trắc nghiệm', 'essay' => 'Tự luận', 'structured' => 'Phương trình'];
     $filterChips = [];
+    if ($filterGroupId ?? null) {
+        $groupLabel = $filterGroupId === 'none' ? 'Chưa phân nhóm' : ($groups->firstWhere('id', (int) $filterGroupId)?->name ?? 'Nhóm #'.$filterGroupId);
+        $filterChips[] = ['label' => 'Nhóm: '.$groupLabel, 'url' => route('admin.question-bank.index', request()->except(['group_id', 'page']))];
+    }
     foreach ($filterTagIds ?? [] as $tagId) {
         $tagName = $tags->firstWhere('id', $tagId)?->name ?? '#'.$tagId;
         $remove = request()->except(['page']);
@@ -40,11 +45,16 @@
 <div class="page-header">
     <div class="page-header__text">
         <h2>Bộ câu hỏi</h2>
-        @if (!$items->isEmpty() || $hasFilters)
+        @if ($grouped)
+            <p class="page-header__meta">{{ collect($sections)->sum('count') }} câu hỏi trong {{ count($sections) }} nhóm</p>
+        @elseif (!$items->isEmpty() || $hasFilters)
             <p class="page-header__meta">{{ $items->total() }} câu hỏi{{ $hasFilters ? ' phù hợp bộ lọc' : '' }}</p>
         @endif
     </div>
-    <a href="{{ route('admin.question-bank.create') }}" class="btn btn-primary">+ Thêm câu hỏi</a>
+    <div class="page-header__actions">
+        <a href="{{ route('admin.groups.index', ['scope' => 'question_bank']) }}" class="btn btn-secondary">Quản lý nhóm</a>
+        <a href="{{ route('admin.question-bank.create') }}" class="btn btn-primary">+ Thêm câu hỏi</a>
+    </div>
 </div>
 
 <div class="card admin-list-card" id="qbListCard" data-bulk-tags-url="{{ route('admin.question-bank.bulk-tags') }}">
@@ -73,6 +83,14 @@
         <form method="GET" class="list-filters-panel__form">
             @if ($hasSearch)<input type="hidden" name="q" value="{{ $searchValue }}">@endif
             <div class="list-filters-panel__grid">
+                <div class="form-group">
+                    @include('admin.partials.group-select', [
+                        'mode' => 'filter',
+                        'id' => 'qbGroupFilter',
+                        'groups' => $groups,
+                        'selected' => $filterGroupId ?? '',
+                    ])
+                </div>
                 <div class="form-group list-filters-panel__wide">
                     <label>Chủ đề</label>
                     @include('admin.partials.tag-select', [
@@ -110,7 +128,7 @@
         'chips' => $filterChips,
     ])
 
-    @if ($items->isEmpty())
+    @if (! $grouped && $items->isEmpty())
         <div class="empty-state">
             Chưa có câu hỏi trong bộ.
             <a href="{{ route('admin.question-bank.create') }}">Thêm câu hỏi đầu tiên</a>
@@ -123,7 +141,7 @@
             </div>
         </div>
         <div class="table-wrap admin-list-table-wrap">
-            <table class="data-table admin-list-table" data-table-id="question-bank-list">
+            <table class="data-table admin-list-table {{ $grouped ? 'admin-grouped-table' : '' }}" data-table-id="question-bank-list">
                 <colgroup>
                     <col data-col="select">
                     @foreach ($pickerColumns as $column)
@@ -140,51 +158,29 @@
                         @endforeach
                     </tr>
                 </thead>
-                <tbody>
-                    @foreach ($items as $item)
-                    <tr data-bank-item-id="{{ $item->id }}">
-                        <td class="admin-col-select" data-col="select">
-                            <input type="checkbox" class="qb-row-check" value="{{ $item->id }}" aria-label="Chọn câu hỏi">
-                        </td>
-                        <td data-col="type">@php
-                            echo match ($item->answer_type) {
-                                'mc' => 'Trắc nghiệm',
-                                'structured' => match ($item->input_mode) {
-                                    'balance' => 'Cân bằng hệ số',
-                                    'blank' => 'Điền chỗ thiếu',
-                                    'blank_balance' => 'Cân bằng + điền',
-                                    'product' => 'Điền sản phẩm',
-                                    default => 'Phương trình',
-                                },
-                                default => 'Tự luận',
-                            };
-                        @endphp</td>
-                        <td data-col="tags" class="qq-tag-cell">
-                            @include('admin.partials.question-tags-cell', [
-                                'tags' => $tags,
-                                'selectedTags' => $item->tags,
-                                'updateUrl' => route('admin.question-bank.update-tags', $item),
-                                'itemId' => $item->id,
-                            ])
-                        </td>
-                        <td data-col="content">{!! Str::limit(strip_tags($item->content), 100) !!}</td>
-                        <td data-col="points">{{ $item->points }}</td>
-                        <td data-col="time">{{ $item->time_limit_seconds }}s</td>
-                        <td data-col="actions" class="actions-cell">
-                            @include('admin.partials.row-action-menu', [
-                                'actions' => [
-                                    ['key' => 'edit', 'label' => 'Sửa', 'href' => route('admin.question-bank.edit', $item)],
-                                    ['key' => 'delete', 'label' => 'Xóa', 'danger' => true, 'href' => route('admin.question-bank.destroy', $item), 'method' => 'DELETE', 'confirm' => 'Xóa câu hỏi khỏi bộ? Câu hỏi trong quiz vẫn giữ nguyên.'],
-                                ],
-                                'dataAttrs' => ['item-label' => Str::limit(strip_tags($item->content), 40)],
-                            ])
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
+                @if ($grouped)
+                    @include('admin.partials.list-group-sections', [
+                        'sections' => $sections,
+                        'recent' => $recent,
+                        'rowView' => 'admin.question-bank._row',
+                        'rowVar' => 'item',
+                        'rowExtra' => ['tags' => $tags],
+                        'rowsUrl' => route('admin.question-bank.group-rows'),
+                        'colspan' => count($pickerColumns) + 1,
+                        'emptyText' => 'Nhóm này chưa có câu hỏi nào.',
+                    ])
+                @else
+                    <tbody>
+                        @foreach ($items as $item)
+                            @include('admin.question-bank._row', ['item' => $item, 'tags' => $tags])
+                        @endforeach
+                    </tbody>
+                @endif
             </table>
         </div>
-        @include('admin.partials.list-table-footer', ['paginator' => $items, 'itemLabel' => 'câu hỏi'])
+        @unless ($grouped)
+            @include('admin.partials.list-table-footer', ['paginator' => $items, 'itemLabel' => 'câu hỏi'])
+        @endunless
     @endif
 </div>
 
@@ -220,4 +216,5 @@
 <script src="@vasset('js/admin-csv-exchange.js')"></script>
 <script src="@vasset('js/question-tags-cell.js')"></script>
 <script src="@vasset('js/question-bank-list.js')"></script>
+<script src="@vasset('js/grouped-list.js')"></script>
 @endpush

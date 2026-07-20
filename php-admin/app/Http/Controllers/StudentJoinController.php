@@ -88,6 +88,8 @@ class StudentJoinController extends Controller
             'js/balance-data.js' => public_path('app/js/balance-data.js'),
             'js/balance-module.js' => public_path('app/js/balance-module.js'),
             'js/student-theme.js' => public_path('app/js/student-theme.js'),
+            'js/student-account.js' => public_path('app/js/student-account.js'),
+            'js/student-entitlements.js' => public_path('app/js/student-entitlements.js'),
             'js/student.js' => public_path('app/js/student.js'),
             'css/shared.css' => public_path('app/css/shared.css'),
             'css/student.css' => public_path('app/css/student.css'),

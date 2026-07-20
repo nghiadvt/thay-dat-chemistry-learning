@@ -9,6 +9,7 @@ class GameResult extends Model
 {
     protected $fillable = [
         'session_id',
+        'student_id',
         'student_name',
         'player_token',
         'score',
@@ -27,5 +28,11 @@ class GameResult extends Model
     public function session(): BelongsTo
     {
         return $this->belongsTo(GameSession::class, 'session_id');
+    }
+
+    /** Null với lượt chơi ẩn danh (vào phòng bằng PIN mà không đăng nhập). */
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
     }
 }

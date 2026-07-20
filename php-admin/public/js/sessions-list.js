@@ -99,8 +99,11 @@
       syncBulkBar();
     });
 
-    document.querySelectorAll('.sessions-row-check').forEach((cb) => {
-      cb.addEventListener('change', syncBulkBar);
+    // Uỷ quyền ở document để hàng nạp thêm khi mở nhóm cũng cập nhật được thanh chọn.
+    document.addEventListener('change', (e) => {
+      if (e.target instanceof Element && e.target.classList.contains('sessions-row-check')) {
+        syncBulkBar();
+      }
     });
 
     bulkDeleteBtn?.addEventListener('click', () => {

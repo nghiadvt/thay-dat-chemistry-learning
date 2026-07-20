@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\Concerns\HandlesAdminCsv;
+use App\Http\Controllers\Admin\Concerns\HandlesGroups;
 use App\Http\Controllers\Controller;
+use App\Models\Group;
 use App\Models\QuestionBankItem;
 use App\Models\Tag;
 use App\Services\AdminListCsvService;
 use App\Services\QuestionBankTagService;
 use App\Services\QuestionValidator;
 use App\Support\AdminListCsvRegistry;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,6 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class QuestionBankController extends Controller
 {
     use HandlesAdminCsv;
+    use HandlesGroups;
 
     public function __construct(
         private QuestionValidator $questionValidator,
@@ -28,20 +32,60 @@ class QuestionBankController extends Controller
         private AdminListCsvService $csvService,
     ) {}
 
+    /** Các tham số khiến trang chuyển từ dạng nhóm sang bảng phẳng. */
+    private const FILTER_KEYS = ['q', 'tag_ids', 'tag_none', 'answer_type', 'group_id'];
+
     public function index(Request $request): View
     {
         $filter = $this->resolveTagFilterParams($request);
-        $items = $this->filteredQuery($request)->paginate(20)->withQueryString();
+        $grouped = $this->isGroupedView($request, self::FILTER_KEYS);
+        $tags = Tag::query()->orderBy('name')->get();
 
-        return view('admin.question-bank.index', [
-            'items' => $items,
-            'tags' => Tag::query()->orderBy('name')->get(),
+        $data = [
+            'tags' => $tags,
+            'groups' => $this->groupsForScope(Group::SCOPE_QUESTION_BANK),
+            'filterGroupId' => $this->currentGroupFilter($request),
             'filterTagIds' => $filter['tag_ids'],
             'filterTagNone' => $filter['tag_none'],
             'filterTagMatch' => $filter['tag_match'],
             'filterAnswerType' => $request->string('answer_type')->toString() ?: null,
             'filterQuery' => $request->string('q')->toString() ?: null,
             'csvRegistry' => AdminListCsvRegistry::questionBank(),
+            'grouped' => $grouped,
+        ];
+
+        if ($grouped) {
+            $data['recent'] = $this->baseQuery()
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->limit(self::RECENT_LIMIT)
+                ->get();
+            $data['sections'] = $this->groupSections(QuestionBankItem::class, Group::SCOPE_QUESTION_BANK);
+            $data['items'] = null;
+        } else {
+            $data['items'] = $this->filteredQuery($request)->paginate(20)->withQueryString();
+        }
+
+        return view('admin.question-bank.index', $data);
+    }
+
+    /**
+     * Nội dung một nhóm, tải dần khi người dùng mở nhóm hoặc bấm «Xem thêm».
+     */
+    public function groupRows(Request $request): JsonResponse
+    {
+        $page = $this->groupRowsPage($this->baseQuery(), $request);
+        $tags = Tag::query()->orderBy('name')->get();
+
+        $html = '';
+        foreach ($page['items'] as $item) {
+            $html .= view('admin.question-bank._row', ['item' => $item, 'tags' => $tags])->render();
+        }
+
+        return response()->json([
+            'html' => $html,
+            'has_more' => $page['has_more'],
+            'next_offset' => $page['next_offset'],
         ]);
     }
 
@@ -88,6 +132,8 @@ class QuestionBankController extends Controller
         return view('admin.question-bank.form', [
             'item' => null,
             'tags' => Tag::query()->orderBy('name')->get(),
+            'groups' => $this->groupsForScope(Group::SCOPE_QUESTION_BANK),
+            'selectedGroupId' => old('group_id'),
             'selectedTagIds' => [],
         ]);
     }
@@ -102,8 +148,11 @@ class QuestionBankController extends Controller
             return back()->withInput()->withErrors($e->errors());
         }
 
+        $request->validate($this->groupValidationRules(Group::SCOPE_QUESTION_BANK));
+
         $item = QuestionBankItem::create([
             ...$prepared,
+            'group_id' => $this->resolveGroupId($request, Group::SCOPE_QUESTION_BANK),
             'time_limit_seconds' => $prepared['time_limit_seconds'] ?? 30,
             'points' => $prepared['points'] ?? 1,
             'is_active' => true,
@@ -122,6 +171,8 @@ class QuestionBankController extends Controller
         return view('admin.question-bank.form', [
             'item' => $question_bank,
             'tags' => Tag::query()->orderBy('name')->get(),
+            'groups' => $this->groupsForScope(Group::SCOPE_QUESTION_BANK),
+            'selectedGroupId' => old('group_id', $question_bank->group_id),
             'selectedTagIds' => old('tag_ids', $question_bank->tags->pluck('id')->all()),
         ]);
     }
@@ -136,7 +187,12 @@ class QuestionBankController extends Controller
             return back()->withInput()->withErrors($e->errors());
         }
 
-        $question_bank->update($prepared);
+        $request->validate($this->groupValidationRules(Group::SCOPE_QUESTION_BANK));
+
+        $question_bank->update([
+            ...$prepared,
+            'group_id' => $this->resolveGroupId($request, Group::SCOPE_QUESTION_BANK),
+        ]);
         $this->tagService->syncFromIds($question_bank, $request->input('tag_ids', []));
 
         return redirect()->route('admin.question-bank.index')
@@ -259,12 +315,18 @@ class QuestionBankController extends Controller
         };
     }
 
+    private function baseQuery(): Builder
+    {
+        return QuestionBankItem::query()
+            ->with(['group', 'tags'])
+            ->orderByDesc('updated_at');
+    }
+
     private function filteredQuery(Request $request)
     {
-        $query = QuestionBankItem::query()
-            ->with('tags')
-            ->orderByDesc('updated_at');
+        $query = $this->baseQuery();
 
+        $this->applyGroupFilter($query, $request);
         $this->applyTagFilter($query, $request);
 
         if ($request->filled('answer_type')) {

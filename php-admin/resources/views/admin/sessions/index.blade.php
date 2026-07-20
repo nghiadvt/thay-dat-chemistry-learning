@@ -6,6 +6,7 @@
 @php
     $sessionColumns = [
         ['key' => 'name', 'label' => 'Tên phòng'],
+        ['key' => 'group', 'label' => 'Nhóm'],
         ['key' => 'pin', 'label' => 'PIN'],
         ['key' => 'quiz', 'label' => 'Quiz'],
         ['key' => 'game', 'label' => 'Game'],
@@ -20,9 +21,10 @@
 
     $searchValue = trim((string) ($search ?? request('q', '')));
     $hasSearch = $searchValue !== '';
-    $hasFilters = request()->hasAny(['q', 'status', 'is_active', 'game_id', 'host_id', 'created_from', 'created_to']);
+    $hasFilters = request()->hasAny(['q', 'status', 'is_active', 'game_id', 'host_id', 'created_from', 'created_to', 'group_id']);
 
     $activeFilterCount = collect([
+        request('group_id'),
         request('status'),
         request('is_active'),
         request('game_id'),
@@ -34,6 +36,10 @@
     // Chip bộ lọc — cùng contract 'url' với partial list-active-filters (như các trang khác)
     $chipRemoveUrl = fn (string $key) => route('admin.sessions.index', array_diff_key(request()->query(), [$key => '', 'page' => '']));
     $filterChips = [];
+    if ($filterGroupId ?? null) {
+        $groupLabel = $filterGroupId === 'none' ? 'Chưa phân nhóm' : ($groups->firstWhere('id', (int) $filterGroupId)?->name ?? 'Nhóm #'.$filterGroupId);
+        $filterChips[] = ['label' => 'Nhóm: '.$groupLabel, 'url' => $chipRemoveUrl('group_id')];
+    }
     if (request('status')) {
         $filterChips[] = ['label' => 'Trạng thái: '.($statusLabels[request('status')] ?? request('status')), 'url' => $chipRemoveUrl('status')];
     }
@@ -60,11 +66,16 @@
 <div class="page-header">
     <div class="page-header__text">
         <h2>Danh sách phòng</h2>
-        @if (!$sessions->isEmpty() || $hasFilters)
+        @if ($grouped)
+            <p class="page-header__meta">{{ collect($sections)->sum('count') }} phòng trong {{ count($sections) }} nhóm</p>
+        @elseif (!$sessions->isEmpty() || $hasFilters)
             <p class="page-header__meta">{{ $sessions->total() }} phòng{{ $hasFilters ? ' phù hợp bộ lọc' : '' }}</p>
         @endif
     </div>
-    <a href="{{ route('admin.sessions.create') }}" class="btn btn-primary">+ Tạo phòng mới</a>
+    <div class="page-header__actions">
+        <a href="{{ route('admin.groups.index', ['scope' => 'session']) }}" class="btn btn-secondary">Quản lý nhóm</a>
+        <a href="{{ route('admin.sessions.create') }}" class="btn btn-primary">+ Tạo phòng mới</a>
+    </div>
 </div>
 
 <div class="card admin-list-card sessions-list-card" id="sessionsListCard" data-bulk-destroy-url="{{ route('admin.sessions.bulk-destroy') }}">
@@ -132,6 +143,14 @@
             @endif
             <div class="list-filters-panel__grid">
                 <div class="form-group">
+                    @include('admin.partials.group-select', [
+                        'mode' => 'filter',
+                        'id' => 'sessionGroupFilter',
+                        'groups' => $groups,
+                        'selected' => $filterGroupId ?? '',
+                    ])
+                </div>
+                <div class="form-group">
                     <label for="sessionStatus">Trạng thái</label>
                     <select id="sessionStatus" name="status" class="list-filter-control">
                         <option value="">Tất cả</option>
@@ -191,7 +210,7 @@
             : null,
     ])
 
-    @if ($sessions->isEmpty())
+    @if (! $grouped && $sessions->isEmpty())
         <div class="empty-state">
             @if ($hasFilters)
                 Không có phòng phù hợp. <a href="{{ route('admin.sessions.index') }}">Xóa bộ lọc</a>
@@ -225,82 +244,28 @@
                         @endforeach
                     </tr>
                 </thead>
-                <tbody>
-                    @foreach ($sessions as $session)
-                    @php
-                        $rowActions = [];
-                        if ($session->quiz_id) {
-                            $rowActions[] = ['key' => 'trial', 'label' => 'Chơi thử'];
-                        }
-                        if ($session->status !== 'ended') {
-                            $rowActions[] = ['key' => 'host', 'label' => 'Vào phòng chơi'];
-                        }
-                        if ($session->status === 'ended' && $session->is_active) {
-                            $rowActions[] = ['key' => 'replay', 'label' => 'Chơi lại'];
-                        }
-                        if ($session->status !== 'playing') {
-                            $rowActions[] = ['key' => 'delete', 'label' => 'Xóa phòng', 'danger' => true];
-                        }
-                    @endphp
-                    <tr class="{{ $session->is_active ? '' : 'row-inactive' }}" data-session-id="{{ $session->id }}">
-                        <td class="sessions-col-select" data-col="select">
-                            <input
-                                type="checkbox"
-                                class="sessions-row-check"
-                                value="{{ $session->id }}"
-                                aria-label="Chọn phòng {{ $session->name ?? $session->pin }}"
-                                @disabled($session->status === 'playing')
-                            >
-                        </td>
-                        <td data-col="name">
-                            <span class="session-name-cell">{{ $session->name ?? 'Phòng '.$session->pin }}</span>
-                        </td>
-                        <td data-col="pin">
-                            <span class="session-pin-badge">{{ $session->pin }}</span>
-                        </td>
-                        <td data-col="quiz" title="{{ $session->quiz?->name }}">{{ $session->quiz?->name ?? '—' }}</td>
-                        <td data-col="game" title="{{ $session->game?->name }}">{{ $session->game?->name ?? '—' }}</td>
-                        <td data-col="host">{{ $session->host?->name ?? '—' }}</td>
-                        <td data-col="status">
-                            <span class="badge badge-{{ $session->status }}">
-                                {{ $statusLabels[$session->status] ?? $session->status }}
-                            </span>
-                        </td>
-                        <td data-col="active">
-                            @include('admin.partials.toggle-switch', [
-                                'formAction' => route('admin.sessions.toggle-active', $session),
-                                'checked' => $session->is_active,
-                                'submitOnChange' => true,
-                                'label' => 'Bật / tắt phòng',
-                            ])
-                        </td>
-                        <td data-col="created" class="session-created-cell">{{ $session->created_at?->format('d/m/Y H:i') }}</td>
-                        <td data-col="actions" class="actions-cell">
-                            <div class="row-actions-group">
-                                <a href="{{ route('admin.sessions.edit', $session) }}" class="btn btn-secondary btn-sm">Chi tiết</a>
-                                @if (!empty($rowActions))
-                                    @include('admin.partials.row-action-menu', [
-                                        'menuLabel' => 'Khác',
-                                        'actions' => $rowActions,
-                                        'dataAttrs' => [
-                                            'host-url' => route('admin.sessions.show', $session),
-                                            'reset-url' => route('admin.sessions.reset', $session),
-                                            'delete-url' => route('admin.sessions.destroy', $session),
-                                            'quiz-id' => $session->quiz_id,
-                                            'quiz-name' => $session->quiz?->name,
-                                            'session-pin' => $session->pin,
-                                            'session-name' => $session->name ?? ('Phòng '.$session->pin),
-                                        ],
-                                    ])
-                                @endif
-                            </div>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
+                @if ($grouped)
+                    @include('admin.partials.list-group-sections', [
+                        'sections' => $sections,
+                        'recent' => $recent,
+                        'rowView' => 'admin.sessions._row',
+                        'rowVar' => 'session',
+                        'rowExtra' => ['statusLabels' => $statusLabels],
+                        'rowsUrl' => route('admin.sessions.group-rows'),
+                        'colspan' => count($sessionColumns) + 1,
+                        'emptyText' => 'Nhóm này chưa có phòng nào.',
+                    ])
+                @else
+                    <tbody>
+                        @foreach ($sessions as $session)
+                            @include('admin.sessions._row', ['session' => $session, 'statusLabels' => $statusLabels])
+                        @endforeach
+                    </tbody>
+                @endif
             </table>
         </div>
 
+        @unless ($grouped)
         <div class="list-table-footer">
             <p class="list-table-footer__summary">
                 @if ($sessions->total())
@@ -313,6 +278,7 @@
                 </div>
             @endif
         </div>
+        @endunless
     @endif
 </div>
 
@@ -343,4 +309,5 @@
 @php $qpJs = public_path('htd-admin/js/quiz-preview.js'); $slJs = public_path('js/sessions-list.js'); @endphp
 <script src="@vasset('htd-admin/js/quiz-preview.js')"></script>
 <script src="@vasset('js/sessions-list.js')"></script>
+<script src="@vasset('js/grouped-list.js')"></script>
 @endpush

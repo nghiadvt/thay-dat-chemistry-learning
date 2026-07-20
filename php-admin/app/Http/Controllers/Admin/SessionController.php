@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\HandlesGroups;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\GameSession;
+use App\Models\Group;
 use App\Models\Quiz;
 use App\Models\User;
 use App\Services\GamePlayModeResolver;
@@ -13,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Services\PinGenerator;
 use App\Services\RedisRoomService;
 use App\Services\SessionQrService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,16 +25,47 @@ use Illuminate\View\View;
 
 class SessionController extends Controller
 {
+    use HandlesGroups;
+
     public function __construct(
         private PinGenerator $pinGenerator,
         private RedisRoomService $redisRoomService,
         private SessionQrService $sessionQrService,
     ) {}
 
+    /** Các tham số khiến trang chuyển từ dạng nhóm sang bảng phẳng. */
+    private const FILTER_KEYS = ['q', 'status', 'is_active', 'game_id', 'host_id', 'created_from', 'created_to', 'group_id'];
+
+    private function baseQuery(): Builder
+    {
+        return GameSession::query()
+            ->with(['game:id,name', 'group', 'quiz:id,name', 'host:id,name']);
+    }
+
+    /**
+     * Nội dung một nhóm, tải dần khi người dùng mở nhóm hoặc bấm «Xem thêm».
+     */
+    public function groupRows(Request $request): JsonResponse
+    {
+        $page = $this->groupRowsPage($this->baseQuery(), $request);
+
+        $html = '';
+        foreach ($page['items'] as $session) {
+            $html .= view('admin.sessions._row', ['session' => $session])->render();
+        }
+
+        return response()->json([
+            'html' => $html,
+            'has_more' => $page['has_more'],
+            'next_offset' => $page['next_offset'],
+        ]);
+    }
+
     public function index(Request $request): View
     {
-        $query = GameSession::query()
-            ->with(['game:id,name', 'quiz:id,name', 'host:id,name']);
+        $query = $this->baseQuery();
+
+        $this->applyGroupFilter($query, $request);
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
@@ -65,10 +99,17 @@ class SessionController extends Controller
             $query->whereDate('created_at', '<=', $request->date('created_to'));
         }
 
-        $sessions = $query
-            ->orderByDesc('created_at')
-            ->paginate(20)
-            ->withQueryString();
+        $grouped = $this->isGroupedView($request, self::FILTER_KEYS);
+
+        $sessions = $grouped
+            ? null
+            : $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+
+        $recent = $grouped
+            ? $this->baseQuery()->orderByDesc('updated_at')->orderByDesc('id')->limit(self::RECENT_LIMIT)->get()
+            : collect();
+
+        $sections = $grouped ? $this->groupSections(GameSession::class, Group::SCOPE_SESSION) : [];
 
         $games = Game::query()->orderBy('name')->get(['id', 'name']);
         $hosts = User::query()
@@ -76,7 +117,13 @@ class SessionController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('admin.sessions.index', compact('sessions', 'games', 'hosts', 'search'));
+        $groups = $this->groupsForScope(Group::SCOPE_SESSION);
+        $filterGroupId = $this->currentGroupFilter($request);
+
+        return view('admin.sessions.index', compact(
+            'sessions', 'games', 'hosts', 'search', 'groups', 'filterGroupId',
+            'grouped', 'recent', 'sections',
+        ));
     }
 
     public function create(): View
@@ -90,7 +137,10 @@ class SessionController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('admin.sessions.create', compact('games', 'quizzes'));
+        $groups = $this->groupsForScope(Group::SCOPE_SESSION);
+        $selectedGroupId = old('group_id');
+
+        return view('admin.sessions.create', compact('games', 'quizzes', 'groups', 'selectedGroupId'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -98,6 +148,7 @@ class SessionController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'quiz_id' => ['required', 'integer', Rule::exists('quizzes', 'id')->where('is_active', true)],
+            ...$this->groupValidationRules(Group::SCOPE_SESSION),
         ]);
 
         $quiz = Quiz::with('game')->findOrFail($validated['quiz_id']);
@@ -112,6 +163,7 @@ class SessionController extends Controller
         $session = GameSession::create([
             'pin' => $pin,
             'name' => $validated['name'],
+            'group_id' => $this->resolveGroupId($request, Group::SCOPE_SESSION),
             'host_id' => Auth::id(),
             'game_id' => $quiz->game_id,
             'quiz_id' => $quiz->id,
@@ -141,7 +193,7 @@ class SessionController extends Controller
 
     public function edit(GameSession $session): View
     {
-        $session->load(['game', 'quiz', 'host']);
+        $session->load(['game', 'group', 'quiz', 'host']);
 
         $games = Game::query()->orderBy('name')->get();
 
@@ -168,7 +220,10 @@ class SessionController extends Controller
         $joinUrl = $this->sessionQrService->joinUrl($session);
         $qrUrl = $this->sessionQrService->displayQrUrl($session, $joinUrl);
 
-        return view('admin.sessions.edit', compact('session', 'games', 'quizzes', 'canChangeQuiz', 'joinUrl', 'qrUrl'));
+        $groups = $this->groupsForScope(Group::SCOPE_SESSION);
+        $selectedGroupId = old('group_id', $session->group_id);
+
+        return view('admin.sessions.edit', compact('session', 'games', 'quizzes', 'canChangeQuiz', 'joinUrl', 'qrUrl', 'groups', 'selectedGroupId'));
     }
 
     public function update(Request $request, GameSession $session): RedirectResponse
@@ -177,6 +232,7 @@ class SessionController extends Controller
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
+            ...$this->groupValidationRules(Group::SCOPE_SESSION),
         ];
 
         if ($canChangeQuiz) {
@@ -186,6 +242,7 @@ class SessionController extends Controller
         $validated = $request->validate($rules);
 
         $session->name = $validated['name'];
+        $session->group_id = $this->resolveGroupId($request, Group::SCOPE_SESSION);
 
         if ($canChangeQuiz) {
             $quiz = Quiz::with('game')->findOrFail($validated['quiz_id']);

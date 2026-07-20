@@ -1,13 +1,42 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions",
     "allow": [
+      "Bash",
+      "PowerShell",
       "Bash(grep -n \"PIN\\\\s*·\\\\s*123456\" -A3 -B15 \"//wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning/prototype/teacher.html\" | head -40)",
       "Read(///wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning/prototype/**)",
       "Bash(php -v)",
       "Skill(update-config)",
       "Skill(update-config:*)",
-      "Bash(curl -s -c cookies.txt -b cookies.txt -H 'X-CSRF-TOKEN: __TRACKED_VAR__' -H 'Accept: application/json' -X DELETE -w '\\\\nHTTP_STATUS:%{http_code}\\\\n' __TRACKED_VAR__/api/image-crop-sources/6/regions/12)"
-    ]
+      "Bash(curl -s -c cookies.txt -b cookies.txt -H 'X-CSRF-TOKEN: __TRACKED_VAR__' -H 'Accept: application/json' -X DELETE -w '\\\\nHTTP_STATUS:%{http_code}\\\\n' __TRACKED_VAR__/api/image-crop-sources/6/regions/12)",
+      "Bash(wsl -e bash -lc \"cd /home/tien-nghia/projects/thay-dat-chemistry-learning/php-admin && echo composer: \\\\$\\(composer --version 2>&1 | head -1\\) && echo sqlite: \\\\$\\(php -m | grep -i pdo_sqlite\\) && echo openssl: \\\\$\\(php -m | grep -i '^openssl'\\)\")",
+      "Bash(wsl -e bash -lc \"cd /home/tien-nghia/projects/thay-dat-chemistry-learning/php-admin && export APP_KEY='base64:gQyiLmxUO2I5ADTT/2Ju5XfGmRAiy/I2lq6GZJOAZ6o=' APP_ENV=local APP_URL=http://127.0.0.1:8899 DB_CONNECTION=sqlite DB_DATABASE=/tmp/smoke2.sqlite SESSION_DRIVER=file CACHE_STORE=file && php artisan serve --host=127.0.0.1 --port=8899 > /tmp/serve2.log 2>&1\")",
+      "Bash(wsl -e bash -lc ' *)",
+      "Bash(wsl -e bash -lc \"pkill -f 'artisan serv[e]'; sleep 1; rm -f /tmp/smoke2.sqlite /tmp/seed2.php /tmp/sj.txt /tmp/tj.txt /tmp/lp.html /tmp/tl.html /tmp/serve2.log; echo 'da don dep'; pgrep -f 'artisan serv[e]' >/dev/null && echo 'CANH BAO: server van chay' || echo 'server da dung'\")",
+      "Bash(wsl -e bash -lc 'cd /home/tien-nghia/projects/thay-dat-chemistry-learning && set -a && . ./.env && set +a && DB_HOST=127.0.0.1 DB_PORT=38306 DB_NAME=htd_verify DB_USER=\"$DB_USER\" DB_PASSWORD=\"$DB_PASSWORD\" node /tmp/ws_verify.js 2>&1 | tail -6')",
+      "Bash(cd \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\tien-nghia\\\\projects\\\\thay-dat-chemistry-learning\")",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning\" && ls php-admin/app/Http/Controllers/Admin/ && echo \"---VIEWS---\" && ls -R php-admin/resources/views/admin/ | head -60)",
+      "Read(///wsl.localhost/Ubuntu/home/tien-nghia/projects/**)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning\" && cat php-admin/routes/web.php | head -120)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning\" && grep -n \"student\" php-admin/routes/web.php | sed -n '1,200p' && echo \"=== VIEWS ===\" && ls -la php-admin/resources/views/admin/students/ && echo \"=== wc ===\" && wc -l php-admin/resources/views/admin/students/* php-admin/app/Http/Controllers/Admin/Student*.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; sed -n 60,140p php-admin/resources/views/layouts/admin.blade.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; tail -30 php-admin/public/css/admin.css; echo \"=== grep tag-chip css ===\"; grep -n \"\\\\.tag-chip\" php-admin/public/css/*.css | head)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; grep -n \"data-confirm\" php-admin/public/js/admin-confirm.js | head -5; echo \"--- controller imports in web.php ---\"; sed -n 1,40p php-admin/routes/web.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; sed -n 152,162p php-admin/routes/web.php)",
+      "Bash(python3 -)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; grep -n \"public function \\\\\\(game\\\\|quiz\\\\|host\\\\\\)\\(\" php-admin/app/Models/GameSession.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; grep -n \"filteredQuery\\\\|public function create\\\\|public function edit\\\\|public function store\\\\|public function update\\\\|validateItem\\\\|private function\\\\|resolveTagFilterParams\" php-admin/app/Http/Controllers/Admin/QuestionBankController.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; sed -n 80,175p php-admin/app/Http/Controllers/Admin/SessionController.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; sed -n 175,215p php-admin/app/Http/Controllers/Admin/SessionController.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; grep -rn \"page-header__actions\" php-admin/public/css/ php-admin/resources/views/ | head; echo \"=== quizzes/show tag-select ===\"; grep -n \"tag-select\\\\|page-header\\\\|form method\" php-admin/resources/views/admin/quizzes/show.blade.php | head -20)",
+      "Bash(cat)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; grep -n \"tag-select\\\\|tag-checklist\\\\|Chủ đề\" php-admin/resources/views/admin/question-bank/form.blade.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; sed -n 1,60p php-admin/resources/views/admin/sessions/edit.blade.php)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\tien-nghia\\\\\\\\projects\\\\\\\\thay-dat-chemistry-learning\"; sed -n 58,82p php-admin/resources/views/admin/sessions/edit.blade.php)",
+      "Read(///wsl.localhost/Ubuntu/home/tien-nghia/projects/thay-dat-chemistry-learning/**)",
+      "Bash(php artisan *)",
+      "Bash(wsl -d Ubuntu -- bash -lc \"cd /home/tien-nghia/projects/thay-dat-chemistry-learning/php-admin && grep -E '^DB_' .env && php artisan migrate --force 2>&1 | tail -20\")"
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }

@@ -9,6 +9,7 @@ class SessionAnswer extends Model
 {
     protected $fillable = [
         'session_id',
+        'student_id',
         'question_id',
         'student_name',
         'answer_submitted',
@@ -34,5 +35,11 @@ class SessionAnswer extends Model
     public function question(): BelongsTo
     {
         return $this->belongsTo(Question::class);
+    }
+
+    /** Null với lượt chơi ẩn danh (vào phòng bằng PIN mà không đăng nhập). */
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
     }
 }

@@ -14,6 +14,7 @@ class GameSession extends Model
         'pin',
         'qr_path',
         'name',
+        'group_id',
         'host_id',
         'game_id',
         'quiz_id',
@@ -64,6 +65,11 @@ class GameSession extends Model
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(Group::class);
     }
 
     public function quiz(): BelongsTo

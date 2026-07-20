@@ -397,6 +397,12 @@
 .ic-icon-btn:hover { background: #f3f4f6; }
 .ic-icon-btn.is-active { border-color: #f97316; color: #f97316; background: #fff7ed; }
 
+.ic-toggle-btn.is-active {
+  border-color: #f97316;
+  color: #f97316;
+  background: #fff7ed;
+}
+
 .ic-box-rotate-input {
   width: 52px;
   padding: 4px 6px;

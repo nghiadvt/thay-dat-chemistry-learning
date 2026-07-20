@@ -76,6 +76,52 @@ a { color: #2D46D6; }
   color: #fff;
 }
 
+.admin-nav-group summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.admin-nav-group summary::-webkit-details-marker { display: none; }
+.admin-nav-group summary::marker { content: ''; }
+.admin-nav-group summary:hover { background: #334155; color: #fff; }
+.admin-nav-group summary.has-active-child { color: #fff; font-weight: 600; }
+
+.admin-nav-group__label { flex: 1; }
+
+.admin-nav-group__chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+.admin-nav-group[open] .admin-nav-group__chevron { transform: rotate(45deg); }
+
+.admin-nav-group__children {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0 6px;
+}
+.admin-nav-group__children a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px 8px 40px;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+.admin-nav-group__children a:hover { background: #334155; color: #fff; }
+.admin-nav-group__children a.active { background: #2D46D6; color: #fff; }
+
 .admin-main {
   flex: 1;
   display: flex;
@@ -1714,3 +1760,90 @@ table.data-table tr.row-inactive td {
 }
 .tag-list--spaced { margin-top: 8px; }
 .input-narrow { max-width: 160px; }
+
+/* ── Chọn nhóm (quiz / bộ câu hỏi / phòng chơi) ───────────────────── */
+.group-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-select__new {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.group-select__new input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.group-select__add {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: #2d46d6;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group-select__add:hover {
+  text-decoration: underline;
+}
+
+/* Trang quản lý nhóm */
+.group-scope-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.group-scope-tabs a {
+  padding: 6px 14px;
+  border: 1px solid #d7dbe7;
+  border-radius: 999px;
+  color: #4b5563;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.group-scope-tabs a.active {
+  border-color: #2d46d6;
+  background: #2d46d6;
+  color: #fff;
+}
+
+.group-row-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.group-row-form input[type="color"] {
+  width: 40px;
+  height: 32px;
+  padding: 2px;
+}
+
+.group-row-form input[type="number"] {
+  width: 76px;
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.page-header__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

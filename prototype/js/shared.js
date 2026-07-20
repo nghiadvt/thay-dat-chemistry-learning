@@ -302,3 +302,19 @@ const HTD = {
     delete room.startedAt;
   },
 };
+
+/* Auto-fullscreen trên mobile (Android Chrome) khi HS chạm lần đầu — bỏ qua nếu
+   đã cài PWA (đã fullscreen sẵn) hoặc không phải thiết bị cảm ứng (desktop admin). */
+(function () {
+  if (!document.body.classList.contains('student-app')) return;
+  if (window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone) return;
+  if (!('ontouchstart' in window)) return;
+
+  document.addEventListener(
+    'touchend',
+    () => {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    },
+    { once: true, capture: true },
+  );
+})();

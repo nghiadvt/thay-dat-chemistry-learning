@@ -44,6 +44,8 @@ const state = {
   streak: 0,
   lastTickSec: null,
   lastDuckScore: null,
+  duckSprite: null,
+  duckSprites: [],
   lastWaitingCount: 0,
   finalTimers: [],
   /** PIN của phòng đang tham gia (backend) — dùng để tự vào lại khi mất mạng */
@@ -219,6 +221,8 @@ function showScreen(id) {
 
   if (id === 'join') initJoin();
   if (id === 'profile') initProfile();
+  if (id === 'account' && window.StudentAccount) StudentAccount.render();
+  if (id === 'duck-pick') renderDuckPicker();
   if (id === 'waiting') {
     renderWaitingGrid();
     startWaitingPoll();
@@ -228,7 +232,7 @@ function showScreen(id) {
   if (id === 'question') startQuestion();
   if (id === 'leaderboard') renderLeaderboard();
   if (id === 'final') renderFinal();
-  if (id === 'elements' && window.ElementsModule) ElementsModule.enterGrid();
+  if (id === 'elements' && window.ElementsModule) ElementsModule.enter();
   syncGamePoll();
 }
 
@@ -246,6 +250,8 @@ function goStudentHome() {
 
 function openHomeFeature(feature) {
   sfx('tap');
+  // Tính năng bị giáo viên khóa hẳn: hiện thông báo, không mở.
+  if (window.StudentEntitlements && !StudentEntitlements.guard(feature)) return;
   if (feature === 'play') {
     window.location.href = '/join';
     return;
@@ -706,7 +712,7 @@ function submitProfile() {
         state.joinedPin = room.pin;
         setupStudentReconnect();
         sfx('join');
-        handleBackendRoomJoined(data);
+        handleBackendRoomJoined(data, { allowDuckPick: true });
       })
       .catch(err => alert(err.message || 'Không vào được phòng.'));
     return;
@@ -791,8 +797,9 @@ function rejoinAfterReconnect(attempt = 0) {
     });
 }
 
-function handleBackendRoomJoined(data) {
+function handleBackendRoomJoined(data, opts = {}) {
   state.myScore = Number(data?.score || 0);
+  if (data?.play_mode_slug) state.playMode = data.play_mode_slug;
 
   // Theme màn hình HS do giáo viên quyết định — áp dụng ngay khi vào phòng
   if (data?.student_theme && window.HTDTheme) {
@@ -817,6 +824,13 @@ function handleBackendRoomJoined(data) {
     if (!state.currentQuestion && state.screen !== 'question') {
       showScreen('waiting');
     }
+    return;
+  }
+
+  if (opts.allowDuckPick && data?.play_mode_slug === 'duck_race') {
+    state.duckSprite = data.duck_sprite || null;
+    state.duckSprites = Array.isArray(data.duck_sprites) ? data.duck_sprites : [];
+    showScreen('duck-pick');
     return;
   }
 
@@ -1924,12 +1938,119 @@ function nextQuestion() {
   showScreen('question');
 }
 
+/* Registry vịt chuyển động (frame + fps) quản lý trong DB — resolve token "db:{id}"
+   từ mode_config.visual.duck_sprites. Xem php-admin/app/Http/Controllers/Api/DuckSpriteController.php */
+const duckSpriteRegistry = { loaded: false, loading: null, byToken: {} };
+
+async function ensureDuckSpriteRegistry() {
+  if (duckSpriteRegistry.loaded) return duckSpriteRegistry.byToken;
+  if (!duckSpriteRegistry.loading) {
+    duckSpriteRegistry.loading = fetch('/api/duck-sprites/public')
+      .then(res => res.json())
+      .then(json => {
+        (json?.data || []).forEach(duck => {
+          duckSpriteRegistry.byToken[`db:${duck.id}`] = {
+            fps: Number(duck.fps) || 10,
+            frames: (duck.frames || []).map(f => f.url),
+          };
+        });
+      })
+      .catch(() => {})
+      .finally(() => {
+        duckSpriteRegistry.loaded = true;
+      });
+  }
+  await duckSpriteRegistry.loading;
+  return duckSpriteRegistry.byToken;
+}
+
+function resolveDuckFrames(sprite) {
+  return String(sprite || '').startsWith('db:') ? duckSpriteRegistry.byToken[sprite] || null : null;
+}
+
 function studentDuckImgUrl(sprite) {
   const base = '/htd-admin/assets/duck-race/';
   const fallback = `${base}ducks/duck-blue.gif`;
   if (!sprite) return fallback;
+  const dbEntry = resolveDuckFrames(sprite);
+  if (dbEntry) return dbEntry.frames[0] || fallback;
+  if (String(sprite).startsWith('db:')) return fallback; // chưa load xong registry
   const path = String(sprite).replace(/^\//, '');
   return path.startsWith('htd-admin/') ? `/${path}` : `${base}${path}`;
+}
+
+async function renderDuckPicker() {
+  const grid = document.getElementById('duckPickGrid');
+  if (!grid) return;
+  const sprites = state.duckSprites.length ? state.duckSprites : [state.duckSprite].filter(Boolean);
+
+  if (sprites.some(s => String(s).startsWith('db:'))) {
+    await ensureDuckSpriteRegistry();
+  }
+  if (state.screen !== 'duck-pick') return; // đã rời màn hình trong lúc chờ tải
+
+  grid.innerHTML = sprites
+    .map(
+      (sprite, i) => `
+        <button type="button" class="duck-pick-item" onclick="selectDuckSprite('${String(sprite).replace(/'/g, "\\'")}')">
+          <img id="duckPickImg${i}" src="${studentDuckImgUrl(sprite)}" alt="">
+        </button>
+      `,
+    )
+    .join('');
+
+  startDuckPickAnimation(sprites);
+}
+
+/* Vòng lặp rAF nhẹ, tự dừng khi rời màn hình duck-pick — cùng thuật toán với
+   preview animation trong admin (php-admin/public/js/duck-sprite-manager.js). */
+function startDuckPickAnimation(sprites) {
+  const anims = sprites
+    .map((sprite, i) => {
+      const entry = resolveDuckFrames(sprite);
+      if (!entry || entry.frames.length < 2) return null;
+      return { img: document.getElementById(`duckPickImg${i}`), urls: entry.frames, fps: entry.fps, idx: 0, acc: 0 };
+    })
+    .filter(Boolean);
+  if (!anims.length) return;
+
+  let lastTs = 0;
+  function tick(ts) {
+    if (state.screen !== 'duck-pick') return;
+    const dt = lastTs ? ts - lastTs : 0;
+    lastTs = ts;
+    anims.forEach(anim => {
+      if (!anim.img?.isConnected) return;
+      anim.acc += dt;
+      const frameMs = 1000 / anim.fps;
+      if (anim.acc >= frameMs) {
+        anim.idx = (anim.idx + Math.floor(anim.acc / frameMs)) % anim.urls.length;
+        anim.acc %= frameMs;
+        anim.img.src = anim.urls[anim.idx];
+      }
+    });
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function selectDuckSprite(sprite) {
+  sfx('tap');
+  state.duckSprite = sprite;
+  if (isBackendMode()) {
+    HTDBridge.selectDuck(sprite).catch(() => {});
+  }
+  proceedFromDuckPick();
+}
+
+function skipDuckPick() {
+  sfx('tap');
+  proceedFromDuckPick();
+}
+
+function proceedFromDuckPick() {
+  state.waitingJoinedAt = Date.now();
+  showScreen('waiting');
 }
 
 function formatStudentFinishTime(elapsedS) {

@@ -3,14 +3,18 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\Concerns\HandlesAdminCsv;
+use App\Http\Controllers\Admin\Concerns\HandlesGroups;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
+use App\Models\Group;
 use App\Models\Keyboard;
 use App\Models\Quiz;
 use App\Models\Tag;
 use App\Services\AdminListCsvService;
 use App\Services\QuizTagService;
 use App\Support\AdminListCsvRegistry;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,25 +24,64 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class QuizController extends Controller
 {
     use HandlesAdminCsv;
+    use HandlesGroups;
 
     public function __construct(
         private QuizTagService $quizTagService,
         private AdminListCsvService $csvService,
     ) {}
 
+    /** Các tham số khiến trang chuyển từ dạng nhóm sang bảng phẳng. */
+    private const FILTER_KEYS = ['q', 'game_id', 'tag_id', 'group_id'];
+
     public function index(Request $request): View
     {
         $search = trim((string) $request->input('q', ''));
-        $quizzes = $this->filteredQuery($request)->paginate(20)->withQueryString();
+        $grouped = $this->isGroupedView($request, self::FILTER_KEYS);
 
-        return view('admin.quizzes.index', [
-            'quizzes' => $quizzes,
+        $data = [
             'games' => Game::orderBy('name')->get(),
             'tags' => Tag::query()->orderBy('name')->get(),
+            'groups' => $this->groupsForScope(Group::SCOPE_QUIZ),
+            'filterGroupId' => $this->currentGroupFilter($request),
             'filterGameId' => $request->integer('game_id') ?: null,
             'filterTagId' => $request->filled('tag_id') ? $request->string('tag_id')->toString() : null,
             'search' => $search,
             'csvRegistry' => AdminListCsvRegistry::quiz(),
+            'grouped' => $grouped,
+        ];
+
+        if ($grouped) {
+            $data['recent'] = $this->baseQuery()
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->limit(self::RECENT_LIMIT)
+                ->get();
+            $data['sections'] = $this->groupSections(Quiz::class, Group::SCOPE_QUIZ);
+            $data['quizzes'] = null;
+        } else {
+            $data['quizzes'] = $this->filteredQuery($request)->paginate(20)->withQueryString();
+        }
+
+        return view('admin.quizzes.index', $data);
+    }
+
+    /**
+     * Nội dung một nhóm, tải dần khi người dùng mở nhóm hoặc bấm «Xem thêm».
+     */
+    public function groupRows(Request $request): JsonResponse
+    {
+        $page = $this->groupRowsPage($this->baseQuery(), $request);
+
+        $html = '';
+        foreach ($page['items'] as $quiz) {
+            $html .= view('admin.quizzes._row', ['quiz' => $quiz])->render();
+        }
+
+        return response()->json([
+            'html' => $html,
+            'has_more' => $page['has_more'],
+            'next_offset' => $page['next_offset'],
         ]);
     }
 
@@ -87,6 +130,8 @@ class QuizController extends Controller
             'games' => Game::orderBy('name')->get(),
             'keyboards' => Keyboard::orderBy('name')->get(),
             'bankTags' => Tag::query()->orderBy('name')->get(),
+            'groups' => $this->groupsForScope(Group::SCOPE_QUIZ),
+            'selectedGroupId' => old('group_id'),
             'selectedQuizTagIds' => old('tag_ids', []),
         ]);
     }
@@ -97,6 +142,7 @@ class QuizController extends Controller
 
         $quiz = Quiz::create([
             ...$validated,
+            'group_id' => $this->resolveGroupId($request, Group::SCOPE_QUIZ),
             'sort_order' => $validated['sort_order'] ?? 0,
             'is_active' => $request->boolean('is_active'),
             'show_explanation' => $request->boolean('show_explanation'),
@@ -113,6 +159,7 @@ class QuizController extends Controller
     {
         $quiz->load([
             'game',
+            'group',
             'keyboard',
             'tags',
             'questions' => fn ($q) => $q->orderBy('sort_order')->with('sourceBankItem.tags'),
@@ -123,6 +170,8 @@ class QuizController extends Controller
             'games' => Game::orderBy('name')->get(),
             'keyboards' => Keyboard::orderBy('name')->get(),
             'bankTags' => Tag::query()->orderBy('name')->get(),
+            'groups' => $this->groupsForScope(Group::SCOPE_QUIZ),
+            'selectedGroupId' => old('group_id', $quiz->group_id),
             'selectedQuizTagIds' => old('tag_ids', $quiz->tags->pluck('id')->all()),
         ]);
     }
@@ -138,6 +187,7 @@ class QuizController extends Controller
 
         $quiz->update([
             ...$validated,
+            'group_id' => $this->resolveGroupId($request, Group::SCOPE_QUIZ),
             'sort_order' => $validated['sort_order'] ?? 0,
             'show_explanation' => $request->boolean('show_explanation'),
             'shuffle_options' => $request->boolean('shuffle_options'),
@@ -185,15 +235,23 @@ class QuizController extends Controller
             'shuffle_options' => ['nullable'],
             'tag_ids' => ['nullable', 'array'],
             'tag_ids.*' => ['integer', 'exists:tags,id'],
+            ...$this->groupValidationRules(Group::SCOPE_QUIZ),
         ]);
+    }
+
+    private function baseQuery(): Builder
+    {
+        return Quiz::query()
+            ->with(['game', 'group', 'keyboard', 'tags'])
+            ->withCount('questions')
+            ->orderBy('sort_order');
     }
 
     private function filteredQuery(Request $request)
     {
-        $query = Quiz::query()
-            ->with(['game', 'keyboard', 'tags'])
-            ->withCount('questions')
-            ->orderBy('sort_order');
+        $query = $this->baseQuery();
+
+        $this->applyGroupFilter($query, $request);
 
         if ($request->filled('game_id')) {
             $query->where('game_id', $request->integer('game_id'));

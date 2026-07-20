@@ -23,6 +23,21 @@
   <link rel="stylesheet" href="css/duck-race-student.css">
   <link rel="stylesheet" href="css/student-themes.css">
   <script>(function(){try{var t=localStorage.getItem('htd_student_theme');if(t&&t!=='default')document.documentElement.setAttribute('data-student-theme',t);}catch(e){}})();</script>
+  <script>
+    (function(){
+      // Một số trình duyệt mobile (WebView cũ, Samsung Internet...) tính 100dvh sai
+      // hoặc không hỗ trợ, khiến màn hình không phủ hết chiều cao thật của máy.
+      // --app-vh lấy chiều cao thực từ visualViewport/innerHeight làm phương án dự phòng.
+      function setAppVh(){
+        var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        document.documentElement.style.setProperty('--app-vh', h + 'px');
+      }
+      setAppVh();
+      window.addEventListener('resize', setAppVh);
+      window.addEventListener('orientationchange', setAppVh);
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', setAppVh);
+    })();
+  </script>
 </head>
 <body class="student-app">
 
@@ -52,9 +67,11 @@
   <!-- Home hub -->
   <section class="screen home-screen active" data-screen="home">
     <div class="home-bg-pattern"></div>
+    <div class="home-account-slot" id="homeAccountChip"></div>
     <div class="home-inner">
       <img src="assets/logo.png" alt="Hóa Thầy Đạt" class="home-logo">
       <h1 class="home-title">Hóa Thầy Đạt</h1>
+      <div id="homeProBanner" hidden></div>
       <nav class="home-menu" aria-label="Chức năng học sinh">
         <button type="button" class="home-menu-item hm-play" onclick="openHomeFeature('play')">
           <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-gamepad"/></svg></span>
@@ -137,6 +154,58 @@
   </section>
 
   <!-- Profile -->
+  <section class="screen account-screen" data-screen="account">
+    <div class="screen-header">
+      <button class="back-btn" onclick="showScreen('home')">←</button>
+      <h2>Tài khoản của tôi</h2>
+    </div>
+    <div class="account-body">
+      <div class="account-identity">
+        <div class="account-avatar" onclick="StudentAccount.pickAvatar()">
+          <img id="accAvatarImg" style="display:none" alt="">
+          <span id="accAvatarInitials">?</span>
+          <span class="account-avatar__badge">📷</span>
+        </div>
+        <input type="file" id="accAvatarInput" accept="image/jpeg,image/png,image/webp" hidden
+               onchange="StudentAccount.onAvatarSelected(event)">
+        <dl class="account-meta">
+          <dt>Tên đăng nhập</dt><dd id="accUsername">—</dd>
+          <dt>Lớp</dt><dd id="accClass">—</dd>
+          <dt>Mã code</dt><dd id="accCode">—</dd>
+        </dl>
+      </div>
+
+      <section class="account-card">
+        <h3>Đổi ảnh đại diện</h3>
+        <p class="account-hint">Nhập mật khẩu rồi chạm vào ảnh ở trên để chọn ảnh mới.</p>
+        <input class="text-input" type="password" id="accAvatarPassword" placeholder="Mật khẩu hiện tại"
+               autocomplete="current-password">
+      </section>
+
+      <section class="account-card">
+        <h3>Đổi tên hiển thị</h3>
+        <input class="text-input" id="accDisplayName" maxlength="100" placeholder="Tên hiển thị">
+        <input class="text-input" type="password" id="accNamePassword" placeholder="Mật khẩu hiện tại"
+               autocomplete="current-password">
+        <button class="btn-primary" onclick="StudentAccount.saveName()">Lưu tên</button>
+      </section>
+
+      <section class="account-card">
+        <h3>Đổi mật khẩu</h3>
+        <input class="text-input" type="password" id="accCurrentPassword" placeholder="Mật khẩu hiện tại"
+               autocomplete="current-password">
+        <input class="text-input" type="password" id="accNewPassword" placeholder="Mật khẩu mới (ít nhất 6 ký tự)"
+               autocomplete="new-password">
+        <input class="text-input" type="password" id="accNewPassword2" placeholder="Nhập lại mật khẩu mới"
+               autocomplete="new-password">
+        <button class="btn-primary" onclick="StudentAccount.savePassword()">Đổi mật khẩu</button>
+        <p class="account-hint">Nhập sai mật khẩu hiện tại 5 lần sẽ bị khóa tài khoản, phải nhờ thầy cô mở lại.</p>
+      </section>
+
+      <button class="account-logout" onclick="StudentAccount.logout()">Đăng xuất</button>
+    </div>
+  </section>
+
   <section class="screen" data-screen="profile">
     <div class="screen-header">
       <button class="back-btn" onclick="showScreen('join')">←</button>
@@ -160,6 +229,18 @@
       <input class="text-input" id="profileName" maxlength="20" placeholder="Tên của bạn" oninput="onProfileNameInput()">
       <div class="char-count"><span id="profileCharCount">0</span>/20</div>
       <button class="btn-primary" style="max-width:280px" id="btnProfileJoin" disabled onclick="submitProfile()">Vào phòng</button>
+    </div>
+  </section>
+
+  <!-- Duck pick -->
+  <section class="screen" data-screen="duck-pick">
+    <div class="screen-header">
+      <h2>Chọn vịt của bạn 🦆</h2>
+    </div>
+    <div class="duck-pick-body">
+      <p class="duck-pick-hint">Chạm để chọn vịt, hoặc bỏ qua để random</p>
+      <div class="duck-pick-grid" id="duckPickGrid"></div>
+      <button class="btn-secondary" style="max-width:280px" onclick="skipDuckPick()">Bỏ qua, random cho tôi »</button>
     </div>
   </section>
 
@@ -289,20 +370,39 @@
     </div>
   </section>
 
-  <!-- Đọc nguyên tố: lưới + thẻ chi tiết -->
+  <!-- Đọc nguyên tố: bảng tuần hoàn + thẻ chi tiết -->
   <section class="screen elements-screen no-pad" data-screen="elements">
     <div class="el-header">
       <button type="button" class="el-back" onclick="goStudentHome()" aria-label="Quay lại">
         <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
       </button>
-      <h2 class="el-title">Đọc nguyên tố</h2>
+      <h2 class="el-title">Bảng tuần hoàn</h2>
       <button type="button" class="el-practice-btn" onclick="ElementsModule.startPractice()">
         <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
         <span>Luyện tập</span>
       </button>
     </div>
-    <div class="el-legend" id="elLegend"></div>
-    <div class="el-grid" id="elGrid"></div>
+    <div class="el-toolbar">
+      <div class="el-filters" id="elFilters">
+        <button type="button" class="el-filter is-on" data-filter="all">Tất cả</button>
+        <button type="button" class="el-filter" data-filter="priority">⬤ Trọng tâm</button>
+        <button type="button" class="el-filter" data-filter="unlearned">Chưa thuộc</button>
+      </div>
+      <p class="el-progress" id="elProgress"></p>
+    </div>
+    <div class="el-table-wrap" id="elTableWrap">
+      <div class="el-table-scroll" id="elTableScroll">
+        <div class="el-table" id="elTable"></div>
+      </div>
+    </div>
+    <div class="el-rotate-gate" id="elRotateGate" hidden>
+      <div class="el-rotate-phone" aria-hidden="true">
+        <span class="el-rotate-screen"></span>
+      </div>
+      <p class="el-rotate-title">Xoay ngang điện thoại</p>
+      <p class="el-rotate-sub">Bảng tuần hoàn rộng 18 cột — xoay ngang để xem trọn bảng nhé!</p>
+      <button type="button" class="el-rotate-skip" id="elRotateDismiss">Cứ xem dọc cũng được</button>
+    </div>
     <div class="el-detail-overlay" id="elDetailOverlay" hidden>
       <div class="el-detail-inner" id="elDetailInner"></div>
     </div>
@@ -423,6 +523,8 @@
 <script src="js/sound.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/student-theme.js"></script>
+<script src="js/student-account.js"></script>
+<script src="js/student-entitlements.js"></script>
 <script src="js/student.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

@@ -158,6 +158,10 @@
       const panel = menu.querySelector('[data-row-action-panel]');
       if (!trigger || !panel) return;
 
+      // Gọi lại được sau khi nạp thêm hàng mà không gắn trùng listener.
+      if (menu.dataset.rowActionBound === '1') return;
+      menu.dataset.rowActionBound = '1';
+
       trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         const willOpen = panel.hidden;
@@ -179,6 +183,15 @@
         });
       });
     });
+
+    bindGlobalMenuClosers();
+  }
+
+  let globalClosersBound = false;
+
+  function bindGlobalMenuClosers() {
+    if (globalClosersBound) return;
+    globalClosersBound = true;
 
     document.addEventListener('click', () => closeAllActionMenus());
     document.addEventListener('keydown', (e) => {
@@ -218,8 +231,12 @@
     initRowActionMenus();
   }
 
+  // Hàng nạp thêm khi mở nhóm cần được gắn lại menu thao tác.
+  document.addEventListener('admin:rows-added', initRowActionMenus);
+
   window.AdminListPage = {
     init,
+    initRowActionMenus,
     initBulkSelectAll,
     closeAllActionMenus,
     submitHiddenForm,

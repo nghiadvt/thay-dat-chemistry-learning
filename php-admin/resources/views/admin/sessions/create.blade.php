@@ -27,6 +27,14 @@
             <p class="hint">Tên hiển thị trong danh sách phòng để giáo viên dễ nhận biết.</p>
             @error('name')<div class="field-error">{{ $message }}</div>@enderror
         </div>
+        <div class="form-group">
+            @include('admin.partials.group-select', [
+                'id' => 'sessionGroup',
+                'groups' => $groups,
+                'selected' => $selectedGroupId ?? '',
+            ])
+            <p class="hint">Gom các phòng cùng lớp hoặc cùng đợt kiểm tra vào một nhóm để dễ tìm lại.</p>
+        </div>
         <div class="form-row">
             <div class="form-group">
                 <label for="filter_game_id">Lọc theo game</label>

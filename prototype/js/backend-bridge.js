@@ -73,6 +73,20 @@ const HTDBridge = (function () {
     try { sessionStorage.setItem(playerTokenStorageKey(pin, name), token); } catch { /* ignore */ }
   }
 
+  /**
+   * Token ngắn hạn chứng minh HS đang đăng nhập, để ws-server gắn lượt chơi vào
+   * đúng tài khoản. Không lấy được (khách vãng lai / lỗi mạng) thì vẫn vào phòng
+   * bình thường, chỉ là kết quả không gắn tài khoản.
+   */
+  async function fetchPlayToken() {
+    try {
+      const data = await HTDApi.studentPlayToken();
+      return (data && data.play_token) || null;
+    } catch {
+      return null;
+    }
+  }
+
   async function joinRoom({ pin, name, isHost = false, avatar = null }) {
     isHost = Boolean(isHost);
     await HTDSocket.syncNtp();
@@ -80,6 +94,10 @@ const HTDBridge = (function () {
     if (!isHost && avatar) payload.avatar = avatar;
     const storedToken = getStoredPlayerToken(pin, name);
     if (storedToken) payload.player_token = storedToken;
+    if (!isHost) {
+      const playToken = await fetchPlayToken();
+      if (playToken) payload.play_token = playToken;
+    }
     const data = await HTDSocket.emit('join_room', payload);
     if (data.player_token) storePlayerToken(pin, name, data.player_token);
     roomMeta = { pin, name, avatar: avatar || null, ...data };
@@ -110,6 +128,10 @@ const HTDBridge = (function () {
     });
   }
 
+  async function selectDuck(duckSprite) {
+    return HTDSocket.emit('select_duck', { duck_sprite: duckSprite });
+  }
+
   function getRoomMeta() {
     return roomMeta;
   }
@@ -127,6 +149,7 @@ const HTDBridge = (function () {
     hostNextQuestion,
     hostEndGame,
     submitAnswer,
+    selectDuck,
     getRoomMeta,
     setRoomMeta,
     isBackendEnabled() {

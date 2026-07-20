@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\GameController as AdminGameController;
+use App\Http\Controllers\Admin\GroupController as AdminGroupController;
 use App\Http\Controllers\Admin\ImageCropperController as AdminImageCropperController;
 use App\Http\Controllers\Admin\KeyboardController as AdminKeyboardController;
 use App\Http\Controllers\Admin\QuestionBankController as AdminQuestionBankController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Admin\QuizController as AdminQuizController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\SessionController as AdminSessionController;
 use App\Http\Controllers\Admin\TagController as AdminTagController;
+use App\Http\Controllers\Api\DuckSpriteController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\GameSessionController;
 use App\Http\Controllers\Api\ImageCropRegionController;
@@ -23,7 +25,18 @@ use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\SiteFeedbackController;
+use App\Http\Controllers\Api\Student\AccountController as StudentAccountController;
+use App\Http\Controllers\Api\Student\EntitlementController as StudentEntitlementApiController;
+use App\Http\Controllers\Api\Student\PlayTokenController as StudentPlayTokenController;
+use App\Http\Controllers\Api\Student\PracticeAttemptController as StudentPracticeAttemptController;
+use App\Http\Controllers\Admin\StudentClassController as AdminStudentClassController;
+use App\Http\Controllers\Admin\StudentController as AdminStudentController;
+use App\Http\Controllers\Admin\StudentEntitlementController as AdminStudentEntitlementController;
+use App\Http\Controllers\Admin\StudentReportController as AdminStudentReportController;
+use App\Http\Controllers\Admin\StudentPasswordToolController as AdminStudentPasswordToolController;
+use App\Http\Controllers\Auth\ConfirmPasswordController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\StudentLoginController;
 use App\Http\Controllers\StudentJoinController;
 use Illuminate\Support\Facades\Route;
 
@@ -66,15 +79,49 @@ Route::get('api/rooms/{pin}', [RoomController::class, 'show']);
 Route::get('api/practice/topics', [PracticeController::class, 'topics']);
 Route::get('api/practice/questions', [PracticeController::class, 'questions']);
 
+// HS đọc danh sách vịt chuyển động (frame + fps) để resolve token "db:{id}" từ mode_config
+Route::get('api/duck-sprites/public', [DuckSpriteController::class, 'index']);
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
 });
 
+// Đăng nhập học sinh — guard riêng để phiên của học sinh không đè phiên giáo viên.
+Route::middleware('guest:student')->group(function () {
+    Route::get('student/login', [StudentLoginController::class, 'showLoginForm'])->name('student.login');
+    Route::post('student/login', [StudentLoginController::class, 'login']);
+});
+Route::post('student/logout', [StudentLoginController::class, 'logout'])
+    ->middleware('auth:student')
+    ->name('student.logout');
+
+// Hồ sơ tài khoản của học sinh đang đăng nhập.
+Route::prefix('api/student')
+    ->middleware(['auth:student', 'student.active', 'throttle:30,1'])
+    ->group(function () {
+        Route::get('me', [StudentAccountController::class, 'me'])->name('student.api.me');
+        Route::patch('profile', [StudentAccountController::class, 'updateProfile'])->name('student.api.profile');
+        Route::put('password', [StudentAccountController::class, 'updatePassword'])->name('student.api.password');
+        Route::post('avatar', [StudentAccountController::class, 'uploadAvatar'])->name('student.api.avatar');
+        Route::get('entitlements', [StudentEntitlementApiController::class, 'index'])->name('student.api.entitlements');
+
+        // Danh tính cho ws-server khi vào phòng chơi (xem StudentPlayToken).
+        Route::post('play-token', [StudentPlayTokenController::class, 'store'])->name('student.api.play-token');
+
+        // Lượt tự luyện (ngoài phòng live)
+        Route::post('practice-attempts', [StudentPracticeAttemptController::class, 'store'])->name('student.api.attempts.store');
+        Route::post('practice-attempts/{attempt}/finish', [StudentPracticeAttemptController::class, 'finish'])->name('student.api.attempts.finish');
+    });
+
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
     Route::redirect('/dashboard', '/admin')->name('dashboard');
+
+    // Xác thực lại mật khẩu trước khi vào các trang nhạy cảm.
+    Route::get('confirm-password', [ConfirmPasswordController::class, 'show'])->name('password.confirm');
+    Route::post('confirm-password', [ConfirmPasswordController::class, 'store']);
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
@@ -85,18 +132,21 @@ Route::middleware('auth')->group(function () {
         Route::get('image-cropper/{imageCropper}/edit', [AdminImageCropperController::class, 'edit'])->name('image-cropper.edit');
         Route::patch('image-cropper/{imageCropper}/groups', [AdminImageCropperController::class, 'updateGroups'])->name('image-cropper.update-groups');
         Route::delete('image-cropper/{imageCropper}', [AdminImageCropperController::class, 'destroy'])->name('image-cropper.destroy');
+        Route::view('image-trimmer', 'admin.image-trimmer.index')->name('image-trimmer');
 
         Route::resource('keyboards', AdminKeyboardController::class)->except(['show', 'update']);
         Route::get('keyboards/{keyboard}/editor', [AdminKeyboardController::class, 'editor'])->name('keyboards.editor');
         Route::get('games/battle-arena-demo', [AdminGameController::class, 'battleDemo'])->name('games.battle-demo');
         Route::get('games/dragon-hunt-demo', [AdminGameController::class, 'dragonDemo'])->name('games.dragon-demo');
         Route::resource('games', AdminGameController::class)->except(['show']);
+        Route::get('quizzes/group-rows', [AdminQuizController::class, 'groupRows'])->name('quizzes.group-rows');
         Route::get('quizzes/export-csv', [AdminQuizController::class, 'exportCsv'])->name('quizzes.export-csv');
         Route::get('quizzes/import-template', [AdminQuizController::class, 'importTemplate'])->name('quizzes.import-template');
         Route::post('quizzes/import-csv', [AdminQuizController::class, 'importCsv'])->name('quizzes.import-csv');
         Route::resource('quizzes', AdminQuizController::class);
         Route::patch('quizzes/{quiz}/active', [AdminQuizController::class, 'toggleActive'])->name('quizzes.toggle-active');
 
+        Route::get('question-bank/group-rows', [AdminQuestionBankController::class, 'groupRows'])->name('question-bank.group-rows');
         Route::get('question-bank/export-csv', [AdminQuestionBankController::class, 'exportCsv'])->name('question-bank.export-csv');
         Route::get('question-bank/import-template', [AdminQuestionBankController::class, 'importTemplate'])->name('question-bank.import-template');
         Route::post('question-bank/import-csv', [AdminQuestionBankController::class, 'importCsv'])->name('question-bank.import-csv');
@@ -104,6 +154,12 @@ Route::middleware('auth')->group(function () {
         Route::patch('question-bank/bulk-tags', [AdminQuestionBankController::class, 'bulkUpdateTags'])->name('question-bank.bulk-tags');
         Route::patch('question-bank/{question_bank}/tags', [AdminQuestionBankController::class, 'updateTags'])->name('question-bank.update-tags');
         Route::resource('question-bank', AdminQuestionBankController::class)->except(['show']);
+
+        // Nhóm dùng để gom quiz / bộ câu hỏi / phòng chơi, mỗi trang một danh sách riêng (scope)
+        Route::get('groups', [AdminGroupController::class, 'index'])->name('groups.index');
+        Route::post('groups', [AdminGroupController::class, 'store'])->name('groups.store');
+        Route::put('groups/{group}', [AdminGroupController::class, 'update'])->name('groups.update');
+        Route::delete('groups/{group}', [AdminGroupController::class, 'destroy'])->name('groups.destroy');
 
         Route::get('tags', [AdminTagController::class, 'index'])->name('tags.index');
         Route::post('tags', [AdminTagController::class, 'store'])->name('tags.store');
@@ -123,6 +179,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('quizzes/{quiz}/questions/{question}', [AdminQuestionController::class, 'destroy'])->name('questions.destroy');
 
         Route::get('sessions', [AdminSessionController::class, 'index'])->name('sessions.index');
+        Route::get('sessions/group-rows', [AdminSessionController::class, 'groupRows'])->name('sessions.group-rows');
         Route::get('sessions/create', [AdminSessionController::class, 'create'])->name('sessions.create');
         Route::post('sessions', [AdminSessionController::class, 'store'])->name('sessions.store');
         Route::post('sessions/bulk-destroy', [AdminSessionController::class, 'bulkDestroy'])->name('sessions.bulk-destroy');
@@ -134,6 +191,44 @@ Route::middleware('auth')->group(function () {
         Route::post('sessions/{session}/close', [AdminSessionController::class, 'close'])->name('sessions.close');
         Route::post('sessions/{session}/regenerate-pin', [AdminSessionController::class, 'regeneratePin'])->name('sessions.regenerate-pin');
         Route::patch('sessions/{session}/active', [AdminSessionController::class, 'toggleActive'])->name('sessions.toggle-active');
+
+        // --- Quản lý học sinh ---
+        // Các route tĩnh phải đứng trước resource('students') để "classes"
+        // không bị nuốt bởi tham số {student}.
+        Route::get('students/classes', [AdminStudentClassController::class, 'index'])->name('students.classes');
+        Route::post('students/classes', [AdminStudentClassController::class, 'store'])->name('students.classes.store');
+        Route::get('students/classes/{class}', [AdminStudentClassController::class, 'show'])->name('students.classes.show');
+        Route::put('students/classes/{class}', [AdminStudentClassController::class, 'update'])->name('students.classes.update');
+        Route::delete('students/classes/{class}', [AdminStudentClassController::class, 'destroy'])->name('students.classes.destroy');
+        Route::get('students/classes/{class}/credentials', [AdminStudentController::class, 'credentialsSheet'])->name('students.credentials-sheet');
+        Route::post('students/bulk-generate', [AdminStudentController::class, 'bulkGenerate'])->name('students.bulk-generate');
+        Route::post('students/{student}/reset-password', [AdminStudentController::class, 'resetPassword'])->name('students.reset-password');
+        Route::post('students/{student}/unlock', [AdminStudentController::class, 'unlock'])->name('students.unlock');
+
+        // Phân quyền tính năng
+        Route::get('students/{student}/entitlements', [AdminStudentEntitlementController::class, 'index'])->name('students.entitlements');
+        Route::post('students/{student}/entitlements', [AdminStudentEntitlementController::class, 'store'])->name('students.entitlements.store');
+        Route::post('students/classes/{class}/entitlements', [AdminStudentEntitlementController::class, 'storeForClass'])->name('students.entitlements.class');
+        Route::post('student-entitlements/{entitlement}/revoke', [AdminStudentEntitlementController::class, 'revoke'])->name('students.entitlements.revoke');
+
+        // Thống kê bài làm
+        Route::get('students/{student}/reports', [AdminStudentReportController::class, 'index'])->name('students.reports');
+        Route::get('students/{student}/reports/room/{result}', [AdminStudentReportController::class, 'showRoomRecord'])->name('students.reports.room');
+        Route::get('students/{student}/reports/solo/{attempt}', [AdminStudentReportController::class, 'showSoloRecord'])->name('students.reports.solo');
+
+        Route::resource('students', AdminStudentController::class)->except(['show']);
+
+        // Công cụ mã hóa/giải mã mật khẩu: bắt xác thực lại + giới hạn tần suất
+        // vì trang này hiển thị mật khẩu ở dạng đọc được.
+        Route::middleware(['password.confirm', 'throttle:20,1'])
+            ->prefix('student-password-tool')
+            ->name('students.password-tool')
+            ->group(function () {
+                Route::get('/', [AdminStudentPasswordToolController::class, 'show']);
+                Route::post('decrypt', [AdminStudentPasswordToolController::class, 'decrypt'])->name('.decrypt');
+                Route::post('encrypt', [AdminStudentPasswordToolController::class, 'encrypt'])->name('.encrypt');
+                Route::post('scan', [AdminStudentPasswordToolController::class, 'scan'])->name('.scan');
+            });
 
         Route::get('reports', [AdminReportController::class, 'index'])->name('reports.index');
         Route::get('reports/{session}', [AdminReportController::class, 'show'])->name('reports.show');
@@ -148,6 +243,12 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('keyboards', KeyboardController::class);
         Route::post('keyboards/{keyboard}/preview', [KeyboardController::class, 'uploadPreview'])->name('keyboards.preview');
         Route::apiResource('games', GameController::class);
+
+        Route::get('duck-sprites', [DuckSpriteController::class, 'index'])->name('duck-sprites.index');
+        Route::post('duck-sprites', [DuckSpriteController::class, 'store'])->name('duck-sprites.store');
+        Route::patch('duck-sprites/{duckSprite}', [DuckSpriteController::class, 'update'])->name('duck-sprites.update');
+        Route::post('duck-sprites/{duckSprite}/frames', [DuckSpriteController::class, 'addFrames'])->name('duck-sprites.frames.store');
+        Route::delete('duck-sprites/{duckSprite}', [DuckSpriteController::class, 'destroy'])->name('duck-sprites.destroy');
         Route::apiResource('quizzes', QuizController::class);
 
         Route::post('question-content-images', [QuestionImageController::class, 'store'])->name('question-images.store');

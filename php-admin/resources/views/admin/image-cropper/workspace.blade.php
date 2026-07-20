@@ -13,6 +13,7 @@
         <h2>{{ $sourceBoot ? 'Chỉnh sửa: '.$sourceBoot['name'] : 'Cắt nhiều ảnh nhỏ từ 1 ảnh lớn' }}</h2>
         <p class="page-header__meta">Tải lên 1 ảnh, kéo chuột trên vùng trống để khoanh vùng cắt mới; kéo vào bên trong 1 vùng đã khoanh để di chuyển nó. Tick chọn nhiều vùng (hoặc giữ Shift khi bấm chọn trên ảnh) để thao tác cùng lúc — vùng đang chọn sẽ đổi màu cam và hiện 4 ô vuông ở góc, rê chuột tới góc rồi kéo để phóng to/thu nhỏ vùng đó. Đặt tên rồi bấm Cắt &amp; Lưu.</p>
         <p class="page-header__meta">Phím tắt: <kbd>Ctrl+Z</kbd> hoàn tác, <kbd>Ctrl+Y</kbd> làm lại, <kbd>Delete</kbd> xóa vùng đang chọn, <kbd>Ctrl+click</kbd> hoặc <kbd>Shift+click</kbd> chọn nhiều vùng, <kbd>Ctrl+C</kbd>/<kbd>Ctrl+V</kbd> copy/paste, mũi tên để di chuyển vùng đang chọn.</p>
+        <p class="page-header__meta">Nút "Tự động khoanh vùng" và "Click để khoanh vùng" chỉ hoạt động tốt với ảnh đã xóa nền (PNG nền trong suốt): mỗi object tách rời sẽ tự thành 1 khung, kiểm tra lại và chỉnh tay các khung dính nhau nếu có. "Click để khoanh vùng" là chế độ bật/tắt — bật lên rồi click vào từng object trên ảnh để khoanh riêng object đó, bấm lại nút để tắt chế độ.</p>
     </div>
     <a href="{{ route('admin.image-cropper.index') }}" class="btn btn-secondary">← Danh sách ảnh</a>
 </div>
@@ -33,6 +34,8 @@
             <span class="ic-hint">Đã khoanh: <strong id="icBoxCount">0</strong> vùng</span>
             <div class="actions">
                 <button type="button" class="btn btn-secondary btn-sm" id="icCreateByDims">+ Tạo khung</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="icAutoDetect" title="Tự động khoanh vùng từng object dựa trên vùng trong suốt của ảnh (dùng cho ảnh đã xóa nền)">Tự động khoanh vùng</button>
+                <button type="button" class="btn btn-secondary btn-sm ic-toggle-btn" id="icClickDetectToggle" title="Bật rồi click vào 1 object trên ảnh để tự động khoanh riêng vùng đó">Click để khoanh vùng</button>
                 <button type="button" class="btn btn-secondary btn-sm" id="icDuplicateBox" disabled>Nhân bản vùng chọn</button>
                 <button type="button" class="btn btn-secondary btn-sm" id="icUndoBox">Xóa vùng cuối</button>
                 <button type="button" class="btn btn-secondary btn-sm" id="icClearBoxes">Xóa hết vùng</button>

@@ -5,6 +5,7 @@
 
 @push('head')
 <link rel="stylesheet" href="@vasset('css/duck-race-game-config.css')">
+<link rel="stylesheet" href="@vasset('css/admin-duck-sprites.css')">
 @endpush
 
 @section('content')
@@ -178,14 +179,93 @@
                     </div>
                 </div>
             </div>
+
+            <div class="drc-section dsm" id="duckSpriteManager" data-api-base="/api/duck-sprites">
+                <div class="dsm-head">
+                    <div class="dsm-head__text">
+                        <h4>🦆 Vịt chuyển động (frame animation)</h4>
+                        <p class="dsm-head__hint">Mỗi vịt gồm 8–10 ảnh frame phát lần lượt để tạo chuyển động. Upload frame, kéo thả sắp thứ tự, chỉnh tốc độ và xem preview ngay.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm dsm-head__add" data-dsm="create">＋ Thêm vịt mới</button>
+                </div>
+                <div class="dsm-toolbar drc-hidden" data-dsm="toolbar">
+                    <span class="dsm-toolbar__count" data-dsm="count"></span>
+                    <button type="button" class="dsm-toolbar__toggle" data-dsm="toggle-all" aria-pressed="true">⏸ Dừng tất cả</button>
+                </div>
+                <div class="dsm-grid" data-dsm="grid"></div>
+                <div class="dsm-empty drc-hidden" data-dsm="empty">
+                    <span class="dsm-empty__icon">🦆</span>
+                    <strong>Chưa có vịt chuyển động nào</strong>
+                    <span>Bấm "＋ Thêm vịt mới" rồi upload 8–10 ảnh frame để tạo con vịt đầu tiên.</span>
+                </div>
+                <div class="dsm-loading" data-dsm="loading">Đang tải danh sách vịt…</div>
+            </div>
         </div>
 
         <button type="submit" class="btn btn-primary drc-submit-btn">{{ $game ? 'Cập nhật' : 'Tạo game' }}</button>
     </form>
 </div>
 
+{{-- Modal editor vịt chuyển động — nằm ngoài <form> để input không submit theo form game --}}
+<div class="dsm-modal drc-hidden" id="duckSpriteModal" role="dialog" aria-modal="true" aria-labelledby="dsmModalTitle">
+    <div class="dsm-modal__backdrop" data-dsm="close"></div>
+    <div class="dsm-modal__panel">
+        <div class="dsm-modal__head">
+            <h3 id="dsmModalTitle" data-dsm="modal-title">Thêm vịt mới</h3>
+            <button type="button" class="dsm-modal__x" data-dsm="close" aria-label="Đóng">✕</button>
+        </div>
+        <div class="dsm-modal__body">
+            <div class="dsm-editor">
+                <div class="dsm-editor__left">
+                    <div class="dsm-player">
+                        <div class="dsm-player__stage">
+                            <img data-dsm="stage-img" alt="Preview vịt" class="drc-hidden">
+                            <div class="dsm-player__placeholder" data-dsm="stage-empty">
+                                <span>🖼️</span>
+                                Chưa có frame nào.<br>Upload ảnh để xem preview chuyển động.
+                            </div>
+                        </div>
+                        <div class="dsm-player__controls">
+                            <button type="button" class="dsm-play-btn" data-dsm="play" aria-label="Chạy / dừng animation">⏸</button>
+                            <input type="range" data-dsm="scrub" min="1" max="1" value="1" step="1" aria-label="Chọn frame">
+                            <span class="dsm-player__frame-label" data-dsm="frame-label">–/–</span>
+                        </div>
+                    </div>
+                    <div class="dsm-speed">
+                        <label for="dsmFps">⚡ Tốc độ animation</label>
+                        <div class="dsm-speed__row">
+                            <input type="range" id="dsmFps" min="1" max="30" step="1" value="10">
+                            <span class="dsm-speed__value" data-dsm="fps-label">10 hình/giây</span>
+                        </div>
+                        <p class="dsm-speed__sub" data-dsm="fps-sub">1 giây phát 10 frame · mỗi frame hiện ≈ 100 ms</p>
+                    </div>
+                </div>
+                <div class="dsm-editor__right">
+                    <div class="form-group">
+                        <label for="dsmName">Tên vịt *</label>
+                        <input type="text" id="dsmName" maxlength="255" placeholder="VD: Vịt vàng đội nón" autocomplete="off">
+                    </div>
+                    <div class="dsm-drop" data-dsm="drop" tabindex="0" role="button" aria-label="Upload ảnh frame">
+                        <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-dsm="file-input">
+                        <strong>📂 Kéo thả 8–10 ảnh frame vào đây</strong>
+                        <span>hoặc bấm để chọn nhiều ảnh cùng lúc — tự xếp thứ tự theo tên file (frame-1, frame-2…)</span>
+                    </div>
+                    <div class="dsm-frames" data-dsm="frames"></div>
+                    <p class="dsm-frames-hint">💡 Kéo thả thumbnail để đổi thứ tự, hoặc sửa số trên góc ảnh. Bấm ảnh để xem frame đó. Tối đa 20 frame.</p>
+                </div>
+            </div>
+        </div>
+        <div class="dsm-modal__foot">
+            <span class="dsm-modal__status" data-dsm="status"></span>
+            <button type="button" class="btn btn-secondary" data-dsm="close">Hủy</button>
+            <button type="button" class="btn btn-primary" data-dsm="save">💾 Lưu vịt</button>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script src="@vasset('js/duck-race-game-config.js')"></script>
 <script src="@vasset('js/games-form.js')"></script>
+<script src="@vasset('js/duck-sprite-manager.js')"></script>
 @endpush
 @endsection

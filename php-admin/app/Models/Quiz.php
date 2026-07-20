@@ -11,6 +11,7 @@ class Quiz extends Model
 {
     protected $fillable = [
         'game_id',
+        'group_id',
         'keyboard_id',
         'name',
         'subject',
@@ -33,6 +34,11 @@ class Quiz extends Model
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(Group::class);
     }
 
     public function keyboard(): BelongsTo

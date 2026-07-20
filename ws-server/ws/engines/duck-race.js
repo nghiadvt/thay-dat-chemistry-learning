@@ -229,10 +229,12 @@ async function handleSubmit(io, redis, socket, payload) {
 
   const sessionId = Number(room.session_id);
   if (sessionId) {
+    const answeringPlayer = await getPlayer(redis, pin, name);
     await saveSessionAnswer({
       sessionId,
       questionId: question.id,
       studentName: name,
+      studentId: answeringPlayer?.student_id || null,
       answerSubmitted: answer,
       isCorrect: correct,
       scoreEarned: delta,
@@ -317,6 +319,7 @@ async function buildFinalLeaderboard(redis, pin, rules) {
       finish_elapsed_s: progress.finish_elapsed_s ?? null,
       finished_at: progress.finished_at,
       player_token: player.player_token || null,
+      student_id: player.student_id || null,
       avatar: player.avatar || null,
       duck_sprite: player.duck_sprite || null,
     });
@@ -344,6 +347,7 @@ async function buildFinalLeaderboard(redis, pin, rules) {
       finish_elapsed_s: null,
       finished_at: null,
       player_token: player.player_token || null,
+      student_id: player.student_id || null,
       avatar: player.avatar || null,
       duck_sprite: player.duck_sprite || null,
     });
@@ -359,6 +363,7 @@ async function buildFinalLeaderboard(redis, pin, rules) {
     finish_rank: entry.finish_rank,
     finish_elapsed_s: entry.finish_elapsed_s ?? null,
     player_token: entry.player_token,
+    student_id: entry.student_id ?? null,
     avatar: entry.avatar,
     duck_sprite: entry.duck_sprite ?? null,
   }));

@@ -235,9 +235,53 @@ window.QuizModule = (function () {
       bestStreak: 0,
       wrong: [],   // câu trả lời sai (kèm lựa chọn của HS) để review + ôn lại
       locked: false,
+      attemptId: null,      // id lượt luyện phía server (null nếu chưa đăng nhập)
+      answers: [],          // {position, answer_index} để nộp cho server chấm lại
+      startedAt: Date.now(),
     };
     showScreen('quiz-play');
     renderQuestion();
+
+    // Chỉ ghi nhận lượt làm đề đầy đủ; lượt «ôn lại câu sai» không tính, giống
+    // như cách kỷ lục cục bộ đang làm.
+    if (mode === 'normal') openAttempt(questions);
+  }
+
+  /**
+   * Mở lượt luyện trên server để giáo viên xem được trong thống kê.
+   * Khách chưa đăng nhập sẽ nhận 401 — nuốt lỗi để không chặn việc ôn tập.
+   */
+  function openAttempt(questions) {
+    if (!window.HTDApi || !HTDApi.studentStartAttempt) return;
+
+    var target = st;
+    HTDApi.studentStartAttempt({
+      featureKey: 'quiz',
+      label: setup.topicName,
+      topicSlug: setup.topic,
+      questionIds: questions.map(function (q) { return q.id; }),
+    }).then(function (data) {
+      // Bỏ qua nếu HS đã thoát hoặc bắt đầu lượt khác trong lúc chờ mạng.
+      if (st !== target || !data || !data.attempt_id) return;
+
+      // Server bỏ những câu không còn trong ngân hàng; khi đó vị trí câu ở
+      // client không còn khớp với server nên thà không ghi còn hơn chấm nhầm.
+      if (data.total_questions !== questions.length) return;
+
+      st.attemptId = data.attempt_id;
+    }).catch(function () { /* chưa đăng nhập hoặc lỗi mạng: bỏ qua */ });
+  }
+
+  /** Nộp bài để server chấm lại — không tin điểm tính ở client. */
+  function submitAttempt() {
+    if (!st || !st.attemptId || !window.HTDApi || !HTDApi.studentFinishAttempt) return;
+
+    var attemptId = st.attemptId;
+    var payload = { answers: st.answers, durationMs: Date.now() - st.startedAt };
+    st.attemptId = null; // tránh nộp hai lần khi HS bấm lại
+
+    HTDApi.studentFinishAttempt(attemptId, payload)
+      .catch(function () { /* mất mạng: lượt để dở, không hiện trong thống kê */ });
   }
 
   /* ── Màn 2: làm bài ─────────────────────────────────────────── */
@@ -296,6 +340,10 @@ window.QuizModule = (function () {
     var picked = Number(btn.dataset.opt);
     var correct = picked === q.correct_index;
     var body = playBody();
+
+    // Vị trí phải khớp với thứ tự câu đã gửi lúc mở lượt (st.idx), không phải
+    // thứ tự đáp án đã xáo.
+    st.answers.push({ position: st.idx, answer_index: picked });
 
     body.querySelectorAll('.qz-option').forEach(function (b) {
       b.disabled = true;
@@ -392,6 +440,7 @@ window.QuizModule = (function () {
     var body = document.getElementById('qzResultBody');
     if (!body || !st) return;
     showScreen('quiz-result');
+    submitAttempt();
 
     var total = st.questions.length;
     var correct = st.correctCount;

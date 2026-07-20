@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DuckRaceAssets;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -39,7 +40,16 @@ class Game extends Model
             return [];
         }
 
-        return $mode->resolvedConfig($this->mode_config);
+        $config = $mode->resolvedConfig($this->mode_config);
+
+        // Danh sách vịt luôn đọc "sống" từ DB tại thời điểm tạo phòng, không
+        // phụ thuộc vào giá trị đã lưu lúc save game — admin thêm vịt mới là
+        // phòng tạo sau đó thấy ngay, không cần lưu lại game.
+        if ($mode->slug === 'duck_race') {
+            $config['visual']['duck_sprites'] = DuckRaceAssets::listSpriteTokens();
+        }
+
+        return $config;
     }
 
     public function creator(): BelongsTo

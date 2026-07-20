@@ -11,13 +11,27 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // SQLite không phân biệt INT/INT UNSIGNED nên cột đã nhận giá trị âm sẵn.
+        if (! $this->isMysql()) {
+            return;
+        }
+
         DB::statement('ALTER TABLE image_crop_regions MODIFY x INT NOT NULL DEFAULT 0');
         DB::statement('ALTER TABLE image_crop_regions MODIFY y INT NOT NULL DEFAULT 0');
     }
 
     public function down(): void
     {
+        if (! $this->isMysql()) {
+            return;
+        }
+
         DB::statement('ALTER TABLE image_crop_regions MODIFY x INT UNSIGNED NOT NULL DEFAULT 0');
         DB::statement('ALTER TABLE image_crop_regions MODIFY y INT UNSIGNED NOT NULL DEFAULT 0');
+    }
+
+    private function isMysql(): bool
+    {
+        return DB::getDriverName() === 'mysql';
     }
 };

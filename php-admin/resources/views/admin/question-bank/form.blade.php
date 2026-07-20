@@ -124,6 +124,14 @@
             </div>
 
             <aside class="qe-sidebar">
+                <div class="form-group">
+                    @include('admin.partials.group-select', [
+                        'id' => 'qbGroup',
+                        'groups' => $groups,
+                        'selected' => $selectedGroupId ?? '',
+                    ])
+                </div>
+
                 @include('admin.partials.tag-select', [
                     'mode' => 'multi',
                     'tags' => $tags,

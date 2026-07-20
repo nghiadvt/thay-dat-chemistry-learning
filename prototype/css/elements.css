@@ -66,87 +66,366 @@
   flex-shrink: 0;
 }
 
-/* ── Legend ── */
-.el-legend {
+/* ── Legend: nhét vào khoảng trống nhóm 3–12 / chu kỳ 1–3 trong bảng ──
+ * (xem buildTable() ở elements-module.js) thay vì chiếm riêng một hàng phía
+ * trên — đỡ tốn chiều cao màn hình, nhường cho bảng tuần hoàn hiển thị to hơn. */
+.el-table-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 14px 10px;
-  flex-shrink: 0;
+  align-content: center;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
+/* Ô to hẳn ra nhờ --el-cell tính theo chiều cao (không bị co bởi bề ngang
+ * nữa) nên 10 chip luôn đủ chỗ — overflow-y ở đây chỉ là lưới an toàn cho
+ * màn quá thấp; vẫn lộ thanh cuộn mảnh nếu lỡ chật, khỏi tưởng thiếu nhóm. */
+.el-table-legend::-webkit-scrollbar { width: 3px; }
+.el-table-legend::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 2px; }
 .el-legend-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 10.5px;
+  gap: 4px;
+  font-size: clamp(8px, calc(var(--el-cell) * 0.17), 10.5px);
   font-weight: 700;
   background: rgba(255,255,255,0.9);
   color: var(--ink);
   border-radius: var(--radius-pill);
-  padding: 4px 9px;
+  padding: 3px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .el-legend-chip i {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2.5px;
   display: inline-block;
+  flex-shrink: 0;
 }
 
-/* ── Lưới nguyên tố ── */
-.el-grid {
+/* ── Toolbar: bộ lọc + tiến độ ── */
+.el-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px 8px;
+  flex-shrink: 0;
+}
+.el-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.el-filter {
+  border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.el-filter.is-on {
+  background: rgba(255,255,255,0.95);
+  border-color: rgba(255,255,255,0.95);
+  color: var(--ink);
+}
+.el-progress {
+  font-size: 11.5px;
+  font-weight: 700;
+  opacity: 0.9;
+  margin: 0;
+}
+
+/* ── Dấu hiệu trọng tâm + mức thuộc bài ──
+ * Trọng tâm  = chấm tròn góc trên phải (thuộc về nội dung bài học)
+ * Thuộc bài  = thanh tiến độ đáy ô (thuộc về học sinh)
+ * Hai thứ này cố ý KHÔNG dùng chung ký hiệu ⭐ với điểm luyện tập. */
+.el-pt-cell.is-dim { opacity: 0.3; }
+
+.el-mastery {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 2px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.28);
+  overflow: hidden;
+}
+.el-mastery i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: #fff;
+  transition: width 0.3s;
+}
+
+/* ── Bảng tuần hoàn đầy đủ ──
+ * Nền tối riêng cho vùng bảng: 10 màu nhóm chỉ đọc được khi ngồi trên nền tối,
+ * giống cách bảng tuần hoàn vẫn được in. Phần còn lại của app giữ nền tím. */
+.el-table-wrap {
   flex: 1;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  padding: 4px 14px max(16px, env(safe-area-inset-bottom));
-  align-content: start;
-}
-@media (min-width: 400px) {
-  .el-grid { grid-template-columns: repeat(5, 1fr); }
-}
-.el-tile {
   position: relative;
-  aspect-ratio: 1 / 1.06;
-  border: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 10px max(10px, env(safe-area-inset-bottom));
   border-radius: 16px;
+  background: #0E0B24;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.el-table-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  align-items: safe center;
+  justify-content: safe center;
+}
+
+/* Ô co theo chiều cao màn hình (9 hàng ô + header + đệm f-block) để bảng
+ * luôn cao gần hết màn — cố ý KHÔNG co thêm theo bề ngang nữa (18 cột luôn
+ * quá rộng cho điện thoại dọc), nên cuộn ngang để xem hết. Cột chu kỳ dán
+ * cố định bên trái (xem .el-pt-period) để không lạc hàng khi cuộn. */
+.el-table {
+  --el-gap: 2px;
+  --el-cell: clamp(32px, calc((100vh - 96px) / 9.8), 64px);
+  display: grid;
+  grid-template-columns: 20px repeat(18, var(--el-cell));
+  grid-template-rows:
+    12px
+    repeat(7, var(--el-cell))
+    calc(var(--el-cell) * 0.34)
+    repeat(2, var(--el-cell));
+  gap: var(--el-gap);
+  width: max-content;
+  margin: auto;
+}
+
+.el-pt-group,
+.el-pt-period,
+.el-pt-frow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--el-cell) * 0.24);
+  font-weight: 800;
+  color: rgba(255,255,255,0.62);
+}
+.el-pt-frow { font-size: calc(var(--el-cell) * 0.21); }
+
+/* Cột số chu kỳ dán cố định bên trái khi cuộn ngang, khỏi lạc hàng. */
+.el-pt-period,
+.el-pt-frow {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #0E0B24;
+}
+
+/* Ô dẫn 57–71 / 89–103 ở nhóm 3: giữ đúng chỗ họ Lantan/Actini trong bảng */
+.el-pt-fref {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.07);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
+  font-size: calc(var(--el-cell) * 0.22);
+  font-weight: 800;
+  color: rgba(255,255,255,0.7);
+}
+
+.el-pt-cell {
+  position: relative;
+  border: none;
+  border-radius: 3px;
   background: var(--el-c, var(--grape));
   color: #fff;
-  cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  padding: 4px 2px;
-  box-shadow: 0 4px 0 var(--el-d, var(--grape-deep)), 0 8px 14px rgba(38,35,92,0.18);
-  transition: transform 0.08s, box-shadow 0.08s;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: center;
+  transition: transform 0.1s, box-shadow 0.1s;
   -webkit-tap-highlight-color: transparent;
 }
-.el-tile:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--el-d, var(--grape-deep)); }
-.el-tile-z {
+button.el-pt-cell { cursor: pointer; }
+button.el-pt-cell:active { transform: scale(0.94); }
+
+/* Ngoài chương trình: vẫn thấy đúng vị trí và màu nhóm, nhưng lùi hẳn về sau */
+.el-pt-cell.is-untaught {
+  opacity: 0.34;
+  filter: saturate(0.7);
+  pointer-events: none;
+}
+
+.el-pt-cell.is-selected {
+  transform: scale(1.18);
+  z-index: 3;
+  box-shadow: 0 0 0 2px #fff, 0 6px 14px rgba(0,0,0,0.55);
+}
+/* Trọng tâm: tam giác trắng góc trên-trái, không chiếm chỗ chữ như chấm tròn */
+.el-pt-cell.is-priority::after {
+  content: '';
   position: absolute;
-  top: 5px;
-  left: 7px;
-  font-size: 10px;
+  top: 0;
+  left: 0;
+  border-width: calc(var(--el-cell) * 0.2) calc(var(--el-cell) * 0.2) 0 0;
+  border-style: solid;
+  border-color: rgba(255,255,255,0.92) transparent transparent transparent;
+}
+.el-pt-z {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: calc(var(--el-cell) * 0.2);
   font-weight: 700;
   opacity: 0.9;
+  line-height: 1;
 }
-.el-tile-symbol {
+.el-pt-symbol {
   font-family: var(--font-display);
-  font-size: clamp(20px, 6vw, 26px);
+  font-size: calc(var(--el-cell) * 0.44);
   font-weight: 800;
-  line-height: 1.1;
-  text-shadow: 0 2px 0 rgba(0,0,0,0.18);
+  line-height: 1.05;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.3);
 }
-.el-tile-name {
-  font-size: 9px;
-  font-weight: 700;
-  opacity: 0.95;
+/* Tên + nguyên tử khối chỉ hiện khi ô đủ lớn để đọc — dưới ngưỡng đó chúng
+ * biến thành vệt mờ làm hỏng ký hiệu, thà bỏ hẳn. */
+.el-pt-name,
+.el-pt-mass {
+  display: none;
   max-width: 100%;
+  padding: 0 1px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.15;
+}
+.el-pt-name { font-size: calc(var(--el-cell) * 0.15); font-weight: 700; }
+.el-pt-mass { font-size: calc(var(--el-cell) * 0.14); font-weight: 600; opacity: 0.85; }
+@media (min-width: 900px) {
+  .el-pt-name, .el-pt-mass { display: block; }
+  .el-pt-symbol { font-size: calc(var(--el-cell) * 0.38); }
+}
+
+/* ── Cổng xoay ngang: che cả màn khi đang cầm dọc ── */
+.el-rotate-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px;
+  text-align: center;
+  background: rgba(14, 11, 36, 0.94);
+  backdrop-filter: blur(6px);
+  animation: el-gate-in 0.28s ease both;
+}
+.el-rotate-gate[hidden] { display: none !important; }
+@keyframes el-gate-in { from { opacity: 0; } to { opacity: 1; } }
+
+.el-rotate-phone {
+  width: 64px;
+  height: 104px;
+  border: 4px solid #fff;
+  border-radius: 12px;
+  padding: 6px 4px;
+  margin-bottom: 18px;
+  animation: el-rotate-turn 2.6s ease-in-out infinite;
+}
+.el-rotate-screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--sky-btn, #38C6FF), var(--bubblegum, #FF5DA2));
+}
+@keyframes el-rotate-turn {
+  0%, 30% { transform: rotate(0deg); }
+  55%, 85% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.el-rotate-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+}
+.el-rotate-sub {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.78);
+  max-width: 280px;
+  margin: 0;
+}
+.el-rotate-skip {
+  margin-top: 20px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: rgba(255,255,255,0.85);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 18px;
+  cursor: pointer;
+}
+@media (orientation: landscape) {
+  .el-rotate-gate { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .el-rotate-phone { animation: none; transform: rotate(-90deg); }
+  .el-rotate-gate { animation: none; }
+}
+
+/* Màn ngang: đã đủ rộng để nhét cả 18 cột, nên co theo CẢ bề ngang lẫn bề
+ * cao (không cuộn) — trái với màn dọc (chỉ co theo chiều cao rồi cuộn ngang,
+ * xem .el-table ở trên). Đây là hướng dùng chính của màn này (có gate mời
+ * xoay ngang), nên phải thấy trọn bảng trong 1 màn hình. */
+@media (orientation: landscape) {
+  .el-table {
+    --el-cell: min(
+      calc((min(100vw, 480px) - 40px - 20px - 19 * var(--el-gap)) / 18),
+      calc((100vh - 122px) / 9.8)
+    );
+  }
+}
+/* Màn ngang thấp (điện thoại): header/toolbar co lại hết mức để nhường thêm
+ * chiều cao cho bảng — hụt bớt 122px xuống 72px nên phải hạ lại mốc trừ. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .el-header { padding-top: 4px; padding-bottom: 2px; gap: 8px; }
+  .el-back { width: 34px; height: 34px; }
+  .el-title { font-size: 15px; }
+  .el-practice-btn { font-size: 12px; padding: 7px 12px; }
+  .el-toolbar { flex-direction: row; align-items: center; gap: 10px; padding-bottom: 4px; }
+  .el-filter { font-size: 10.5px; padding: 4px 10px; }
+  .el-progress { margin-left: auto; }
+  .el-table {
+    --el-cell: min(
+      calc((min(100vw, 480px) - 40px - 20px - 19 * var(--el-gap)) / 18),
+      calc((100vh - 72px) / 9.8)
+    );
+  }
 }
 
 /* ── Thẻ chi tiết (overlay + lật 3D) ── */
@@ -157,9 +436,10 @@
   background: rgba(38,35,92,0.72);
   backdrop-filter: blur(5px);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: safe center;
+  justify-content: safe center;
   padding: 20px;
+  overflow-y: auto;
 }
 .el-detail-overlay[hidden] { display: none !important; }
 .el-detail-inner {
@@ -169,6 +449,7 @@
   flex-direction: column;
   align-items: center;
   gap: 14px;
+  margin: auto 0;
 }
 
 .el-card {
@@ -319,6 +600,17 @@
   transition: transform 0.08s;
 }
 .el-nav-btn:active { transform: scale(0.95); }
+
+/* Màn ngang: chiều cao chật (điện thoại xoay ngang) — thẻ chi tiết xếp dọc
+ * bình thường sẽ tràn màn (thẻ + nút phát âm + nút điều hướng cộng dồn cao
+ * hơn viewport). Thu nhỏ thẻ theo vh và bớt đệm/khoảng cách để vừa trọn. */
+@media (orientation: landscape) {
+  .el-detail-overlay { padding: 10px; }
+  .el-detail-inner { gap: 8px; }
+  .el-card { width: min(270px, 76vw, 48vh); }
+  .el-speak-btn { padding: 8px; font-size: 12.5px; }
+  .el-nav-btn { padding: 7px 6px; font-size: 11.5px; }
+}
 
 /* ── Luyện tập «Nghe & đoán» ── */
 .pr-body {

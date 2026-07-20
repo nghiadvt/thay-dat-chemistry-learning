@@ -131,6 +131,22 @@
     document.querySelectorAll('[data-table-column-picker]').forEach(initColumnPicker);
   }
 
+  /**
+   * Hàng nạp thêm khi mở nhóm chưa biết cột nào đang bị ẩn — áp lại theo cấu hình đã lưu.
+   */
+  function reapplyVisibility() {
+    document.querySelectorAll('[data-table-column-picker]').forEach((picker) => {
+      const tableId = picker.dataset.tableTarget;
+      if (!tableId) return;
+      const table = findTargetTable(tableId);
+      if (!table) return;
+      const checkboxes = [...picker.querySelectorAll('input[type="checkbox"][data-col-toggle]')];
+      applyColumnVisibility(table, loadVisibleCols(tableId, parseDefaultCols(picker, checkboxes)));
+    });
+  }
+
+  document.addEventListener('admin:rows-added', reapplyVisibility);
+
   function getVisibleCols(tableId, defaultCols) {
     return loadVisibleCols(tableId, defaultCols ?? []);
   }

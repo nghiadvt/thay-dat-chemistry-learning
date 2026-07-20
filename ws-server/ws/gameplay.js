@@ -320,6 +320,7 @@ async function buildFinalLeaderboardPayload(redis, pin) {
       score,
       rank: finalLeaderboard.length + 1,
       player_token: player.player_token || null,
+      student_id: player.student_id || null,
       avatar: player.avatar || null,
     });
   }
@@ -658,6 +659,7 @@ async function finalizeCurrentQuestion(io, redis, pin) {
         sessionId,
         questionId: question.id,
         studentName: name,
+        studentId: player?.student_id || null,
         answerSubmitted: answer,
         isCorrect: correct,
         scoreEarned,

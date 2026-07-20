@@ -736,3 +736,76 @@ table.data-table td[data-col="select"] {
   margin-top: 20px;
 }
 
+
+/* ── Danh sách dạng nhóm gập/mở ───────────────────────────────────── */
+.list-group-head > td {
+  padding: 0;
+  background: #f6f7fb;
+  border-top: 1px solid #e4e7f0;
+}
+
+.list-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+}
+
+.list-group-toggle:hover {
+  background: #eef0f8;
+}
+
+.list-group-caret {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 6px solid #6b7280;
+  border-top: 4.5px solid transparent;
+  border-bottom: 4.5px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.list-group-section:not(.is-collapsed) .list-group-caret {
+  transform: rotate(90deg);
+}
+
+.list-group-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.list-group-count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e0e4f0;
+  color: #4b5563;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Gập nhóm = ẩn mọi hàng trừ hàng tiêu đề */
+.list-group-section.is-collapsed > tr:not(.list-group-head) {
+  display: none;
+}
+
+.list-group-status > td,
+.list-group-more > td,
+.list-group-empty {
+  padding: 10px 14px 10px 38px;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.list-group-status.is-error > td {
+  color: #b91c1c;
+}

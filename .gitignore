@@ -6,3 +6,6 @@ ws-server/node_modules/
 
 # Windows download artifacts
 *Zone.Identifier
+
+# Dump DB (chua du lieu that) - khong commit
+/backups/

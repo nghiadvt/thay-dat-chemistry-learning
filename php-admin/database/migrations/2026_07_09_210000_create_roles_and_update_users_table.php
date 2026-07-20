@@ -55,7 +55,11 @@ return new class extends Migration
             DB::table('users')->whereNull('role_id')->update(['role_id' => $teacherRoleId]);
         }
 
-        DB::statement('ALTER TABLE users MODIFY role_id BIGINT UNSIGNED NOT NULL');
+        // Siết NOT NULL sau khi đã backfill. Cú pháp MODIFY chỉ có ở MySQL;
+        // SQLite (dùng cho test) bỏ qua, cột vẫn nullable nhưng luôn có giá trị.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE users MODIFY role_id BIGINT UNSIGNED NOT NULL');
+        }
     }
 
     public function down(): void

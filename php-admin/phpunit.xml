@@ -19,6 +19,8 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Khóa cố định cho test: StudentPasswordCipher dẫn xuất khóa từ APP_KEY. -->
+        <env name="APP_KEY" value="base64:gQyiLmxUO2I5ADTT/2Ju5XfGmRAiy/I2lq6GZJOAZ6o="/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

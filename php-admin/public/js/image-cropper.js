@@ -28,6 +28,13 @@
   const RULER_MIN_TICK_PX = 60;
   const RULER_TICK_CANDIDATES = [5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000];
   const DPI_PRESETS = { custom: 96, logo: 300, banner: 72, hero: 150 };
+  const AUTO_DETECT_MAX_DIM = 1200;
+  const AUTO_DETECT_ALPHA_THRESHOLD = 16;
+  const AUTO_DETECT_MIN_AREA_PX = 24;
+  const AUTO_DETECT_PADDING = 6;
+  const AUTO_DETECT_DILATE_PASSES = 2;
+  const AUTO_DETECT_FULL_OPAQUE_RATIO = 0.98;
+  const CLICK_DETECT_SEARCH_RADIUS = 8;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -145,6 +152,8 @@
     const rulerHCanvas = document.getElementById('icRulerHCanvas');
     const rulerVCanvas = document.getElementById('icRulerVCanvas');
 
+    const autoDetectBtn = document.getElementById('icAutoDetect');
+    const clickDetectToggleBtn = document.getElementById('icClickDetectToggle');
     const createByDimsBtn = document.getElementById('icCreateByDims');
     const createDimsPanel = document.getElementById('icCreateDimsPanel');
     const dimsXInput = document.getElementById('icDimsX');
@@ -188,6 +197,12 @@
 
     let dimsPanelBox = null;
     let dimsPanelSnapshot = null;
+
+    // Chế độ "click để khoanh vùng" — bật/tắt độc lập với mode kéo-vẽ bên
+    // dưới, khi bật thì mousedown trên canvas chạy flood-fill từ điểm click
+    // thay vì vẽ/di chuyển/resize như bình thường.
+    let clickDetectActive = false;
+    let clickDetectMaskCache = null; // { img, mask, dw, dh, scale } — làm mới khi img đổi
 
     // mode: null | 'draw' (khoanh vùng mới) | 'move' (kéo vùng có sẵn) | 'resize' (kéo góc)
     let mode = null;
@@ -284,6 +299,10 @@
     }
 
     function updateHoverCursor(point) {
+      if (clickDetectActive) {
+        canvas.style.cursor = 'crosshair';
+        return;
+      }
       const handle = hitTestHandle(point);
       if (handle) {
         canvas.style.cursor = CORNER_CURSORS[handle.corner];
@@ -672,6 +691,7 @@
     document.addEventListener('keydown', (evt) => {
       if (evt.key === 'Escape' && !modal.hidden) closeModal();
       if (evt.key === 'Escape' && exportModal && !exportModal.hidden) closeExportModal();
+      if (evt.key === 'Escape' && clickDetectActive) setClickDetectActive(false);
     });
 
     // Điều khiển xoay/lật trong modal thao tác trên `modalBox` (vùng đang mở)
@@ -1311,6 +1331,272 @@
       if (el) el.addEventListener('input', updateDimsPanelBoxFromInputs);
     });
 
+    // ── Tự động khoanh vùng — chỉ dùng được với ảnh đã xóa nền: coi mỗi cụm
+    // pixel không-trong-suốt liền kề nhau (theo alpha channel) là 1 object,
+    // lấy bounding box của cụm đó làm vùng khoanh. Phân tích trên bản thu nhỏ
+    // (AUTO_DETECT_MAX_DIM) để nhanh, rồi quy đổi tọa độ về ảnh gốc — không
+    // dùng ảnh gốc trực tiếp vì ảnh quét/scan có thể rất lớn. Dilate vài lần
+    // trước khi gom cụm để nối các phần bị đứt do viền khử răng cưa (anti-
+    // alias) sau khi xóa nền. Dùng chung cho cả "khoanh tất cả object" và
+    // "click vào 1 object để khoanh riêng nó". ──
+    function buildDilatedAlphaMask() {
+      const scale = Math.min(1, AUTO_DETECT_MAX_DIM / Math.max(imgW, imgH));
+      const dw = Math.max(1, Math.round(imgW * scale));
+      const dh = Math.max(1, Math.round(imgH * scale));
+
+      const off = document.createElement('canvas');
+      off.width = dw;
+      off.height = dh;
+      const offCtx = off.getContext('2d', { willReadFrequently: true });
+      offCtx.clearRect(0, 0, dw, dh);
+      offCtx.drawImage(img, 0, 0, dw, dh);
+      const data = offCtx.getImageData(0, 0, dw, dh).data;
+
+      let mask = new Uint8Array(dw * dh);
+      let opaqueCount = 0;
+      for (let i = 0, p = 0; i < mask.length; i += 1, p += 4) {
+        if (data[p + 3] > AUTO_DETECT_ALPHA_THRESHOLD) {
+          mask[i] = 1;
+          opaqueCount += 1;
+        }
+      }
+
+      for (let pass = 0; pass < AUTO_DETECT_DILATE_PASSES && opaqueCount > 0; pass += 1) {
+        const next = new Uint8Array(mask.length);
+        for (let y = 0; y < dh; y += 1) {
+          for (let x = 0; x < dw; x += 1) {
+            const idx = y * dw + x;
+            if (mask[idx]) { next[idx] = 1; continue; }
+            let hit = 0;
+            for (let ny = Math.max(0, y - 1); ny <= Math.min(dh - 1, y + 1) && !hit; ny += 1) {
+              for (let nx = Math.max(0, x - 1); nx <= Math.min(dw - 1, x + 1); nx += 1) {
+                if (mask[ny * dw + nx]) { hit = 1; break; }
+              }
+            }
+            next[idx] = hit;
+          }
+        }
+        mask = next;
+      }
+
+      return { mask, dw, dh, scale, opaqueCount };
+    }
+
+    // Flood-fill (iterative, dùng stack) từ 1 pixel hạt giống, đánh dấu vào
+    // `visited` dùng chung để hỗ trợ cả quét toàn ảnh (mảng visited persist
+    // qua nhiều cụm) lẫn 1 lần click (mảng visited tạo mới mỗi lần).
+    function floodFillComponent(mask, dw, dh, seedIdx, visited) {
+      if (!mask[seedIdx] || visited[seedIdx]) return null;
+      visited[seedIdx] = 1;
+      const stack = [seedIdx];
+      let minX = seedIdx % dw;
+      let maxX = minX;
+      let minY = (seedIdx / dw) | 0;
+      let maxY = minY;
+      let area = 0;
+
+      while (stack.length) {
+        const idx = stack.pop();
+        area += 1;
+        const cy = (idx / dw) | 0;
+        const cx = idx - cy * dw;
+        if (cx < minX) minX = cx;
+        if (cx > maxX) maxX = cx;
+        if (cy < minY) minY = cy;
+        if (cy > maxY) maxY = cy;
+
+        if (cx > 0 && mask[idx - 1] && !visited[idx - 1]) { visited[idx - 1] = 1; stack.push(idx - 1); }
+        if (cx < dw - 1 && mask[idx + 1] && !visited[idx + 1]) { visited[idx + 1] = 1; stack.push(idx + 1); }
+        if (cy > 0 && mask[idx - dw] && !visited[idx - dw]) { visited[idx - dw] = 1; stack.push(idx - dw); }
+        if (cy < dh - 1 && mask[idx + dw] && !visited[idx + dw]) { visited[idx + dw] = 1; stack.push(idx + dw); }
+      }
+
+      return { minX, minY, maxX, maxY, area };
+    }
+
+    // Quy đổi bbox (theo tọa độ mask thu nhỏ) về tọa độ ảnh gốc + đệm biên,
+    // trả về null nếu sau khi đệm/kẹp biên vẫn nhỏ hơn kích thước tối thiểu.
+    function clusterToRect(cluster, invScale) {
+      let rx = cluster.minX * invScale - AUTO_DETECT_PADDING;
+      let ry = cluster.minY * invScale - AUTO_DETECT_PADDING;
+      let rw = (cluster.maxX - cluster.minX + 1) * invScale + AUTO_DETECT_PADDING * 2;
+      let rh = (cluster.maxY - cluster.minY + 1) * invScale + AUTO_DETECT_PADDING * 2;
+      rx = clamp(rx, 0, imgW);
+      ry = clamp(ry, 0, imgH);
+      rw = Math.min(rw, imgW - rx);
+      rh = Math.min(rh, imgH - ry);
+      if (rw < MIN_BOX_SIZE || rh < MIN_BOX_SIZE) return null;
+      return { x: Math.round(rx), y: Math.round(ry), w: Math.round(rw), h: Math.round(rh) };
+    }
+
+    function detectObjectRegions() {
+      const { mask, dw, dh, scale, opaqueCount } = buildDilatedAlphaMask();
+      if (opaqueCount === 0) return { regions: [], fullyOpaque: false };
+      const fullyOpaque = opaqueCount >= dw * dh * AUTO_DETECT_FULL_OPAQUE_RATIO;
+
+      const labeled = new Uint8Array(dw * dh);
+      const clusters = [];
+      for (let y = 0; y < dh; y += 1) {
+        for (let x = 0; x < dw; x += 1) {
+          const start = y * dw + x;
+          if (!mask[start] || labeled[start]) continue;
+          const comp = floodFillComponent(mask, dw, dh, start, labeled);
+          if (comp.area < AUTO_DETECT_MIN_AREA_PX) continue;
+          clusters.push(comp);
+        }
+      }
+
+      const invScale = 1 / scale;
+      const regions = clusters
+        .map((c) => clusterToRect(c, invScale))
+        .filter(Boolean)
+        .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+      return { regions, fullyOpaque };
+    }
+
+    function autoDetectRegions() {
+      if (!img || !imgW || !imgH) return;
+
+      if (autoDetectBtn) {
+        autoDetectBtn.disabled = true;
+        autoDetectBtn.textContent = 'Đang phân tích...';
+      }
+
+      // setTimeout để trình duyệt kịp vẽ trạng thái "Đang phân tích..." trước
+      // khi chạy vòng lặp đồng bộ (có thể mất vài trăm ms với ảnh lớn).
+      setTimeout(() => {
+        try {
+          const { regions, fullyOpaque } = detectObjectRegions();
+
+          if (fullyOpaque) {
+            toast('Ảnh gần như không có vùng trong suốt — chức năng này chỉ nhận diện tốt trên ảnh đã xóa nền.', 'error');
+          }
+
+          if (regions.length === 0) {
+            toast('Không tìm thấy object nào trên ảnh. Kiểm tra ảnh đã xóa nền (có kênh alpha) chưa.', 'error');
+            return;
+          }
+
+          commitHistory(snapshotState());
+          clearSelection();
+          regions.forEach((rect) => {
+            boxSeq += 1;
+            boxes.push({
+              id: boxSeq,
+              regionId: null,
+              x: rect.x,
+              y: rect.y,
+              w: rect.w,
+              h: rect.h,
+              rotation: 0,
+              flipped: false,
+              label: `vung-${boxSeq}`,
+              selected: true,
+            });
+          });
+          drawScene();
+          renderBoxList();
+          toast(`Đã tự động khoanh ${regions.length} vùng.`, 'success');
+        } catch (err) {
+          toast('Có lỗi khi tự động khoanh vùng.', 'error');
+        } finally {
+          if (autoDetectBtn) {
+            autoDetectBtn.disabled = false;
+            autoDetectBtn.textContent = 'Tự động khoanh vùng';
+          }
+        }
+      }, 30);
+    }
+
+    if (autoDetectBtn) autoDetectBtn.addEventListener('click', autoDetectRegions);
+
+    // ── Chế độ "Click để khoanh vùng" — bật lên thì mỗi click trên ảnh chạy
+    // flood-fill riêng từ điểm click, không đụng tới các vùng đã khoanh sẵn. ──
+    function getClickDetectMask() {
+      if (clickDetectMaskCache && clickDetectMaskCache.img === img) return clickDetectMaskCache;
+      clickDetectMaskCache = { img, ...buildDilatedAlphaMask() };
+      return clickDetectMaskCache;
+    }
+
+    function findNearestOpaqueIdx(mask, dw, dh, cx, cy, maxRadius) {
+      if (mask[cy * dw + cx]) return cy * dw + cx;
+      for (let r = 1; r <= maxRadius; r += 1) {
+        for (let dy = -r; dy <= r; dy += 1) {
+          const ny = cy + dy;
+          if (ny < 0 || ny >= dh) continue;
+          const onEdgeRow = Math.abs(dy) === r;
+          for (let dx = -r; dx <= r; dx += 1) {
+            if (!onEdgeRow && Math.abs(dx) !== r) continue;
+            const nx = cx + dx;
+            if (nx < 0 || nx >= dw) continue;
+            if (mask[ny * dw + nx]) return ny * dw + nx;
+          }
+        }
+      }
+      return -1;
+    }
+
+    function performClickDetect(point) {
+      if (!img) return;
+      const { mask, dw, dh, scale, opaqueCount } = getClickDetectMask();
+      if (opaqueCount === 0) {
+        toast('Ảnh không có vùng trong suốt — chức năng này chỉ dùng được với ảnh đã xóa nền.', 'error');
+        return;
+      }
+
+      const mx = clamp(Math.round(point.x * scale), 0, dw - 1);
+      const my = clamp(Math.round(point.y * scale), 0, dh - 1);
+      const seedIdx = findNearestOpaqueIdx(mask, dw, dh, mx, my, CLICK_DETECT_SEARCH_RADIUS);
+      if (seedIdx === -1) {
+        toast('Không tìm thấy object ở vị trí bạn click.', 'error');
+        return;
+      }
+
+      const visited = new Uint8Array(mask.length);
+      const comp = floodFillComponent(mask, dw, dh, seedIdx, visited);
+      const rect = comp && comp.area >= AUTO_DETECT_MIN_AREA_PX ? clusterToRect(comp, 1 / scale) : null;
+      if (!rect) {
+        toast('Vùng tại vị trí click quá nhỏ để khoanh.', 'error');
+        return;
+      }
+
+      commitHistory(snapshotState());
+      clearSelection();
+      boxSeq += 1;
+      boxes.push({
+        id: boxSeq,
+        regionId: null,
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        rotation: 0,
+        flipped: false,
+        label: `vung-${boxSeq}`,
+        selected: true,
+      });
+      drawScene();
+      renderBoxList();
+    }
+
+    function setClickDetectActive(active) {
+      clickDetectActive = !!active;
+      if (clickDetectToggleBtn) {
+        clickDetectToggleBtn.classList.toggle('is-active', clickDetectActive);
+        clickDetectToggleBtn.textContent = clickDetectActive
+          ? 'Đang bật — click ảnh để khoanh (bấm để tắt)'
+          : 'Click để khoanh vùng';
+      }
+    }
+
+    if (clickDetectToggleBtn) {
+      clickDetectToggleBtn.addEventListener('click', () => {
+        if (!img) return;
+        setClickDetectActive(!clickDetectActive);
+      });
+    }
+
     function resetWorkspace() {
       boxes = [];
       boxSeq = 0;
@@ -1334,6 +1620,8 @@
       dimsPanelBox = null;
       dimsPanelSnapshot = null;
       if (createDimsPanel) createDimsPanel.hidden = true;
+      clickDetectMaskCache = null;
+      setClickDetectActive(false);
       resultsCard.hidden = true;
       resultListEl.innerHTML = '';
       renderBoxList();
@@ -1415,6 +1703,12 @@
     canvas.addEventListener('mousedown', (evt) => {
       if (!img) return;
       const point = pointFromEvent(evt);
+
+      if (clickDetectActive) {
+        performClickDetect(point);
+        return;
+      }
+
       const multiSelect = evt.shiftKey || evt.ctrlKey || evt.metaKey;
 
       const handle = hitTestHandle(point);

@@ -6,6 +6,7 @@
 @php
     $columns = [
         ['key' => 'name', 'label' => 'Tên'],
+        ['key' => 'group', 'label' => 'Nhóm'],
         ['key' => 'tags', 'label' => 'Chủ đề'],
         ['key' => 'game', 'label' => 'Game'],
         ['key' => 'keyboard', 'label' => 'Bàn phím'],
@@ -16,9 +17,13 @@
     ];
     $searchValue = trim((string) ($search ?? ''));
     $hasSearch = $searchValue !== '';
-    $hasFilters = request()->hasAny(['q', 'game_id', 'tag_id']);
-    $activeFilterCount = collect([request('game_id'), request('tag_id')])->filter(fn ($v) => $v !== null && $v !== '')->count();
+    $hasFilters = request()->hasAny(['q', 'game_id', 'tag_id', 'group_id']);
+    $activeFilterCount = collect([request('game_id'), request('tag_id'), request('group_id')])->filter(fn ($v) => $v !== null && $v !== '')->count();
     $filterChips = [];
+    if ($filterGroupId) {
+        $groupLabel = $filterGroupId === 'none' ? 'Chưa phân nhóm' : ($groups->firstWhere('id', (int) $filterGroupId)?->name ?? 'Nhóm #'.$filterGroupId);
+        $filterChips[] = ['label' => 'Nhóm: '.$groupLabel, 'url' => route('admin.quizzes.index', request()->except(['group_id', 'page']))];
+    }
     if ($filterGameId) {
         $gameName = $games->firstWhere('id', $filterGameId)?->name ?? 'Game #'.$filterGameId;
         $filterChips[] = ['label' => 'Game: '.$gameName, 'url' => route('admin.quizzes.index', request()->except(['game_id', 'page']))];
@@ -33,11 +38,16 @@
 <div class="page-header">
     <div class="page-header__text">
         <h2>Danh sách quiz</h2>
-        @if (!$quizzes->isEmpty() || $hasFilters)
+        @if ($grouped)
+            <p class="page-header__meta">{{ collect($sections)->sum('count') }} quiz trong {{ count($sections) }} nhóm</p>
+        @elseif (!$quizzes->isEmpty() || $hasFilters)
             <p class="page-header__meta">{{ $quizzes->total() }} quiz{{ $hasFilters ? ' phù hợp bộ lọc' : '' }}</p>
         @endif
     </div>
-    <a href="{{ route('admin.quizzes.create') }}" class="btn btn-primary">+ Tạo quiz</a>
+    <div class="page-header__actions">
+        <a href="{{ route('admin.groups.index', ['scope' => 'quiz']) }}" class="btn btn-secondary">Quản lý nhóm</a>
+        <a href="{{ route('admin.quizzes.create') }}" class="btn btn-primary">+ Tạo quiz</a>
+    </div>
 </div>
 
 <div class="card admin-list-card">
@@ -66,6 +76,14 @@
         <form method="GET" class="list-filters-panel__form">
             @if ($hasSearch)<input type="hidden" name="q" value="{{ $searchValue }}">@endif
             <div class="list-filters-panel__grid">
+                <div class="form-group">
+                    @include('admin.partials.group-select', [
+                        'mode' => 'filter',
+                        'id' => 'quizGroupFilter',
+                        'groups' => $groups,
+                        'selected' => $filterGroupId ?? '',
+                    ])
+                </div>
                 <div class="form-group">
                     <label for="quizGame">Game</label>
                     <select id="quizGame" name="game_id" class="list-filter-control">
@@ -102,7 +120,33 @@
         'chips' => $filterChips,
     ])
 
-    @if ($quizzes->isEmpty())
+    @if ($grouped)
+        <div class="table-wrap admin-list-table-wrap">
+            <table class="data-table admin-list-table admin-grouped-table" data-table-id="quizzes-list">
+                <colgroup>
+                    @foreach ($columns as $column)
+                        <col data-col="{{ $column['key'] }}">
+                    @endforeach
+                </colgroup>
+                <thead>
+                    <tr>
+                        @foreach ($columns as $column)
+                            <th data-col="{{ $column['key'] }}">{{ $column['label'] }}</th>
+                        @endforeach
+                    </tr>
+                </thead>
+                @include('admin.partials.list-group-sections', [
+                    'sections' => $sections,
+                    'recent' => $recent,
+                    'rowView' => 'admin.quizzes._row',
+                    'rowVar' => 'quiz',
+                    'rowsUrl' => route('admin.quizzes.group-rows'),
+                    'colspan' => count($columns),
+                    'emptyText' => 'Nhóm này chưa có quiz nào.',
+                ])
+            </table>
+        </div>
+    @elseif ($quizzes->isEmpty())
         <div class="empty-state">
             @if ($hasFilters)
                 Không có quiz phù hợp. <a href="{{ route('admin.quizzes.index') }}">Xóa bộ lọc</a>
@@ -127,49 +171,7 @@
                 </thead>
                 <tbody>
                     @foreach ($quizzes as $quiz)
-                    <tr class="{{ $quiz->is_active ? '' : 'row-inactive' }}">
-                        <td data-col="name"><strong>{{ $quiz->name }}</strong></td>
-                        <td data-col="tags">
-                            @if ($quiz->tags->isEmpty())
-                                <span class="text-muted">—</span>
-                            @else
-                                <div class="tag-list tag-list--compact">
-                                    @foreach ($quiz->tags as $tag)
-                                        @include('admin.partials.tag-chip', [
-                                            'tag' => $tag,
-                                            'link' => route('admin.quizzes.index', ['tag_id' => $tag->id]),
-                                        ])
-                                    @endforeach
-                                </div>
-                            @endif
-                        </td>
-                        <td data-col="game">{{ $quiz->game?->name }}</td>
-                        <td data-col="keyboard">{{ $quiz->keyboard?->name }}</td>
-                        <td data-col="grade">{{ $quiz->grade ?: '—' }}</td>
-                        <td data-col="questions">{{ $quiz->questions_count }}</td>
-                        <td data-col="active">
-                            @include('admin.partials.toggle-switch', [
-                                'formAction' => route('admin.quizzes.toggle-active', $quiz),
-                                'checked' => $quiz->is_active,
-                                'submitOnChange' => true,
-                                'label' => 'Bật/tắt quiz',
-                            ])
-                        </td>
-                        <td data-col="actions" class="actions-cell">
-                            @include('admin.partials.row-action-menu', [
-                                'actions' => [
-                                    ['key' => 'preview', 'label' => 'Xem trước'],
-                                    ['key' => 'detail', 'label' => 'Chi tiết', 'href' => route('admin.quizzes.show', $quiz)],
-                                    ['key' => 'delete', 'label' => 'Xóa', 'danger' => true, 'href' => route('admin.quizzes.destroy', $quiz), 'method' => 'DELETE', 'confirm' => "Xóa quiz «{$quiz->name}» và tất cả câu hỏi?"],
-                                ],
-                                'dataAttrs' => [
-                                    'quiz-id' => $quiz->id,
-                                    'quiz-name' => $quiz->name,
-                                    'item-label' => $quiz->name,
-                                ],
-                            ])
-                        </td>
-                    </tr>
+                        @include('admin.quizzes._row', ['quiz' => $quiz])
                     @endforeach
                 </tbody>
             </table>
@@ -187,6 +189,7 @@
 @push('scripts')
 @php $qpJs = public_path('htd-admin/js/quiz-preview.js'); @endphp
 <script src="@vasset('js/admin-csv-exchange.js')"></script>
+<script src="@vasset('js/grouped-list.js')"></script>
 <script src="@vasset('htd-admin/js/quiz-preview.js')"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {

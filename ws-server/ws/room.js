@@ -16,6 +16,33 @@ const MAX_AVATAR_LENGTH = 120000;
 /** Theme màn hình học sinh — GV chọn, đồng bộ mọi HS (khớp prototype/js/student-theme.js) */
 const STUDENT_THEMES = ['default', 'lab', 'galaxy', 'arcade', 'chalk'];
 
+/** Khóa Redis do Laravel ghi — xem App\Services\StudentPlayToken. */
+const PLAY_TOKEN_PREFIX = 'student_play_token:';
+
+/**
+ * Đổi token ngắn hạn lấy student_id.
+ *
+ * Token do Laravel phát ra sau khi đã xác thực phiên học sinh, nên đây là cách
+ * duy nhất để ws-server biết chắc lượt chơi thuộc về tài khoản nào. Token sai
+ * hoặc hết hạn thì coi như chơi ẩn danh chứ không chặn vào phòng — học sinh
+ * chưa có tài khoản vẫn phải chơi được bằng PIN như trước.
+ */
+async function resolvePlayToken(redis, rawToken) {
+  if (!rawToken) return null;
+
+  const token = String(rawToken).trim();
+  if (!token || token.length > 128) return null;
+
+  try {
+    const value = await redis.get(PLAY_TOKEN_PREFIX + token);
+    const studentId = Number(value);
+    return Number.isInteger(studentId) && studentId > 0 ? studentId : null;
+  } catch {
+    // Redis lỗi thì vẫn cho vào phòng, chỉ là không gắn được tài khoản.
+    return null;
+  }
+}
+
 function sanitizeAvatar(raw) {
   if (raw == null || raw === '') return null;
   const avatar = String(raw).trim();
@@ -71,10 +98,52 @@ function registerRoomHandlers(io, redis) {
       }
     });
 
+    socket.on('select_duck', async (payload = {}, ack) => {
+      try {
+        const result = await handleSelectDuck(redis, socket, payload);
+        if (typeof ack === 'function') ack({ success: true, data: result });
+      } catch (err) {
+        const message = err.message || 'Không chọn được vịt.';
+        if (typeof ack === 'function') ack({ success: false, error: message });
+      }
+    });
+
     socket.on('disconnect', async () => {
       await handleDisconnect(redis, socket);
     });
   });
+}
+
+async function handleSelectDuck(redis, socket, payload) {
+  const { pin, name, isHost } = socket.data || {};
+  if (!pin || !name || isHost) {
+    throw new Error('Không thể chọn vịt.');
+  }
+
+  const room = await redis.hgetall(roomKey(pin));
+  if ((room.play_mode_slug || '') !== 'duck_race') {
+    throw new Error('Phòng này không phải chế độ đua vịt.');
+  }
+  if (room.status !== 'waiting') {
+    throw new Error('Không thể đổi vịt sau khi ván đấu đã bắt đầu.');
+  }
+
+  const { parseModeConfig, getDuckSprites } = require('./engines/duck-race-config');
+  const config = parseModeConfig(room);
+  const sprites = getDuckSprites(config);
+  const sprite = String(payload.duck_sprite || '');
+  if (!sprites.includes(sprite)) {
+    throw new Error('Vịt không hợp lệ.');
+  }
+
+  const player = await getPlayer(redis, pin, name);
+  if (!player) {
+    throw new Error('Không tìm thấy người chơi.');
+  }
+  player.duck_sprite = sprite;
+  await savePlayer(redis, pin, player);
+
+  return { duck_sprite: sprite };
 }
 
 async function handleJoinRoom(io, redis, socket, payload) {
@@ -109,6 +178,9 @@ async function handleJoinRoom(io, redis, socket, payload) {
   const room = await redis.hgetall(roomKey(pin));
 
   const providedToken = payload.player_token ? String(payload.player_token).trim() : null;
+  // Danh tính tài khoản học sinh: KHÔNG nhận student_id do client gửi (sửa được
+  // để gán lượt chơi cho bạn khác). Chỉ tin token ngắn hạn do Laravel phát ra.
+  const resolvedStudentId = await resolvePlayToken(redis, payload.play_token);
   const existingRaw = await redis.hget(playersKey(pin), name);
 
   // HS mới không vào được phòng đã kết thúc; HS đã chơi được quay lại xem kết quả.
@@ -137,6 +209,11 @@ async function handleJoinRoom(io, redis, socket, payload) {
       throw new Error('Tên đã được sử dụng trong phòng này.');
     }
     reconnected = true;
+    // Vào lại kèm token hợp lệ thì cập nhật; không có token thì giữ nguyên
+    // danh tính đã gắn lúc vào lần đầu.
+    if (resolvedStudentId) {
+      player.student_id = resolvedStudentId;
+    }
     player.connected = true;
     player.disconnected_at = null;
     player.socket_id = socket.id;
@@ -161,6 +238,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
       player = {
         name,
         player_token: randomUUID(),
+        student_id: resolvedStudentId,
         connected: true,
         is_host: false,
         streak_correct: 0,
@@ -171,10 +249,12 @@ async function handleJoinRoom(io, redis, socket, payload) {
     }
   }
 
+  let duckSprites;
   if (!player.is_host && (room.play_mode_slug || '') === 'duck_race') {
-    const { parseModeConfig, assignDuckSprite } = require('./engines/duck-race-config');
+    const { parseModeConfig, assignDuckSprite, getDuckSprites } = require('./engines/duck-race-config');
     const config = parseModeConfig(room);
     player.duck_sprite = await assignDuckSprite(redis, pin, config, player.duck_sprite);
+    duckSprites = getDuckSprites(config);
   }
 
   await redis.hset(playersKey(pin), name, JSON.stringify(player));
@@ -184,6 +264,7 @@ async function handleJoinRoom(io, redis, socket, payload) {
   socket.data.name = name;
   socket.data.isHost = player.is_host;
   socket.data.playerToken = player.player_token;
+  socket.data.studentId = player.student_id || null;
 
   await socket.join(pin);
   if (player.is_host) {
@@ -206,6 +287,9 @@ async function handleJoinRoom(io, redis, socket, payload) {
     room_status: room.status || 'waiting',
     question_index: room.status === 'playing' ? Number(room.question_index || 0) : null,
     student_theme: STUDENT_THEMES.includes(room.student_theme) ? room.student_theme : 'default',
+    play_mode_slug: room.play_mode_slug || null,
+    duck_sprite: player.duck_sprite || null,
+    duck_sprites: duckSprites || null,
   };
 }
 
@@ -287,6 +371,7 @@ async function savePlayer(redis, pin, player) {
 
 module.exports = {
   registerRoomHandlers,
+  resolvePlayToken,
   getConnectedStudents,
   getHostSockets,
   broadcastPlayerList,
