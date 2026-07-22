@@ -61,6 +61,9 @@ window.HTDApi = (function () {
     async checkPin(pin) {
       return request(`/api/rooms/${encodeURIComponent(pin)}`, { skipCsrf: true });
     },
+    async elementsTable() {
+      return request('/api/elements/table', { skipCsrf: true });
+    },
     async practiceTopics({ grade } = {}) {
       const params = new URLSearchParams();
       if (grade) params.set('grade', grade);
@@ -169,7 +172,7 @@ window.HTDApi = (function () {
       return request('/api/student/avatar', { method: 'POST', body: form });
     },
     studentLoginUrl() {
-      return apiUrl('/student/login');
+      return apiUrl('/login');
     },
     /** Route logout trả redirect chứ không phải JSON nên gọi fetch trực tiếp. */
     async studentLogout() {

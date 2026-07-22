@@ -214,3 +214,36 @@ window.HTD_PERIODIC_TABLE = [
   [102, 'No', 'Nobelium', 259, 'actini', 16, 'Ac'],
   [103, 'Lr', 'Lawrencium', 266, 'actini', 17, 'Ac'],
 ];
+
+/* HTD_loadElements — nạp bảng nguyên tố từ phiên bản đang live ở admin.
+ *
+ * Ghi đè HTD_ELEMENTS / HTD_ELEMENT_CATEGORIES bằng dữ liệu server (chỉ các
+ * nguyên tố is_visible của phiên bản live). Nếu fetch lỗi (offline) thì GIỮ
+ * NGUYÊN dữ liệu tĩnh phía trên làm fallback — app vẫn chạy được.
+ *
+ * priority được suy ra từ isLit (sáng = trọng tâm) để tương thích code cũ:
+ * filter/luyện tập/tiến độ vẫn dùng field priority như trước.
+ * HTD_PERIODIC_TABLE giữ nguyên tĩnh (khung nền 118 ô).
+ */
+window.HTD_loadElements = async function () {
+  try {
+    var data = window.HTDApi && HTDApi.elementsTable
+      ? await HTDApi.elementsTable()
+      : await fetch('/api/elements/table', { credentials: 'include' })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { return j && j.data; });
+
+    if (data && Array.isArray(data.elements) && data.elements.length) {
+      window.HTD_ELEMENTS = data.elements.map(function (e) {
+        if (e.priority == null) e.priority = e.isLit ? 1 : 2;
+        return e;
+      });
+      if (data.categories && Object.keys(data.categories).length) {
+        window.HTD_ELEMENT_CATEGORIES = data.categories;
+      }
+    }
+  } catch (e) {
+    if (window.console) console.warn('[elements] dùng dữ liệu tĩnh (fetch lỗi):', e && e.message);
+  }
+  return window.HTD_ELEMENTS;
+};

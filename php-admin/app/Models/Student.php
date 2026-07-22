@@ -25,6 +25,7 @@ class Student extends Authenticatable
         'student_code',
         'username',
         'display_name',
+        'email',
         'password',
         'avatar_path',
         'status',

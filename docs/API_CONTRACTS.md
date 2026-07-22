@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-09 (màn kết thúc: bục vinh danh + bảng xếp hạng ảnh)
+**Cập nhật lần cuối:** 2026-07-22 (Mẫu thẻ: `/admin/card-templates` CRUD JSON + preview; periodic 118+legend)
 
 ---
 
@@ -31,7 +31,13 @@ Lỗi:
 
 **Auth:** session cookie + CSRF (`@csrf` form hoặc header `X-XSRF-TOKEN` từ cookie `XSRF-TOKEN`).
 
-**Headless / script client:** `POST /login` phải gửi kèm **session cookie** lấy từ `GET /login` (nếu không → 419 CSRF). Sau login thành công (302), dùng cookie mới + `X-XSRF-TOKEN` cho mọi `/api/*`. Script mẫu: `ws-server/scripts/ws-smoke-test.js`, `ws-server/scripts/phase4-test.js`.
+**Headless / script client (GV):** `POST /admin/login` phải gửi kèm **session cookie** lấy từ `GET /admin/login` (nếu không → 419 CSRF). Sau login thành công (302), dùng cookie mới + `X-XSRF-TOKEN` cho mọi `/api/*` / `/admin/*` JSON. Client admin `public/htd-admin/js/api.js` (`HTDApi.ensureCsrf`) gọi `GET /admin/login`. Script mẫu: `ws-server/scripts/ws-smoke-test.js`, `ws-server/scripts/phase4-test.js`.
+
+**Login tách:**
+| Ai | Path |
+|---|---|
+| Giáo viên / admin | `GET|POST /admin/login` (route name `login`) |
+| Học sinh (account) | `GET|POST /login` (route name `student.login`) |
 
 **Base URL local:** `http://localhost:38480`
 
@@ -41,9 +47,11 @@ Lỗi:
 
 | Method | Path | Mô tả |
 |---|---|---|
-| GET | `/login` | Form đăng nhập |
-| POST | `/login` | `{ email, password }` → session |
-| POST | `/logout` | Hủy session (cần auth) |
+| GET | `/admin/login` | Form đăng nhập GV/admin |
+| POST | `/admin/login` | `{ email, password }` → session |
+| GET | `/login` | Form đăng nhập học sinh (account) |
+| POST | `/login` | Student login |
+| POST | `/logout` | Hủy session GV (cần auth) |
 | GET | `/dashboard` | Redirect → `/admin` |
 | GET | `/admin` | **Dashboard** — KPI, biểu đồ (14 ngày, trạng thái phòng, top game), phòng/báo cáo gần đây, thao tác nhanh |
 | GET | `/admin/dashboard/export` | **CSV tổng quan** — chỉ số hệ thống + tối đa 200 phiên kết thúc gần nhất (admin: toàn hệ thống; GV: phòng của mình) |
@@ -88,13 +96,26 @@ Tất cả công cụ GV nằm trong `/admin` — **không** dùng iframe hay `/
 | GET | `/admin/reports` | Lịch sử session `ended` |
 | GET | `/admin/reports/{id}` | Chi tiết điểm |
 | GET | `/admin/reports/{id}/export` | Tải CSV UTF-8 |
+| GET | `/admin/periodic` | Danh sách phiên bản bảng nguyên tố (card + thumbnail khung 118 ô mode như HS thường; bấm ảnh → modal phóng to + legend) |
+| POST | `/admin/periodic` | Tạo phiên bản `{ name }` → redirect workspace; gắn mọi element mặc định lit/visible/không Pro |
+| GET | `/admin/periodic/{id}/edit` | Workspace: `pw-stage` = 118 ô + f-block + chú giải nhóm nhúng (giống HS); tab Sửa / HS thường / HS Pro |
+| PUT | `/admin/periodic/{id}/config` | JSON lưu cấu hình **NHÁP** — xem §7.6 |
+| POST | `/admin/periodic/{id}/publish` | Xuất bản (đóng băng snapshot, đặt `is_live`) |
+| POST | `/admin/periodic/{id}/duplicate` | Nhân bản (không live, chưa có snapshot) |
+| DELETE | `/admin/periodic/{id}` | Xóa — chặn nếu đang `is_live` |
+| PATCH | `/admin/elements/{id}` | JSON sửa catalog gốc — xem §7.6 |
+| POST | `/admin/elements/{id}/sound` | Multipart `sound` (≤5MB, audio) → `sound_path` |
+| DELETE | `/admin/elements/{id}/sound` | Xóa file audio |
+| POST | `/admin/element-categories` | JSON tạo nhóm — xem §7.6 |
+| PATCH | `/admin/element-categories/{id}` | JSON sửa tên/màu nhóm |
+| DELETE | `/admin/element-categories/{id}` | Xóa nhóm (`elements.category_id` → null) |
 
-| GET | `/home` | Trang chủ học sinh — hub 4 chức năng (inject `HTD_ENTRY_SCREEN=home`) |
+| GET | `/` hoặc `/home` | Trang chủ học sinh — hub (inject `HTD_ENTRY_SCREEN=home`) |
 | GET | `/join` | Chơi game — nhập PIN / quét QR camera (inject `HTD_ENTRY_SCREEN=join`) |
 | GET | `/join/{pin}` | Deep-link QR: inject `HTD_JOIN_PIN` → validate → tên/avatar; **không** dừng ở nhập PIN |
-| GET | `/app/index.html` | Legacy — redirect → `/home`, `/join/{pin}` nếu có `?pin=` |
+| GET | `/app/index.html` | Legacy — redirect → `/` (hoặc `/join/{pin}` nếu có `?pin=`) |
 
-Học sinh: trang chủ `http://192.168.x.x:38480/home` · chơi game `/join` · deep-link `/join/123456` (quét QR bằng app Camera điện thoại). Tab **Quét QR** trong app: live camera (HTTPS) hoặc chụp ảnh QR (HTTP LAN).
+Học sinh: trang chủ `http://192.168.x.x:38480/` · chơi game `/join` · deep-link `/join/123456` (quét QR bằng app Camera điện thoại). Tab **Quét QR** trong app: live camera (HTTPS) hoặc chụp ảnh QR (HTTP LAN).
 
 **QR trên trang host:** `SessionQrService::displayQrUrl()` — PNG lưu storage nếu tạo được; không được thì CDN `qrserver` với `data={APP_URL}/join/{pin}`. **Không** fallback `htd-admin/assets/qr-login.png` (ảnh mock). Dưới QR hiển thị text `joinUrl` để đối chiếu.
 
@@ -127,6 +148,41 @@ Response mẫu:
 ```
 
 Lỗi 404: PIN không tồn tại hoặc đã hết TTL.
+
+---
+
+## 2.3 Public elements table (không cần auth)
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/elements/table` | Snapshot bảng nguyên tố đang live — module «Đọc nguyên tố» |
+
+Client: `prototype/js/api.js` → `HTDApi.elementsTable()` (`skipCsrf`). Pro/thường do client đối chiếu `/api/student/entitlements` feature `elements` (ô `requiresPro`).
+
+Response mẫu:
+
+```json
+{
+  "success": true,
+  "data": {
+    "preset": { "id": 1, "name": "Mặc định" },
+    "categories": {
+      "kiem": { "label": "Kim loại kiềm", "color": "#FF5DA2", "deep": "#D63384" }
+    },
+    "elements": [
+      {
+        "z": 1, "symbol": "H", "nameVi": "Hiđro", "nameEn": "Hydrogen",
+        "mass": 1.008, "category": "phi-kim", "phonetic": "Hi-đrô",
+        "soundUrl": null, "group": 1, "period": 1,
+        "order": 1, "isLit": true, "requiresPro": false
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+Không có bản `is_live`: `preset: null`, `categories`/`elements` = `[]`. Schema snapshot: [`DATA_MODEL.md`](DATA_MODEL.md) §13.3.
 
 ---
 
@@ -283,6 +339,70 @@ Widget floating trên mọi trang admin (`layouts/admin.blade.php`). Client gử
 **Toast sau POST thành công:** `Cảm ơn bạn đã góp ý! Ý kiến của bạn giúp chúng tôi không ngừng cải thiện ứng dụng.`
 
 **Nhãn FAB:** luôn hiển thị `💬 Góp ý về ứng dụng` bên trên icon chatbot (speech bubble + mũi nhọn); ẩn khi panel góp ý đang mở. **Kéo thả:** giữ và kéo icon chatbot để đổi vị trí; lưu `localStorage` key `htd_feedback_widget_pos_{user_id}`. Bấm (không kéo) để mở panel.
+
+---
+
+## 7.6 Bảng nguyên tố (admin JSON, session auth)
+
+Workspace Blade gọi các endpoint dưới (CSRF + cookie). Đổi catalog/nhóm → `has_unpublished_changes=true` trên **mọi** preset. Đổi config pivot chỉ dirty preset đang sửa. Học sinh chỉ thấy sau `POST .../publish`.
+
+### Config NHÁP
+
+| Method | Path | Body | Response `data` |
+|---|---|---|---|
+| PUT | `/admin/periodic/{id}/config` | `{ name?, elements: [{ id, is_lit, is_visible, requires_pro, sort_override? }] }` | `{ has_unpublished_changes: true }` |
+
+### Catalog nguyên tố gốc
+
+| Method | Path | Body | Response `data` |
+|---|---|---|---|
+| PATCH | `/admin/elements/{id}` | `{ name_vi, name_en, mass, category_id?, phonetic?, sort_order? }` | `{ element: { id, z, symbol, name_vi, name_en, mass, category_id, phonetic, sort_order, sound_url } }` |
+| POST | `/admin/elements/{id}/sound` | multipart `sound` | `{ sound_url }` |
+| DELETE | `/admin/elements/{id}/sound` | — | `{ sound_url: null }` |
+
+### Nhóm nguyên tố
+
+| Method | Path | Body | Response `data` |
+|---|---|---|---|
+| POST | `/admin/element-categories` | `{ name, color, deep_color }` | `{ category: { id, slug, name, color, deep } }` — `slug` tự sinh |
+| PATCH | `/admin/element-categories/{id}` | `{ name, color, deep_color }` | `{ category: … }` |
+| DELETE | `/admin/element-categories/{id}` | — | `{ id }` |
+
+Publish / duplicate / destroy: form POST + redirect (flash), không JSON — xem bảng §2.2.
+
+---
+
+## 7.7 Mẫu thẻ tài khoản (admin, session auth)
+
+Editor WYSIWYG gọi JSON qua `HTDApi.createCardTemplate` / `updateCardTemplate` (`public/htd-admin/js/api.js`).
+
+| Method | Path | Body | Response `data` |
+|---|---|---|---|
+| POST | `/admin/card-templates` | `{ name, sides (1\|2), frame_width_mm, frame_height_mm, layout, layer_uploads?, front_baked?, back_baked? }` | `{ template: { id, name, sides, frame_*_mm, layout, front_baked_url, back_baked_url, updated_at } }` |
+| PUT | `/admin/card-templates/{id}` | (giống POST) | `{ template: … }` |
+| DELETE | `/admin/card-templates/{id}` | — | `{ deleted: true }` |
+
+**Trang Blade (redirect/HTML):** `GET /admin/card-templates` (danh sách), `GET …/create`, `GET …/{id}/edit` (editor).
+
+**Xem trước 1 thẻ (HTML, dữ liệu mẫu):** `GET|POST /admin/card-templates/{id}/preview` — iframe/modal editor.
+
+**Quyền:** chỉ `teacher_id` sở hữu (admin xem tất cả). Người khác → 403.
+
+**Ảnh:** lớp gốc `storage/app/public/card-templates/{id}/{side}/{layerId}.png`; baked `…/{side}-baked.png`.
+
+### In phiếu theo lớp
+
+Trang `GET /admin/students/classes/{class}/print-cards` — chọn mẫu rồi export ZIP.
+
+| Query/Form `template` | Ý nghĩa |
+|---|---|
+| `builtin:modern` \| `builtin:classic` \| `builtin:minimal` | Mẫu HTML tĩnh (legacy: `modern` vẫn chấp nhận) |
+| `custom:{id}` | Mẫu `card_templates` của giáo viên — render `card-templates/sheet.blade.php`, auto-tile A4 |
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/admin/students/classes/{class}/print-cards/preview?template=` | HTML 1 trang xem trước |
+| POST | `/admin/students/classes/{class}/print-cards/export` | Form field `template` — ZIP gồm PDF từng trang; mẫu 2 mặt → `phieu-truoc-*.pdf` rồi `phieu-sau-*.pdf` |
 
 ---
 

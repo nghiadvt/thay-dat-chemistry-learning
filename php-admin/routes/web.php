@@ -1,6 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\CardTemplateController as AdminCardTemplateController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\ElementCategoryController as AdminElementCategoryController;
+use App\Http\Controllers\Admin\ElementController as AdminElementController;
+use App\Http\Controllers\Admin\PeriodicPresetController as AdminPeriodicPresetController;
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\Admin\GroupController as AdminGroupController;
@@ -13,6 +17,7 @@ use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\SessionController as AdminSessionController;
 use App\Http\Controllers\Admin\TagController as AdminTagController;
 use App\Http\Controllers\Api\DuckSpriteController;
+use App\Http\Controllers\Api\ElementTableController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\GameSessionController;
 use App\Http\Controllers\Api\ImageCropRegionController;
@@ -41,10 +46,6 @@ use App\Http\Controllers\Auth\StudentLoginController;
 use App\Http\Controllers\StudentJoinController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return redirect()->route('login');
-});
-
 Route::get('manifest.webmanifest', function () {
     $path = public_path('app/manifest.webmanifest');
     abort_unless(is_readable($path), 404);
@@ -66,7 +67,7 @@ Route::get('sw.js', function () {
     ]);
 });
 
-Route::get('home', [StudentJoinController::class, 'home'])->name('student.home');
+Route::get('/', [StudentJoinController::class, 'home'])->name('student.home');
 
 Route::get('join', [StudentJoinController::class, 'show'])->name('student.join');
 Route::get('join/{pin}', [StudentJoinController::class, 'show'])
@@ -80,18 +81,21 @@ Route::get('api/rooms/{pin}', [RoomController::class, 'show']);
 Route::get('api/practice/topics', [PracticeController::class, 'topics']);
 Route::get('api/practice/questions', [PracticeController::class, 'questions']);
 
+// Bảng nguyên tố "Đọc nguyên tố" — phiên bản đang live (không cần đăng nhập)
+Route::get('api/elements/table', [ElementTableController::class, 'show']);
+
 // HS đọc danh sách vịt chuyển động (frame + fps) để resolve token "db:{id}" từ mode_config
 Route::get('api/duck-sprites/public', [DuckSpriteController::class, 'index']);
 
 Route::middleware('guest')->group(function () {
-    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+    Route::get('admin/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('admin/login', [LoginController::class, 'login']);
 });
 
 // Đăng nhập học sinh — guard riêng để phiên của học sinh không đè phiên giáo viên.
 Route::middleware('guest:student')->group(function () {
-    Route::get('student/login', [StudentLoginController::class, 'showLoginForm'])->name('student.login');
-    Route::post('student/login', [StudentLoginController::class, 'login']);
+    Route::get('/login', [StudentLoginController::class, 'showLoginForm'])->name('student.login');
+    Route::post('/login', [StudentLoginController::class, 'login']);
 });
 Route::post('student/logout', [StudentLoginController::class, 'logout'])
     ->middleware('auth:student')
@@ -137,6 +141,23 @@ Route::middleware('auth')->group(function () {
 
         Route::resource('keyboards', AdminKeyboardController::class)->except(['show', 'update']);
         Route::get('keyboards/{keyboard}/editor', [AdminKeyboardController::class, 'editor'])->name('keyboards.editor');
+
+        // --- Bảng nguyên tố "Đọc nguyên tố" ---
+        // Route tĩnh/động phụ phải đứng trước resource để không bị {periodic} nuốt.
+        Route::put('periodic/{periodic}/config', [AdminPeriodicPresetController::class, 'saveConfig'])->name('periodic.config');
+        Route::post('periodic/{periodic}/publish', [AdminPeriodicPresetController::class, 'publish'])->name('periodic.publish');
+        Route::post('periodic/{periodic}/duplicate', [AdminPeriodicPresetController::class, 'duplicate'])->name('periodic.duplicate');
+        Route::get('periodic', [AdminPeriodicPresetController::class, 'index'])->name('periodic.index');
+        Route::post('periodic', [AdminPeriodicPresetController::class, 'store'])->name('periodic.store');
+        Route::get('periodic/{periodic}/edit', [AdminPeriodicPresetController::class, 'edit'])->name('periodic.edit');
+        Route::delete('periodic/{periodic}', [AdminPeriodicPresetController::class, 'destroy'])->name('periodic.destroy');
+        // Catalog gốc + nhóm (gọi bằng fetch từ workspace)
+        Route::patch('elements/{element}', [AdminElementController::class, 'update'])->name('elements.update');
+        Route::post('elements/{element}/sound', [AdminElementController::class, 'uploadSound'])->name('elements.sound');
+        Route::delete('elements/{element}/sound', [AdminElementController::class, 'deleteSound'])->name('elements.sound.delete');
+        Route::post('element-categories', [AdminElementCategoryController::class, 'store'])->name('element-categories.store');
+        Route::patch('element-categories/{category}', [AdminElementCategoryController::class, 'update'])->name('element-categories.update');
+        Route::delete('element-categories/{category}', [AdminElementCategoryController::class, 'destroy'])->name('element-categories.destroy');
         Route::get('games/battle-arena-demo', [AdminGameController::class, 'battleDemo'])->name('games.battle-demo');
         Route::get('games/dragon-hunt-demo', [AdminGameController::class, 'dragonDemo'])->name('games.dragon-demo');
         Route::resource('games', AdminGameController::class)->except(['show']);
@@ -208,6 +229,15 @@ Route::middleware('auth')->group(function () {
         Route::get('students/classes/{class}/print-cards', [AdminStudentPrintCardController::class, 'index'])->name('students.print-cards');
         Route::get('students/classes/{class}/print-cards/preview', [AdminStudentPrintCardController::class, 'preview'])->name('students.print-cards.preview');
         Route::post('students/classes/{class}/print-cards/export', [AdminStudentPrintCardController::class, 'export'])->name('students.print-cards.export');
+
+        Route::get('card-templates', [AdminCardTemplateController::class, 'index'])->name('card-templates.index');
+        Route::get('card-templates/create', [AdminCardTemplateController::class, 'create'])->name('card-templates.create');
+        Route::post('card-templates', [AdminCardTemplateController::class, 'store'])->name('card-templates.store');
+        Route::get('card-templates/{template}/edit', [AdminCardTemplateController::class, 'edit'])->name('card-templates.edit');
+        Route::put('card-templates/{template}', [AdminCardTemplateController::class, 'update'])->name('card-templates.update');
+        Route::delete('card-templates/{template}', [AdminCardTemplateController::class, 'destroy'])->name('card-templates.destroy');
+        Route::match(['get', 'post'], 'card-templates/{template}/preview', [AdminCardTemplateController::class, 'preview'])->name('card-templates.preview');
+
         Route::post('students/bulk-generate', [AdminStudentController::class, 'bulkGenerate'])->name('students.bulk-generate');
         Route::post('students/{student}/reset-password', [AdminStudentController::class, 'resetPassword'])->name('students.reset-password');
         Route::post('students/{student}/unlock', [AdminStudentController::class, 'unlock'])->name('students.unlock');

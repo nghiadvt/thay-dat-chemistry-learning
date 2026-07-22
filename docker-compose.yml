@@ -96,7 +96,9 @@ services:
       - ./php-admin/resources/views:/var/www/html/resources/views:ro
       - ./php-admin/routes:/var/www/html/routes:ro
       - ./php-admin/app:/var/www/html/app:ro
+      - ./php-admin/config:/var/www/html/config:ro
       - ./php-admin/database:/var/www/html/database:ro
+      - ./php-admin/resources/fonts:/var/www/html/resources/fonts:ro
       - ./php-admin/storage/app/public:/var/www/html/storage/app/public
 
 volumes:

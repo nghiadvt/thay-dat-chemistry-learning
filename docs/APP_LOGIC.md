@@ -3,7 +3,7 @@
 > Logic ứng dụng: luồng màn hình, state, scoring, bàn phím, WebSocket events.
 > Nguồn gốc: [`dac-ta-ky-thuat-v4.docx.md`](../dac-ta-ky-thuat-v4.docx.md) v4.0
 
-**Cập nhật lần cuối:** 2026-07-09 (GV đua vịt: bục + BXH khi game_ended; token phím ghép công thức)
+**Cập nhật lần cuối:** 2026-07-22 (Admin periodic: khung 118 ô + legend trên pw-stage như HS)
 
 ---
 
@@ -18,7 +18,7 @@ Home (hub) ──► Chơi game (/join) ──► PIN / Quét QR ──► Profi
             └── Ôn trắc nghiệm (sắp ra mắt)
 ```
 
-**URL:** `GET /home` = trang chủ hub · `GET /join` = luồng chơi game (PIN/QR) · `GET /join/{pin}` = deep-link QR (bỏ qua home + PIN).
+**URL:** `GET /` (và `/home`) = trang chủ hub · `GET /join` = luồng chơi game (PIN/QR) · `GET /join/{pin}` = deep-link QR (bỏ qua home + PIN). Legacy `/app/index.html` redirect → `/` (hoặc `/join/{pin}` nếu `?pin=`).
 
 ### Luồng chơi game (realtime)
 
@@ -84,6 +84,9 @@ CSS/JS dùng chung: `admin-list.css`, `admin-list-page.js`, `admin-data-table.js
 | Phòng chơi | `/admin/sessions` | Tên, PIN | Đầy đủ | Có | 20/trang |
 | Báo cáo | `/admin/reports` | PIN, tên phòng | Game, ngày | Có | 20/trang |
 | Góp ý | `/admin/feedback` | Nội dung, trang | Ưu tiên, trạng thái | Có | 20/trang |
+| Bảng nguyên tố | `/admin/periodic` | — | — | Không (card grid) | — |
+
+**`/admin/periodic`:** mỗi card có thumbnail render sống mode `normal` trên **khung 118 ô** (= đúng thứ HS tài khoản thường thấy: ẩn ô `is_visible=false`, khoá ô `requires_pro`, ô ngoài chương trình mờ). Bấm thumbnail → modal phóng to cùng mode + chú giải nhóm. Workspace `/admin/periodic/{id}/edit`: `pw-stage` vẽ đủ 118 ô + f-block + **chú giải nhóm nhúng trong bảng** (như HS); sidebar «Nhóm nguyên tố» để sửa tên/màu. Tab Sửa / như HS thường / như HS Pro.
 
 Chip bộ lọc + menu **Hành động** từng dòng trên mọi bảng (trừ Game dùng nút trên card).
 

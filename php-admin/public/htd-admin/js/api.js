@@ -16,7 +16,7 @@ window.HTDApi = (function () {
 
   async function ensureCsrf() {
     if (readCookie('XSRF-TOKEN')) return;
-    await fetch(apiUrl('/login'), { credentials: 'include' });
+    await fetch(apiUrl('/admin/login'), { credentials: 'include' });
   }
 
   async function request(path, options = {}) {
@@ -98,9 +98,29 @@ window.HTDApi = (function () {
       });
       return data;
     },
+    async createCardTemplate(body) {
+      await ensureCsrf();
+      const data = await request('/admin/card-templates', {
+        method: 'POST',
+        body,
+      });
+      return data.template || data;
+    },
+    async updateCardTemplate(id, body) {
+      await ensureCsrf();
+      const data = await request(`/admin/card-templates/${id}`, {
+        method: 'PUT',
+        body,
+      });
+      return data.template || data;
+    },
+    async deleteCardTemplate(id) {
+      await ensureCsrf();
+      return request(`/admin/card-templates/${id}`, { method: 'DELETE' });
+    },
     loginUrl(redirectPath) {
       const redirect = encodeURIComponent(redirectPath || location.pathname);
-      return `${apiUrl('/login')}?redirect=${redirect}`;
+      return `${apiUrl('/admin/login')}?redirect=${redirect}`;
     },
   };
 })();

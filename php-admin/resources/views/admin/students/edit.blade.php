@@ -16,6 +16,10 @@
             <input type="text" name="display_name" value="{{ old('display_name', $student->display_name) }}" required maxlength="100">
         </label>
         <label>
+            Email <small>(tùy chọn — in lên phiếu tài khoản)</small>
+            <input type="email" name="email" value="{{ old('email', $student->email) }}" maxlength="190" placeholder="an@example.com">
+        </label>
+        <label>
             Tên đăng nhập
             <input type="text" name="username" value="{{ old('username', $student->username) }}" required maxlength="64">
         </label>

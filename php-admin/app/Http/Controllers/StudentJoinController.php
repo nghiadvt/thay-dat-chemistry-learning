@@ -35,7 +35,7 @@ class StudentJoinController extends Controller
             return redirect('/join/'.$pin);
         }
 
-        return redirect('/home');
+        return redirect('/');
     }
 
     /**

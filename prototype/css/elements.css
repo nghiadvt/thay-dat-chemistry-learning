@@ -282,6 +282,40 @@ button.el-pt-cell:active { transform: scale(0.94); }
   border-style: solid;
   border-color: rgba(255,255,255,0.92) transparent transparent transparent;
 }
+/* ── Trạng thái do giáo viên cấu hình ở admin ──────────────────────
+ * Ba trạng thái "mờ" phải phân biệt được bằng mắt (không chỉ dựa màu):
+ *   - inactive: xám phẳng, KHÔNG badge, vẫn thấy giá trị.
+ *   - locked (Pro, HS thường): giữ chút màu nhóm + khoá VÀNG ở góc.
+ *   - hidden: client không render (server không trả về). */
+.el-pt-cell.is-inactive {
+  background: #6b7280;         /* xám phẳng — tách khỏi ô có màu nhóm */
+  filter: saturate(0.12);
+  opacity: 0.72;
+}
+.el-pt-cell.is-inactive::after { display: none; } /* bỏ tam giác trọng tâm */
+
+.el-pt-cell.is-locked { filter: grayscale(0.42) brightness(0.92); }
+.el-pt-cell.is-locked::after { display: none; }   /* khoá thay cho tam giác */
+
+.el-pt-lock {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--el-cell) * 0.36);
+  height: calc(var(--el-cell) * 0.36);
+  min-width: 13px;
+  min-height: 13px;
+  border-radius: 50%;
+  background: #FFC93C;         /* vàng Pro */
+  color: #6b3d00;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.el-pt-lock svg { width: 66%; height: 66%; }
+
 .el-pt-z {
   position: absolute;
   top: 1px;

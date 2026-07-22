@@ -16,6 +16,7 @@
         <h2>In phiếu tài khoản</h2>
         <p class="stu-hero__meta"><strong>{{ $students->count() }}</strong> học sinh sẽ được in</p>
     </div>
+    <a href="{{ route('admin.card-templates.create') }}" class="btn">+ Thiết kế thẻ mới</a>
 </div>
 
 <form method="POST" action="{{ route('admin.students.print-cards.export', $class) }}" id="printCardsForm" class="print-cards">
@@ -26,7 +27,8 @@
             @foreach ($templates as $key => $tpl)
                 <label class="template-card {{ $key === $defaultTemplate ? 'is-selected' : '' }}">
                     <input type="radio" name="template" value="{{ $key }}"
-                           @checked($key === $defaultTemplate) data-template-radio>
+                           @checked($key === $defaultTemplate) data-template-radio
+                           @if(!empty($tpl['twoSided'])) data-two-sided="1" @endif>
                     <span class="template-card__head">
                         <span class="template-card__name">{{ $tpl['name'] }}</span>
                         <span class="template-card__badge">{{ $tpl['cardsPerSheet'] }} thẻ/trang</span>
@@ -70,7 +72,15 @@
 
         const perSheet = cardsPerSheet[key] || 1;
         const sheets = Math.ceil(totalStudents / perSheet);
-        sheetInfo.textContent = totalStudents + ' học sinh · sẽ tạo ' + sheets + ' file PDF, gộp vào 1 file zip';
+        const radio = document.querySelector('[data-template-radio][value="' + CSS.escape(key) + '"]');
+        const isTwoSided = radio && radio.hasAttribute('data-two-sided');
+
+        let info = totalStudents + ' học sinh · sẽ tạo ' + sheets + ' file PDF';
+        if (isTwoSided) {
+            info += ' mặt trước + ' + sheets + ' mặt sau';
+        }
+        info += ', gộp vào 1 file zip';
+        sheetInfo.textContent = info;
     }
 
     radios.forEach((radio) => radio.addEventListener('change', () => selectTemplate(radio.value)));
@@ -81,8 +91,6 @@
     form.addEventListener('submit', () => {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Đang tạo file…';
-        // Form submit thường (không phải AJAX) nên trình duyệt tự tải file zip;
-        // mở lại nút sau vài giây để giáo viên in lại được nếu cần.
         setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Tạo & tải file ZIP';

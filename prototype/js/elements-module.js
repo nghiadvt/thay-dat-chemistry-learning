@@ -22,10 +22,25 @@ window.ElementsModule = (function () {
   var built = false;
   var detailIdx = 0;
   var filter = 'all';     // 'all' | 'priority' | 'unlearned'
+  var isProUser = false;  // HS có full access tính năng "elements" hay không
 
   /* Tra ngược từ số hiệu về nguyên tố trong chương trình (nếu có dạy). */
   var idxByZ = {};
-  ELS.forEach(function (el, i) { idxByZ[el.z] = i; });
+
+  /* Đồng bộ lại dữ liệu từ window (sau khi HTD_loadElements ghi đè từ server). */
+  function syncData() {
+    ELS = window.HTD_ELEMENTS || [];
+    CATS = window.HTD_ELEMENT_CATEGORIES || {};
+    LAYOUT = window.HTD_PERIODIC_TABLE || [];
+    idxByZ = {};
+    ELS.forEach(function (el, i) { idxByZ[el.z] = i; });
+    isProUser = !!(window.StudentEntitlements && window.StudentEntitlements.isPro
+      && window.StudentEntitlements.isPro('elements'));
+  }
+  syncData();
+
+  /* Ô yêu cầu Pro mà HS chưa có full access → hiển thị mờ + khoá, chặn mở chi tiết. */
+  function isLocked(el) { return !!(el && el.requiresPro) && !isProUser; }
 
   /* ── Mức thuộc bài (localStorage, tách khỏi điểm luyện tập) ─── */
   var mastery = {};
@@ -69,7 +84,24 @@ window.ElementsModule = (function () {
     }
   }
 
+  var elAudio = null;
+
   function speakElement(el) {
+    if (!el) return;
+    // Ưu tiên file audio giáo viên đã upload; thiếu thì fallback TTS tên IUPAC.
+    if (el.soundUrl) {
+      if (hasSpeech) window.speechSynthesis.cancel();
+      try {
+        if (elAudio) { elAudio.pause(); }
+        elAudio = new Audio(el.soundUrl);
+        elAudio.play().catch(function () { ttsElement(el); });
+        return;
+      } catch (e) { /* rơi xuống TTS */ }
+    }
+    ttsElement(el);
+  }
+
+  function ttsElement(el) {
     if (!hasSpeech || !el || !el.nameEn) return;
     window.speechSynthesis.cancel(); // Android Chrome hay kẹt queue
     var u = new SpeechSynthesisUtterance(el.nameEn);
@@ -92,9 +124,14 @@ window.ElementsModule = (function () {
     if (built) return;
     built = true;
 
-    buildTable();
-    bindToolbar();
-    applyFilter();
+    // Nạp phiên bản đang live từ server (fallback dữ liệu tĩnh nếu lỗi), rồi dựng.
+    var loading = window.HTD_loadElements ? window.HTD_loadElements() : Promise.resolve();
+    Promise.resolve(loading).then(function () {
+      syncData();
+      buildTable();
+      bindToolbar();
+      applyFilter();
+    });
   }
 
   /* ── Menu trượt màn ngang: loa/luyện tập/filter dồn vào đây ────────
@@ -189,14 +226,32 @@ window.ElementsModule = (function () {
       }
 
       var el = ELS[idx];
-      html += '<button type="button" class="el-pt-cell' + (el.priority === 1 ? ' is-priority' : '') + '" ' +
+      var locked = isLocked(el);
+      var cls = 'el-pt-cell';
+      if (el.priority === 1) cls += ' is-priority';
+      if (el.isLit === false) cls += ' is-inactive'; // active/inactive: vẫn hiện, chỉ mờ
+      if (locked) cls += ' is-locked';               // yêu cầu Pro: mờ nhẹ + khoá, vẫn thấy giá trị
+
+      var aria = symbol + ' — ' + label + ', số hiệu ' + z + (locked ? ' (cần bản Pro)' : '');
+      // Icon khoá SVG (không dùng chữ) — dấu hiệu duy nhất cho ô yêu cầu Pro, tách
+      // biệt rõ với ô inactive (không có badge).
+      var lockBadge = locked
+        ? '<span class="el-pt-lock" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<rect x="4" y="10.5" width="16" height="10" rx="2.2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>' +
+          '</span>'
+        : '';
+
+      html += '<button type="button" class="' + cls + '" ' +
         'style="' + style + '" data-idx="' + idx + '" data-z="' + z + '" ' +
-        'aria-label="' + symbol + ' — ' + label + ', số hiệu ' + z + '">' +
+        (locked ? 'data-locked="1" ' : '') +
+        'aria-label="' + aria + '">' +
         '<span class="el-pt-z">' + z + '</span>' +
         '<span class="el-pt-symbol">' + symbol + '</span>' +
         '<span class="el-pt-name">' + label + '</span>' +
         '<span class="el-pt-mass">' + mass + '</span>' +
         masteryBar(z) +
+        lockBadge +
         '</button>';
     });
 
@@ -215,7 +270,22 @@ window.ElementsModule = (function () {
     }
     cell.classList.add('is-selected');
     sfxLocal('tap');
+
+    // Ô yêu cầu Pro: không mở chi tiết, báo cho HS biết cần nâng cấp.
+    if (cell.dataset.locked) {
+      showProLock(ELS[Number(cell.dataset.idx)]);
+      return;
+    }
     openDetail(Number(cell.dataset.idx));
+  }
+
+  /* Thông báo ô cần bản Pro. Dùng toast hoạt hình sẵn có; giá trị nguyên tố HS
+   * vẫn thấy ngay trên bảng nên chỉ cần cho biết đây là nội dung Pro. */
+  function showProLock(el) {
+    var name = el ? (el.nameVi || el.symbol) : 'Nguyên tố này';
+    if (typeof window.showCartoonToast === 'function') {
+      window.showCartoonToast(name + ' nằm trong gói Pro. Nâng cấp để mở khoá và học thêm nhiều nguyên tố nhé!', '🔒');
+    }
   }
 
   /* ── Toolbar: lọc ────────────────────────────────────────────── */
@@ -291,7 +361,7 @@ window.ElementsModule = (function () {
     var inner = document.getElementById('elDetailInner');
     if (!overlay || !inner) return;
 
-    var speakBtns = hasSpeech
+    var speakBtns = (hasSpeech || el.soundUrl)
       ? '<div class="el-speak-row">' +
           '<button type="button" class="el-speak-btn el-speak-en">🔊 ' + el.nameEn + '</button>' +
         '</div>'

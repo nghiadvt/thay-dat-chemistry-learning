@@ -10,5 +10,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(SampleDataSeeder::class);
         $this->call(DemoDataSeeder::class);
+        $this->call(PeriodicTableSeeder::class);
     }
 }

@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-09 (đua vịt: kết thúc khi min(podium, số HS))
+**Cập nhật lần cuối:** 2026-07-22 (Mẫu thẻ: `frameCropY` trên layout mỗi mặt)
 
 ---
 
@@ -17,6 +17,7 @@ erDiagram
   PLAY_MODES ||--o{ GAMES : "mechanic"
   USERS ||--o{ GAMES : creates
   USERS ||--o{ GAME_SESSIONS : hosts
+  USERS ||--o{ PERIODIC_PRESETS : creates
   GAMES ||--o{ QUIZZES : contains
   KEYBOARDS ||--o{ QUIZZES : "used by"
   QUIZZES ||--o{ QUESTIONS : contains
@@ -27,6 +28,8 @@ erDiagram
   GAME_SESSIONS ||--o{ GAME_RESULTS : "final scores"
   GAME_SESSIONS ||--o{ SESSION_ANSWERS : "per question"
   QUESTIONS ||--o{ SESSION_ANSWERS : answered
+  ELEMENT_CATEGORIES ||--o{ ELEMENTS : "groups"
+  PERIODIC_PRESETS }o--o{ ELEMENTS : "pivot config"
 ```
 
 ---
@@ -409,7 +412,142 @@ Chi tiết từng câu — phục vụ scoring, CSV, thống kê sai (v1.2).
 
 ---
 
-## 11. Mở rộng tương lai (chưa implement)
+## 11. Bảng `students` (bổ sung)
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `email` | VARCHAR(190) NULL | Email học sinh (tùy chọn). Dùng bind trên mẫu thẻ in phiếu tài khoản |
+
+---
+
+## 12. Bảng `card_templates`
+
+Mẫu thẻ tài khoản tùy chỉnh do giáo viên thiết kế (WYSIWYG). Thuộc về giáo viên, tái sử dụng cho nhiều lớp.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `teacher_id` | BIGINT FK → `users.id` ON DELETE CASCADE | Chủ sở hữu |
+| `name` | VARCHAR(120) | Tên template |
+| `sides` | TINYINT | `1` = một mặt, `2` = hai mặt |
+| `frame_width_mm` | DECIMAL(6,2) | Khung thẻ (dùng chung cả 2 mặt) |
+| `frame_height_mm` | DECIMAL(6,2) | Khung thẻ (dùng chung cả 2 mặt) |
+| `front_baked_path` | VARCHAR(255) NULL | PNG đã bake 300 DPI mặt trước (`storage/app/public/`) |
+| `back_baked_path` | VARCHAR(255) NULL | PNG đã bake 300 DPI mặt sau |
+| `layout` | JSON | Cấu trúc editor — xem `docs/card-template-designer-plan.md` |
+| `created_at`, `updated_at` | TIMESTAMP | |
+| `deleted_at` | TIMESTAMP NULL | Soft delete |
+
+**Quan hệ:** `users` 1—N `card_templates`.
+
+**Cấu trúc `layout` JSON (tóm tắt):**
+- `front` / `back`: `{ imageLayers[], elements[], frameCropY }` — geometry element theo phân số [0..1] **trong khung thẻ**; `frameCropY` [0..1] = vị trí dọc khung crop trên ảnh nền full-width
+- `a4`: `{ marginMm, gapMm, cardWidthMm }` — cấu hình xếp lưới A4
+
+Ảnh gốc từng lớp: `card-templates/{id}/{side}/{layerId}.png` trên disk `public`.
+
+---
+
+## 13. Module «Đọc nguyên tố» (bảng tuần hoàn)
+
+Catalog gốc dùng chung mọi phiên bản; cấu hình hiện/ẩn/Pro nằm ở pivot theo từng phiên bản. Học sinh **chỉ** đọc `published_snapshot` của phiên bản `is_live`.
+
+Migrations: `2026_07_22_000001` … `000004`. Seed: `PeriodicTableSeeder` (gọi từ `DatabaseSeeder`) — ~10 nhóm + ~45 nguyên tố chương trình + phiên bản «Mặc định» (xuất bản nếu chưa có bản live).
+
+### 13.1 Bảng `element_categories`
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `slug` | VARCHAR(64) UNIQUE | Ổn định — client HS map màu theo slug (`kiem`, `halogen`…) |
+| `name` | VARCHAR | Nhãn hiển thị |
+| `color` | VARCHAR(32) | Màu ô |
+| `deep_color` | VARCHAR(32) | Màu đậm (viền/nhấn) |
+| `sort_order` | SMALLINT UNSIGNED DEFAULT 0 | |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+**Quan hệ:** 1—N `elements`. Đổi tên/màu → đánh dấu mọi `periodic_presets.has_unpublished_changes = true`. Xóa nhóm → `elements.category_id` null (`nullOnDelete`).
+
+### 13.2 Bảng `elements`
+
+Catalog nguyên tố gốc. Đổi tên/khối lượng/sound áp dụng mọi phiên bản (đánh dirty toàn bộ preset).
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `z` | SMALLINT UNSIGNED UNIQUE | Số hiệu nguyên tử |
+| `symbol` | VARCHAR(8) | |
+| `name_vi`, `name_en` | VARCHAR | |
+| `mass` | DECIMAL(9,4) | |
+| `category_id` | BIGINT FK → `element_categories.id` NULL ON DELETE SET NULL | |
+| `phonetic` | VARCHAR NULL | Gợi ý đọc TV (TTS phụ) |
+| `group_no` | TINYINT UNSIGNED | Cột 1–18 |
+| `period_no` | TINYINT UNSIGNED | Chu kỳ 1–7 |
+| `sound_path` | VARCHAR NULL | Audio upload disk `public` (`elements/{slug-z}-{YmdHis}.ext`); accessor `sound_url` |
+| `sort_order` | SMALLINT UNSIGNED DEFAULT 0 | Thứ tự mặc định (seed: priority chương trình rồi `z`) |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+### 13.3 Bảng `periodic_presets`
+
+Một «phiên bản bảng». Mô hình Nháp / Xuất bản:
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `name` | VARCHAR | |
+| `is_live` | BOOLEAN DEFAULT false | Chỉ **một** phiên bản `true` tại một thời điểm |
+| `published_snapshot` | JSON NULL | Đóng băng lúc Xuất bản — payload HS đọc |
+| `published_at` | TIMESTAMP NULL | |
+| `has_unpublished_changes` | BOOLEAN DEFAULT false | Badge «có thay đổi chưa xuất bản» |
+| `note` | TEXT NULL | |
+| `created_by` | BIGINT FK → `users.id` NULL ON DELETE SET NULL | |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+**`publish()`:** unset `is_live` các bản khác → `published_snapshot = buildSnapshot()` → `is_live=true`, `has_unpublished_changes=false`.
+
+**`buildSnapshot()`** (chỉ phần tử `is_visible`):
+
+```jsonc
+{
+  "categories": {
+    "kiem": { "label": "Kim loại kiềm", "color": "#FF5DA2", "deep": "#D63384" }
+    /* … key = slug … */
+  },
+  "elements": [
+    {
+      "z": 1, "symbol": "H", "nameVi": "Hiđro", "nameEn": "Hydrogen",
+      "mass": 1.008, "category": "phi-kim", "phonetic": "Hi-đrô",
+      "soundUrl": null, "group": 1, "period": 1,
+      "order": 1, "isLit": true, "requiresPro": false
+    }
+  ]
+}
+```
+
+`order` = `sort_override` pivot nếu có, không thì `elements.sort_order`.
+
+### 13.4 Bảng `periodic_preset_element` (pivot NHÁP)
+
+Cấu hình theo phiên bản — chưa tới HS cho tới khi Xuất bản.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `preset_id` | BIGINT FK → `periodic_presets.id` CASCADE | |
+| `element_id` | BIGINT FK → `elements.id` CASCADE | |
+| `is_lit` | BOOLEAN DEFAULT true | Active/sáng; inactive vẫn hiện nhưng mờ |
+| `is_visible` | BOOLEAN DEFAULT true | `false` → không đưa vào snapshot / ẩn với HS |
+| `requires_pro` | BOOLEAN DEFAULT false | Ô khoá nếu HS chưa Pro feature `elements` |
+| `sort_override` | SMALLINT UNSIGNED NULL | `null` = theo `elements.sort_order` |
+| `created_at`, `updated_at` | TIMESTAMP | |
+
+**Unique:** `(preset_id, element_id)`.
+
+**Admin UI:** `/admin/periodic` (card thumbnail mode `normal` trên khung 118 ô + modal phóng to); workspace `/admin/periodic/{id}/edit` — `pw-stage` = đủ 118 ô + hàng La/Ac + chú giải nhóm nhúng (giống HS). Catalog DB (~45 nguyên tố chương trình) overlay lên layout; ô còn lại mờ «ngoài chương trình». Assets: `public/js/periodic-layout.js` (118), `periodic-grid.js`, `periodic-index.js`, `periodic-workspace.js`, `public/css/admin-periodic.css`.
+
+---
+
+## 14. Mở rộng tương lai (chưa implement)
 
 | Version | Thay đổi schema |
 |---|---|
@@ -420,8 +558,8 @@ Chi tiết từng câu — phục vụ scoring, CSV, thống kê sai (v1.2).
 
 ---
 
-## 12. Tài liệu liên quan
+## 15. Tài liệu liên quan
 
-- [`docs/APP_LOGIC.md`](APP_LOGIC.md) — `answer_type`, payload WebSocket
+- [`docs/APP_LOGIC.md`](APP_LOGIC.md) — `answer_type`, payload WebSocket, admin `/admin/periodic`
 - [`docs/API_CONTRACTS.md`](API_CONTRACTS.md) — endpoints & events (task 2.1)
 - [`local-deployment-plan.md`](../local-deployment-plan.md) — checklist Phase 1

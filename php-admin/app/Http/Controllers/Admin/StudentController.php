@@ -74,6 +74,7 @@ class StudentController extends Controller
 
         $validated = $request->validate([
             'display_name' => ['required', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:190'],
             'username' => ['required', 'string', 'max:64', 'alpha_dash', Rule::unique('students', 'username')],
             'class_id' => ['nullable', Rule::exists('student_classes', 'id')],
             'password' => ['nullable', 'string', 'min:6', 'max:64'],
@@ -90,6 +91,7 @@ class StudentController extends Controller
                 'student_code' => $this->credentials->generateStudentCode(),
                 'username' => $validated['username'],
                 'display_name' => $validated['display_name'],
+                'email' => $validated['email'] ?? null,
                 // Mật khẩu thật được đặt ngay sau bằng StudentPasswordService để
                 // hash và bản mã luôn khớp nhau; giá trị này chỉ là chỗ giữ chỗ.
                 'password' => Str::random(32),
@@ -129,6 +131,7 @@ class StudentController extends Controller
 
         $validated = $request->validate([
             'display_name' => ['required', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:190'],
             'username' => ['required', 'string', 'max:64', 'alpha_dash', Rule::unique('students', 'username')->ignore($student->id)],
             'class_id' => ['nullable', Rule::exists('student_classes', 'id')],
             'status' => ['required', Rule::in(['active', 'locked', 'disabled'])],

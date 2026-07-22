@@ -65,6 +65,10 @@
                 <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.5c-1.5-1-4-1.5-6-1.5v13c2 0 4.5.5 6 1.5m0-13c1.5-1 4-1.5 6-1.5v13c-2 0-4.5.5-6 1.5m0-13v13"/></svg>
                 <span>Bộ câu hỏi</span>
             </a>
+            <a href="{{ route('admin.periodic.index') }}" class="{{ request()->routeIs('admin.periodic.*') ? 'active' : '' }}" title="Bảng nguyên tố">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                <span>Bảng nguyên tố</span>
+            </a>
             <details class="admin-nav-group" @if(request()->routeIs('admin.image-cropper.*', 'admin.image-trimmer')) open @endif>
                 <summary class="{{ request()->routeIs('admin.image-cropper.*', 'admin.image-trimmer') ? 'has-active-child' : '' }}" title="Thao tác hình ảnh">
                     <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="9.5" r="1.4"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 16l-5-5-4 4-3-3-6 6"/></svg>
@@ -79,6 +83,10 @@
             <a href="{{ route('admin.students.index') }}" class="{{ request()->routeIs('admin.students.*') ? 'active' : '' }}" title="Học sinh">
                 <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4L3 8.5 12 13l9-4.5L12 4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.5 10.7v4.3c0 1.5 2.5 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.3"/></svg>
                 <span>Học sinh</span>
+            </a>
+            <a href="{{ route('admin.card-templates.index') }}" class="{{ request()->routeIs('admin.card-templates.*') ? 'active' : '' }}" title="Mẫu thẻ của tôi">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" d="M7 10h4M7 14h10"/></svg>
+                <span>Mẫu thẻ của tôi</span>
             </a>
             <a href="{{ route('admin.sessions.index') }}" class="{{ request()->routeIs('admin.sessions.*') ? 'active' : '' }}" title="Phòng chơi">
                 <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9.3l4.5 2.7-4.5 2.7V9.3z"/></svg>
