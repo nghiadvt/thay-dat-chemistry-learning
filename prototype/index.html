@@ -97,6 +97,47 @@
     </div>
   </section>
 
+  <!-- Game select: chọn game trước khi vào phòng -->
+  <section class="screen game-select-screen no-pad" data-screen="game-select">
+    <div class="gs-header">
+      <div class="gs-header-top">
+        <button class="gs-back" onclick="goStudentHome()" aria-label="Quay lại">←</button>
+        <h2>Game hóa học</h2>
+        <span class="gs-back gs-back--ghost" aria-hidden="true"></span>
+      </div>
+      <div class="gs-hero">
+        <div class="gs-bubble">Chơi game cũng học được nè!</div>
+        <div class="gs-mascot" aria-hidden="true">
+          <img src="assets/game-select/mascot.png" alt="">
+          <span class="gs-mascot-sparkle">✨</span>
+        </div>
+      </div>
+    </div>
+    <div class="gs-list">
+      <article class="gs-card gs-card--duck" data-game="duck_race">
+        <div class="gs-card-text">
+          <h3>Đua Vịt Hóa Học</h3>
+          <p>Vượt chướng ngại vật, về đích cùng kiến thức!</p>
+          <button type="button" class="gs-play-btn" onclick="selectGame('duck_race')">Chơi ngay</button>
+        </div>
+        <div class="gs-card-art">
+          <img src="assets/game-select/duck-boat.png" alt="Đua Vịt Hóa Học">
+        </div>
+      </article>
+      <article class="gs-card gs-card--dragon locked" data-game="dragon_hunt">
+        <div class="gs-card-text">
+          <h3>Săn Rồng Hóa Học</h3>
+          <p>Tiêu diệt rồng bằng kiến thức hóa học!</p>
+          <button type="button" class="gs-play-btn" onclick="selectGame('dragon_hunt')">Chơi ngay</button>
+        </div>
+        <div class="gs-card-art">
+          <img src="assets/game-select/game-rong.png" alt="Săn Rồng Hóa Học">
+        </div>
+        <span class="gs-lock-badge">🔒 Sắp ra mắt</span>
+      </article>
+    </div>
+  </section>
+
   <!-- Join: PIN + QR -->
   <section class="screen join-screen no-pad" data-screen="join">
     <div class="join-top">

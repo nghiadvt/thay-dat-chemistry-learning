@@ -37,7 +37,7 @@ function connectSocket() {
 }
 
 async function createSessionPin(gameId) {
-  const loginPage = await fetch(`${PHP_URL}/login`);
+  const loginPage = await fetch(`${PHP_URL}/admin/login`);
   const html = await loginPage.text();
   const token = (html.match(/name="_token" value="([^"]+)"/) || [])[1];
   if (!token) throw new Error('CSRF token not found');
@@ -46,7 +46,7 @@ async function createSessionPin(gameId) {
     ? loginPage.headers.getSetCookie().map((c) => c.split(';')[0])
     : [];
 
-  const loginRes = await fetch(`${PHP_URL}/login`, {
+  const loginRes = await fetch(`${PHP_URL}/admin/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',

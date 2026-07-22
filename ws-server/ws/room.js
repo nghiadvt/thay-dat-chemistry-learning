@@ -108,6 +108,16 @@ function registerRoomHandlers(io, redis) {
       }
     });
 
+    socket.on('update_profile', async (payload = {}, ack) => {
+      try {
+        const result = await handleUpdateProfile(io, redis, socket, payload);
+        if (typeof ack === 'function') ack({ success: true, data: result });
+      } catch (err) {
+        const message = err.message || 'Không cập nhật được thông tin.';
+        if (typeof ack === 'function') ack({ success: false, error: message });
+      }
+    });
+
     socket.on('disconnect', async () => {
       await handleDisconnect(redis, socket);
     });
@@ -144,6 +154,59 @@ async function handleSelectDuck(redis, socket, payload) {
   await savePlayer(redis, pin, player);
 
   return { duck_sprite: sprite };
+}
+
+/**
+ * Đổi tên/ảnh giữa lúc chờ. Tên là khóa định danh người chơi trong Redis
+ * (players hash + leaderboard zset), nên đổi tên phải rename cả 2 chỗ và
+ * cập nhật socket.data.name — chỉ cho phép khi phòng còn 'waiting' để tránh
+ * vỡ dữ liệu theo tên đã ghi lúc đang chơi (submitted:*, answer:*...).
+ */
+async function handleUpdateProfile(io, redis, socket, payload) {
+  const { pin, name, isHost } = socket.data || {};
+  if (!pin || !name || isHost) {
+    throw new Error('Không thể cập nhật thông tin.');
+  }
+
+  const room = await redis.hgetall(roomKey(pin));
+  if (room.status !== 'waiting') {
+    throw new Error('Không thể chỉnh sửa sau khi ván đấu đã bắt đầu.');
+  }
+
+  const player = await getPlayer(redis, pin, name);
+  if (!player) {
+    throw new Error('Không tìm thấy người chơi.');
+  }
+
+  let currentName = name;
+  const rawName = payload.name != null ? String(payload.name).trim() : null;
+  if (rawName && rawName !== name) {
+    if (rawName.length > MAX_NAME_LENGTH) {
+      throw new Error(`Tên tối đa ${MAX_NAME_LENGTH} ký tự.`);
+    }
+    const taken = await redis.hexists(playersKey(pin), rawName);
+    if (taken) {
+      throw new Error('Tên đã được sử dụng trong phòng này.');
+    }
+    const score = Number(await redis.zscore(leaderboardKey(pin), name)) || 0;
+    await redis.hdel(playersKey(pin), name);
+    await redis.zrem(leaderboardKey(pin), name);
+    await redis.zadd(leaderboardKey(pin), score, rawName);
+    player.name = rawName;
+    currentName = rawName;
+    socket.data.name = rawName;
+  }
+
+  if (payload.remove_avatar) {
+    player.avatar = null;
+  } else if (payload.avatar) {
+    player.avatar = sanitizeAvatar(payload.avatar);
+  }
+
+  await savePlayer(redis, pin, player);
+  await broadcastPlayerList(io, redis, pin);
+
+  return { name: currentName, avatar: player.avatar || null };
 }
 
 async function handleJoinRoom(io, redis, socket, payload) {

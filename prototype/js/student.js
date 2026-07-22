@@ -254,7 +254,7 @@ function openHomeFeature(feature) {
   // Tính năng bị giáo viên khóa hẳn: hiện thông báo, không mở.
   if (window.StudentEntitlements && !StudentEntitlements.guard(feature)) return;
   if (feature === 'play') {
-    window.location.href = '/join';
+    showScreen('game-select');
     return;
   }
   if (feature === 'elements' && window.ElementsModule) {
@@ -271,6 +271,16 @@ function openHomeFeature(feature) {
   }
   const label = HOME_FEATURE_LABELS[feature] || 'Tính năng';
   showCartoonToast(`${label} — sắp ra mắt!`, '🧪');
+}
+
+// ─── Game select (trước khi vào /join) ───
+function selectGame(game) {
+  sfx('tap');
+  if (game === 'duck_race') {
+    window.location.href = '/join';
+    return;
+  }
+  showCartoonToast('Săn Rồng Hóa Học — sắp ra mắt!', '🐉');
 }
 
 // ─── Join PIN / QR ───

@@ -40,7 +40,7 @@ function connectClient() {
 }
 
 async function laravelLogin() {
-  const loginPage = await fetch(`${PHP_URL}/login`);
+  const loginPage = await fetch(`${PHP_URL}/admin/login`);
   const html = await loginPage.text();
   const token = (html.match(/name="_token" value="([^"]+)"/) || [])[1];
   if (!token) throw new Error('CSRF token not found');
@@ -50,7 +50,7 @@ async function laravelLogin() {
     : [];
   const pageCookie = pageCookies.join('; ');
 
-  const loginRes = await fetch(`${PHP_URL}/login`, {
+  const loginRes = await fetch(`${PHP_URL}/admin/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
