@@ -237,7 +237,7 @@ class StudentPrintCardController extends Controller
         Request $request,
         string $workDir,
     ): array {
-        $rows = $this->printRows($students, $request);
+        $rows = $this->printRows($students, $class, $request);
         $pdfPaths = [];
         $sides = ['front'];
         if ((int) $cardTemplate->sides === 2) {

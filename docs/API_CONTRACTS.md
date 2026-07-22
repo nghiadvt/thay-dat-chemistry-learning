@@ -3,7 +3,7 @@
 > WebSocket events, PHP endpoints, Redis keys — single source of truth.
 > WS events skeleton mở rộng ở Phase 2; Phase 1 ghi đầy đủ PHP admin endpoints.
 
-**Cập nhật lần cuối:** 2026-07-22 (Mẫu thẻ: `/admin/card-templates` CRUD JSON + preview; periodic 118+legend)
+**Cập nhật lần cuối:** 2026-07-22 (In phiếu custom: `printRows` truyền đủ `$class` cho bind dữ liệu)
 
 ---
 
@@ -403,6 +403,18 @@ Trang `GET /admin/students/classes/{class}/print-cards` — chọn mẫu rồi e
 |---|---|---|
 | GET | `/admin/students/classes/{class}/print-cards/preview?template=` | HTML 1 trang xem trước |
 | POST | `/admin/students/classes/{class}/print-cards/export` | Form field `template` — ZIP gồm PDF từng trang; mẫu 2 mặt → `phieu-truoc-*.pdf` rồi `phieu-sau-*.pdf` |
+
+**Dữ liệu bind khi in (custom):** `StudentPrintCardController::printRows($students, $class, $request)` — **bắt buộc** truyền `$class` (cùng `$students`, `$request`) cho cả `preview` và `exportCustom`. Mỗi học sinh → `{ data: CardFonts::dataForPrint($student, $class, $password, $teacher) }` với `$teacher = $request->user()`. Payload mẫu:
+
+```json
+{
+  "student": { "display_name", "username", "password", "student_code", "email" },
+  "class": { "name", "grade" },
+  "teacher": { "name" }
+}
+```
+
+Mật khẩu lấy qua `StudentPasswordService::reveal()` (giống mẫu built-in). Thiếu `$class` → lỗi runtime và không bind được `class.name` / `class.grade` trên thẻ.
 
 ---
 

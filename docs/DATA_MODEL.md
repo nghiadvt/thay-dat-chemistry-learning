@@ -3,7 +3,7 @@
 > Schema chốt trước Phase 1.1. Migrations Laravel implement theo file này.
 > Chi tiết loại câu hỏi/đáp án: [`APP_LOGIC.md`](APP_LOGIC.md) §3.1.
 
-**Cập nhật lần cuối:** 2026-07-22 (Mẫu thẻ: `frameCropY` trên layout mỗi mặt)
+**Cập nhật lần cuối:** 2026-07-22 (In phiếu: bind `students` + `student_classes` + giáo viên qua `printRows`)
 
 ---
 
@@ -445,6 +445,8 @@ Mẫu thẻ tài khoản tùy chỉnh do giáo viên thiết kế (WYSIWYG). Thu
 - `a4`: `{ marginMm, gapMm, cardWidthMm }` — cấu hình xếp lưới A4
 
 Ảnh gốc từng lớp: `card-templates/{id}/{side}/{layerId}.png` trên disk `public`.
+
+**In phiếu lớp (`StudentPrintCardController`):** Khi export/preview mẫu `custom:{id}`, controller gom dữ liệu in qua `printRows($students, $class, $request)` — cần cả bản ghi `StudentClass` (`$class`) để bind `class.name`, `class.grade` cùng cột `students` (`display_name`, `username`, `student_code`, `email`) và giáo viên đang đăng nhập (`teacher.name`). Chi tiết endpoint: `docs/API_CONTRACTS.md` §7.7.
 
 ---
 
