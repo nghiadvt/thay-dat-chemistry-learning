@@ -56,7 +56,8 @@
                     <th style="width:36px">#</th>
                     <th>Học sinh</th>
                     <th>Tên đăng nhập</th>
-                    <th>Trạng thái</th>
+                    <th>Mô tả</th>
+                    <th>Kích hoạt</th>
                     <th style="text-align:right">Thao tác</th>
                 </tr>
             </thead>
@@ -71,22 +72,21 @@
                             </span>
                         </td>
                         <td><code>{{ $student->username }}</code></td>
+                        <td style="max-width:220px">{{ $student->description ? Str::limit($student->description, 60) : '—' }}</td>
                         <td>
+                            @include('admin.partials.toggle-switch', [
+                                'formAction' => route('admin.students.toggle-active', $student),
+                                'checked' => $student->isActive(),
+                                'submitOnChange' => true,
+                                'label' => 'Kích hoạt / khóa tài khoản '.$student->display_name,
+                            ])
                             @if ($student->isLocked())
-                                <span class="stu-status stu-status--locked">Bị khóa</span>
-                            @elseif ($student->status === 'disabled')
-                                <span class="stu-status stu-status--disabled">Ngừng dùng</span>
-                            @else
-                                <span class="stu-status">Đang dùng</span>
+                                <div class="stu-lock-reason">
+                                    {{ $student->latestLockLog?->locked_by_teacher ? 'Giáo viên khóa' : 'Tự khóa do nhập sai nhiều lần' }}
+                                </div>
                             @endif
                         </td>
                         <td class="row-actions">
-                            @if ($student->isLocked())
-                                <form method="POST" action="{{ route('admin.students.unlock', $student) }}" style="display:inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-primary">Mở khóa</button>
-                                </form>
-                            @endif
                             <button type="button" class="btn btn-sm"
                                     onclick="openStudentReports('{{ route('admin.students.reports', $student) }}')">Thống kê</button>
                             <a class="btn btn-sm" href="{{ route('admin.students.edit', $student) }}">Sửa</a>

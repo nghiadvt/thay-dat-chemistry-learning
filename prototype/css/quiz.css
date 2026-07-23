@@ -90,7 +90,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  /* gap: 10px; */
   padding: 14px 10px 16px;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 100%);
@@ -194,27 +194,29 @@
 .qz-record-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
+  gap: 3px;
+  font-size: 11px;
   font-weight: 700;
   color: #7A5B33;
+  white-space: nowrap;
 }
-/* Cột điểm có bề rộng cố định để "|" và độ khó luôn thẳng hàng giữa
+/* Cột điểm có bề rộng cố định để độ khó luôn bắt đầu cùng 1 vị trí giữa
    các record, bất kể số điểm dài ngắn khác nhau. */
 .qz-record-points {
   display: flex;
   align-items: center;
-  gap: 3px;
-  width: 82px;
+  gap: 2px;
+  width: 42px;
   flex-shrink: 0;
 }
-.qz-record-points .icon { width: 13px; height: 13px; color: var(--gold); flex-shrink: 0; }
-.qz-record-sep { flex-shrink: 0; opacity: 0.5; }
-.qz-record-diff { display: flex; align-items: center; gap: 4px; }
-.qz-record-diff-icon { font-size: 12px; line-height: 1; }
+.qz-record-points .icon { width: 11px; height: 11px; color: var(--gold); flex-shrink: 0; }
+.qz-record-diff { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.qz-record-diff-icon { font-size: 10px; line-height: 1; }
 .qz-record-diff.diff-cao { color: var(--cherry-deep); }
 .qz-record-diff.diff-trung { color: #C87A1E; }
 .qz-record-diff.diff-thap { color: var(--lime-deep); }
+.qz-record-qcount { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.qz-record-qcount .icon { width: 11px; height: 11px; color: #8A6A3A; flex-shrink: 0; }
 .qz-record-chevron {
   flex-shrink: 0;
   width: 22px;

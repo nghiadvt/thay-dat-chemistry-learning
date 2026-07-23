@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
+use App\Services\StudentLockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,8 @@ use Illuminate\View\View;
 
 class StudentLoginController extends Controller
 {
+    public function __construct(private StudentLockService $locks) {}
+
     public function showLoginForm(): View|RedirectResponse
     {
         if (Auth::guard('student')->check()) {
@@ -42,14 +45,20 @@ class StudentLoginController extends Controller
             return back()->withInput($request->only('username'))->withErrors($generic);
         }
 
-        if ($student->status === 'disabled') {
+        if ($student->studentClass && ! $student->studentClass->is_active) {
             return back()->withInput($request->only('username'))
-                ->withErrors(['username' => 'Tài khoản đã ngừng sử dụng. Liên hệ giáo viên.']);
+                ->withErrors(['username' => 'Lớp học đã tạm ngừng hoạt động. Vui lòng liên hệ giáo viên/admin.']);
         }
 
         if ($student->isLocked()) {
+            $byTeacher = $student->latestLockLog?->locked_by_teacher ?? false;
+
+            $message = $byTeacher
+                ? 'Tài khoản đã bị khóa bởi giáo viên. Vui lòng liên hệ giáo viên/admin để được hỗ trợ.'
+                : 'Tài khoản đang bị khóa do nhập sai nhiều lần. Liên hệ giáo viên để mở khóa.';
+
             return back()->withInput($request->only('username'))
-                ->withErrors(['username' => 'Tài khoản đang bị khóa do nhập sai nhiều lần. Liên hệ giáo viên để mở khóa.']);
+                ->withErrors(['username' => $message]);
         }
 
         if (! Auth::guard('student')->attempt($validated)) {
@@ -59,7 +68,7 @@ class StudentLoginController extends Controller
             $student->refresh();
 
             if ($student->failed_attempts >= Student::MAX_FAILED_ATTEMPTS) {
-                $student->forceFill(['status' => 'locked', 'locked_at' => now()])->save();
+                $this->locks->lock($student, actor: null, ip: $request->ip(), byTeacher: false);
 
                 return back()->withInput($request->only('username'))
                     ->withErrors(['username' => 'Đã nhập sai '.Student::MAX_FAILED_ATTEMPTS.' lần, tài khoản bị khóa. Liên hệ giáo viên để mở khóa.']);

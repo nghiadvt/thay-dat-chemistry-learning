@@ -85,8 +85,11 @@
     {{-- Mỗi lớp một thẻ; bấm vào thẻ để quản lý học sinh của lớp đó --}}
     <div class="class-grid">
         @foreach ($classes as $class)
-            <a class="class-card" href="{{ route('admin.students.classes.show', $class) }}"
-               style="--hue: {{ $hueOf($class->name) }}; --i: {{ $loop->index }}">
+            <div class="class-card @if(!$class->is_active) class-card--inactive @endif"
+                 style="--hue: {{ $hueOf($class->name) }}; --i: {{ $loop->index }}">
+                <a class="class-card__link" href="{{ route('admin.students.classes.show', $class) }}"
+                   aria-label="Xem lớp {{ $class->name }}"></a>
+
                 <span class="class-card__top">
                     <span class="class-card__tile">{{ mb_strtoupper(mb_substr($class->name, 0, 4)) }}</span>
                     <span>
@@ -94,15 +97,34 @@
                         @if ($class->grade)
                             <span class="class-card__grade">Khối {{ $class->grade }}</span>
                         @endif
+                        @if (!$class->is_active)
+                            <span class="class-card__grade" style="color:var(--stu-danger)">Ngừng hoạt động</span>
+                        @endif
                     </span>
                 </span>
+
                 <span class="class-card__foot">
                     <span>{{ $class->students_count }} học sinh</span>
                     <svg class="class-card__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M5 12h14m-6-6 6 6-6 6"/>
                     </svg>
                 </span>
-            </a>
+
+                <span class="class-card__actions">
+                    @include('admin.partials.toggle-switch', [
+                        'formAction' => route('admin.students.classes.toggle-active', $class),
+                        'checked' => $class->is_active,
+                        'submitOnChange' => true,
+                        'label' => 'Bật/tắt hoạt động lớp '.$class->name,
+                    ])
+                    <button type="button" class="btn btn-sm" data-edit-class
+                            data-id="{{ $class->id }}" data-name="{{ $class->name }}"
+                            data-description="{{ $class->description }}">Sửa</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-delete-class
+                            data-id="{{ $class->id }}" data-name="{{ $class->name }}"
+                            data-students-count="{{ $class->students_count }}">Xóa</button>
+                </span>
+            </div>
         @endforeach
 
         <form method="POST" action="{{ route('admin.students.classes.store') }}"
@@ -114,6 +136,68 @@
             <button type="submit" class="btn btn-primary btn-sm">Tạo lớp</button>
         </form>
     </div>
+
+    {{-- Sửa tên/mô tả lớp --}}
+    <dialog id="editClassDialog" class="class-dialog">
+        <form method="POST" id="editClassForm">
+            @csrf
+            @method('PUT')
+            <h3>Sửa lớp</h3>
+            <label>
+                Tên lớp
+                <input type="text" name="name" id="editClassName" required maxlength="100">
+            </label>
+            <label>
+                Mô tả
+                <textarea name="description" id="editClassDescription" maxlength="1000" rows="3"></textarea>
+            </label>
+            <div class="class-dialog__actions">
+                <button type="button" class="btn" onclick="document.getElementById('editClassDialog').close()">Hủy</button>
+                <button type="submit" class="btn btn-primary">Lưu</button>
+            </div>
+        </form>
+    </dialog>
+
+    {{-- Xác nhận xóa lớp --}}
+    <dialog id="deleteClassDialog" class="class-dialog">
+        <form method="POST" id="deleteClassForm">
+            @csrf
+            @method('DELETE')
+            <h3>Xóa lớp</h3>
+            <p id="deleteClassText"></p>
+            <div class="class-dialog__actions">
+                <button type="button" class="btn" onclick="document.getElementById('deleteClassDialog').close()">Hủy</button>
+                <button type="submit" class="btn btn-danger" id="deleteClassSubmit">Xóa lớp</button>
+            </div>
+        </form>
+    </dialog>
+
+    @push('scripts')
+    <script>
+    document.querySelectorAll('[data-edit-class]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const form = document.getElementById('editClassForm');
+            form.action = '{{ url('admin/students/classes') }}/' + btn.dataset.id;
+            document.getElementById('editClassName').value = btn.dataset.name;
+            document.getElementById('editClassDescription').value = btn.dataset.description || '';
+            document.getElementById('editClassDialog').showModal();
+        });
+    });
+
+    document.querySelectorAll('[data-delete-class]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const form = document.getElementById('deleteClassForm');
+            const count = Number(btn.dataset.studentsCount || 0);
+            form.action = '{{ url('admin/students/classes') }}/' + btn.dataset.id;
+            document.getElementById('deleteClassText').textContent = count > 0
+                ? `Lớp "${btn.dataset.name}" vẫn còn ${count} học sinh — hãy chuyển lớp cho học sinh trước khi xóa.`
+                : `Xóa lớp "${btn.dataset.name}"? Không thể hoàn tác.`;
+            document.getElementById('deleteClassSubmit').disabled = count > 0;
+            document.getElementById('deleteClassDialog').showModal();
+        });
+    });
+    </script>
+    @endpush
 
     @if ($classes->isEmpty())
         <div class="stu-panel stu-empty" style="margin-top:20px">

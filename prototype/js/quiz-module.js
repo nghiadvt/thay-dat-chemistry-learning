@@ -188,9 +188,9 @@ window.QuizModule = (function () {
             '<span class="qz-record-badge ' + r.badge.cls + '">' + r.badge.text + '</span>' +
           '</span>' +
           '<span class="qz-record-meta">' +
-            '<span class="qz-record-points"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>' + r.points + ' điểm</span>' +
-            '<span class="qz-record-sep">|</span>' +
+            '<span class="qz-record-points"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>' + r.points + 'đ</span>' +
             '<span class="qz-record-diff diff-' + r.diff.key + '"><span class="qz-record-diff-icon">' + r.diff.icon + '</span>' + r.diff.label + '</span>' +
+            '<span class="qz-record-qcount"><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg>' + (t.question_count || 0) + ' câu</span>' +
           '</span>' +
         '</span>' +
         rightIcon +

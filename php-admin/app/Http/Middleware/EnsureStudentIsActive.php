@@ -19,14 +19,21 @@ class EnsureStudentIsActive
     {
         $student = $request->user('student');
 
-        if ($student && ! $student->isActive()) {
+        $classInactive = $student && $student->studentClass && ! $student->studentClass->is_active;
+
+        if ($student && (! $student->isActive() || $classInactive)) {
             Auth::guard('student')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            $message = $student->isLocked()
-                ? 'Tài khoản đang bị khóa. Hãy liên hệ giáo viên để mở lại.'
-                : 'Tài khoản đã ngừng sử dụng. Hãy liên hệ giáo viên.';
+            if ($classInactive) {
+                $message = 'Lớp học đã tạm ngừng hoạt động. Vui lòng liên hệ giáo viên/admin.';
+            } else {
+                $byTeacher = $student->latestLockLog?->locked_by_teacher ?? false;
+                $message = $byTeacher
+                    ? 'Tài khoản đã bị khóa bởi giáo viên. Hãy liên hệ giáo viên/admin để mở lại.'
+                    : 'Tài khoản đang bị khóa do nhập sai nhiều lần. Hãy liên hệ giáo viên để mở lại.';
+            }
 
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'data' => null, 'error' => $message], 403);

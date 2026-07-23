@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,7 @@ class Student extends Authenticatable
         'username',
         'display_name',
         'email',
+        'description',
         'password',
         'avatar_path',
         'status',
@@ -76,6 +78,16 @@ class Student extends Authenticatable
     public function passwordAudits(): HasMany
     {
         return $this->hasMany(StudentPasswordAudit::class);
+    }
+
+    public function lockLogs(): HasMany
+    {
+        return $this->hasMany(StudentLockLog::class);
+    }
+
+    public function latestLockLog(): HasOne
+    {
+        return $this->hasOne(StudentLockLog::class)->latestOfMany('locked_at');
     }
 
     /**

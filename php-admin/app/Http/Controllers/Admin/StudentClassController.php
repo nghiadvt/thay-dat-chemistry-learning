@@ -27,6 +27,7 @@ class StudentClassController extends Controller
         $this->assertOwned($request, $class);
 
         $students = $class->students()
+            ->with('latestLockLog')
             ->orderBy('display_name')
             ->orderBy('username')
             ->get();
@@ -55,11 +56,21 @@ class StudentClassController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'grade' => ['nullable', 'string', 'max:20'],
+            'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $class->update($validated);
 
         return back()->with('success', 'Đã cập nhật lớp.');
+    }
+
+    public function toggleActive(Request $request, StudentClass $class): RedirectResponse
+    {
+        $this->assertOwned($request, $class);
+
+        $class->update(['is_active' => ! $class->is_active]);
+
+        return back()->with('success', $class->is_active ? 'Đã bật hoạt động cho lớp.' : 'Đã tắt hoạt động của lớp.');
     }
 
     public function destroy(Request $request, StudentClass $class): RedirectResponse

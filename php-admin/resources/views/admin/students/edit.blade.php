@@ -20,6 +20,10 @@
             <input type="email" name="email" value="{{ old('email', $student->email) }}" maxlength="190" placeholder="an@example.com">
         </label>
         <label>
+            Mô tả <small>(tùy chọn)</small>
+            <textarea name="description" maxlength="1000" rows="3">{{ old('description', $student->description) }}</textarea>
+        </label>
+        <label>
             Tên đăng nhập
             <input type="text" name="username" value="{{ old('username', $student->username) }}" required maxlength="64">
         </label>
@@ -35,7 +39,7 @@
         <label>
             Trạng thái
             <select name="status">
-                @foreach (['active' => 'Đang dùng', 'locked' => 'Bị khóa', 'disabled' => 'Ngừng sử dụng'] as $value => $label)
+                @foreach (['active' => 'Đang dùng', 'locked' => 'Bị khóa'] as $value => $label)
                     <option value="{{ $value }}" @selected(old('status', $student->status) === $value)>{{ $label }}</option>
                 @endforeach
             </select>

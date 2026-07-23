@@ -17,6 +17,8 @@ class StudentClass extends Model
         'teacher_id',
         'name',
         'grade',
+        'description',
+        'is_active',
         'default_policy',
     ];
 
@@ -24,6 +26,7 @@ class StudentClass extends Model
     {
         return [
             'default_policy' => 'array',
+            'is_active' => 'boolean',
         ];
     }
 

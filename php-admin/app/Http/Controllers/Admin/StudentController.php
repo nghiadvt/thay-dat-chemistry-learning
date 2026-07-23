@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\StudentClass;
 use App\Services\StudentCredentials;
+use App\Services\StudentLockService;
 use App\Services\StudentPasswordService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class StudentController extends Controller
     public function __construct(
         private StudentCredentials $credentials,
         private StudentPasswordService $passwords,
+        private StudentLockService $locks,
     ) {}
 
     /**
@@ -75,6 +77,7 @@ class StudentController extends Controller
         $validated = $request->validate([
             'display_name' => ['required', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:190'],
+            'description' => ['nullable', 'string', 'max:1000'],
             'username' => ['required', 'string', 'max:64', 'alpha_dash', Rule::unique('students', 'username')],
             'class_id' => ['nullable', Rule::exists('student_classes', 'id')],
             'password' => ['nullable', 'string', 'min:6', 'max:64'],
@@ -92,6 +95,7 @@ class StudentController extends Controller
                 'username' => $validated['username'],
                 'display_name' => $validated['display_name'],
                 'email' => $validated['email'] ?? null,
+                'description' => $validated['description'] ?? null,
                 // Mật khẩu thật được đặt ngay sau bằng StudentPasswordService để
                 // hash và bản mã luôn khớp nhau; giá trị này chỉ là chỗ giữ chỗ.
                 'password' => Str::random(32),
@@ -132,20 +136,23 @@ class StudentController extends Controller
         $validated = $request->validate([
             'display_name' => ['required', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:190'],
+            'description' => ['nullable', 'string', 'max:1000'],
             'username' => ['required', 'string', 'max:64', 'alpha_dash', Rule::unique('students', 'username')->ignore($student->id)],
             'class_id' => ['nullable', Rule::exists('student_classes', 'id')],
-            'status' => ['required', Rule::in(['active', 'locked', 'disabled'])],
+            'status' => ['required', Rule::in(['active', 'locked'])],
         ]);
 
-        $this->assertClassOwned($request, $validated['class_id'] ?? null);
-
-        // Mở khóa thì phải xóa bộ đếm sai, nếu không học sinh sẽ bị khóa lại ngay.
-        if ($validated['status'] === 'active' && $student->status !== 'active') {
-            $student->failed_attempts = 0;
-            $student->locked_at = null;
-        }
+        $status = $validated['status'];
+        unset($validated['status']);
 
         $student->fill($validated)->save();
+
+        // Đi qua StudentLockService để mọi thay đổi trạng thái đều có audit trail.
+        if ($status !== $student->status) {
+            $status === 'active'
+                ? $this->locks->unlock($student, $request->ip())
+                : $this->locks->lock($student, $request->user(), $request->ip(), byTeacher: true);
+        }
 
         $destination = $student->class_id
             ? route('admin.students.classes.show', $student->class_id)
@@ -253,13 +260,22 @@ class StudentController extends Controller
     {
         $this->assertOwned($request, $student);
 
-        $student->forceFill([
-            'status' => 'active',
-            'failed_attempts' => 0,
-            'locked_at' => null,
-        ])->save();
+        $this->locks->unlock($student, $request->ip());
 
         return back()->with('success', 'Đã mở khóa tài khoản học sinh.');
+    }
+
+    public function toggleActive(Request $request, Student $student): RedirectResponse
+    {
+        $this->assertOwned($request, $student);
+
+        if ($student->isActive()) {
+            $this->locks->lock($student, $request->user(), $request->ip(), byTeacher: true);
+        } else {
+            $this->locks->unlock($student, $request->ip());
+        }
+
+        return back()->with('success', $student->fresh()->isActive() ? 'Đã kích hoạt tài khoản học sinh.' : 'Đã khóa tài khoản học sinh.');
     }
 
     /**

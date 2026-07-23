@@ -253,6 +253,7 @@ Route::middleware('auth')->group(function () {
         Route::post('students/classes', [AdminStudentClassController::class, 'store'])->name('students.classes.store');
         Route::get('students/classes/{class}', [AdminStudentClassController::class, 'show'])->name('students.classes.show');
         Route::put('students/classes/{class}', [AdminStudentClassController::class, 'update'])->name('students.classes.update');
+        Route::patch('students/classes/{class}/active', [AdminStudentClassController::class, 'toggleActive'])->name('students.classes.toggle-active');
         Route::delete('students/classes/{class}', [AdminStudentClassController::class, 'destroy'])->name('students.classes.destroy');
         Route::get('students/classes/{class}/credentials', [AdminStudentController::class, 'credentialsSheet'])->name('students.credentials-sheet');
         Route::get('students/classes/{class}/print-cards', [AdminStudentPrintCardController::class, 'index'])->name('students.print-cards');
@@ -270,6 +271,7 @@ Route::middleware('auth')->group(function () {
         Route::post('students/bulk-generate', [AdminStudentController::class, 'bulkGenerate'])->name('students.bulk-generate');
         Route::post('students/{student}/reset-password', [AdminStudentController::class, 'resetPassword'])->name('students.reset-password');
         Route::post('students/{student}/unlock', [AdminStudentController::class, 'unlock'])->name('students.unlock');
+        Route::patch('students/{student}/toggle-active', [AdminStudentController::class, 'toggleActive'])->name('students.toggle-active');
 
         // Phân quyền tính năng
         Route::get('students/{student}/entitlements', [AdminStudentEntitlementController::class, 'index'])->name('students.entitlements');
