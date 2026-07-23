@@ -68,6 +68,7 @@
   <!-- Home hub -->
   <section class="screen home-screen active" data-screen="home">
     <div class="home-bg-pattern"></div>
+    <div class="home-bottom-fade" aria-hidden="true"></div>
     <div class="home-account-slot" id="homeAccountChip"></div>
     <div class="home-inner">
       <h1 class="home-title"><span class="tt-a">Hóa học</span><br><span class="tt-b">không quạo</span></h1>
@@ -78,20 +79,16 @@
       <div id="homeProBanner" hidden></div>
       <nav class="home-menu" aria-label="Chức năng học sinh">
         <button type="button" class="home-menu-item hm-play" onclick="openHomeFeature('play')">
-          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-gamepad"/></svg></span>
-          <span class="home-menu-label">Chơi game</span>
+          <img class="home-menu-img" src="assets/home-menu/choi-game.png" alt="Chơi game">
         </button>
         <button type="button" class="home-menu-item hm-elements" onclick="openHomeFeature('elements')">
-          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-book"/></svg></span>
-          <span class="home-menu-label">Đọc nguyên tố</span>
+          <img class="home-menu-img" src="assets/home-menu/doc-nguyen-to.png" alt="Đọc nguyên tố">
         </button>
         <button type="button" class="home-menu-item hm-balance" onclick="openHomeFeature('balance')">
-          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-scale"/></svg></span>
-          <span class="home-menu-label">Cân bằng phương trình</span>
+          <img class="home-menu-img" src="assets/home-menu/can-bang-phuong-trinh.png" alt="Cân bằng phương trình">
         </button>
         <button type="button" class="home-menu-item hm-quiz" onclick="openHomeFeature('quiz')">
-          <span class="home-menu-icon" aria-hidden="true"><svg class="icon"><use href="#i-trophy"/></svg></span>
-          <span class="home-menu-label">Ôn trắc nghiệm</span>
+          <img class="home-menu-img" src="assets/home-menu/on-trac-nghiem.png" alt="Ôn trắc nghiệm">
         </button>
       </nav>
     </div>
@@ -464,21 +461,10 @@
     </div>
   </section>
 
-  <!-- Ôn trắc nghiệm: chọn lớp -->
-  <section class="screen quiz-screen no-pad" data-screen="quiz-grade">
-    <div class="el-header">
-      <button type="button" class="el-back" onclick="goStudentHome()" aria-label="Quay lại">
-        <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
-      </button>
-      <h2 class="el-title">Ôn trắc nghiệm</h2>
-    </div>
-    <div class="qz-grade-body" id="qzGradeBody"></div>
-  </section>
-
-  <!-- Ôn trắc nghiệm: chọn chủ đề + số câu -->
+  <!-- Ôn trắc nghiệm: chọn chủ đề -->
   <section class="screen quiz-screen no-pad" data-screen="quiz-setup">
     <div class="el-header">
-      <button type="button" class="el-back" onclick="QuizModule.backToGrade()" aria-label="Chọn lại lớp">
+      <button type="button" class="el-back" onclick="goStudentHome()" aria-label="Quay lại">
         <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
       </button>
       <h2 class="el-title" id="qzSetupTitle">Ôn trắc nghiệm</h2>

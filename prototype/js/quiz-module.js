@@ -1,18 +1,31 @@
 /* QuizModule — «📖 Ôn trắc nghiệm»
  *
  * Chế độ tự luyện không cần phòng/PIN:
- * - Chọn chủ đề (tag ngân hàng câu hỏi) + số câu → tải đề ngẫu nhiên qua API công khai
+ * - Chạm 1 chủ đề (tag ngân hàng câu hỏi) → vào bài luôn; số câu mỗi đề do
+ *   server quyết định (giáo viên quản lý), HS không tự chọn số câu
  * - Làm bài tự do không đồng hồ: chấm ngay khi chạm, hiện giải thích, chuỗi 🔥
  * - Tổng kết 1–3 sao + vòng % + ôn lại riêng những câu sai
- * - Kỷ lục từng (chủ đề × số câu) lưu localStorage `htd_quiz_best`
+ * - Kỷ lục từng chủ đề lưu localStorage `htd_quiz_best`
  */
 window.QuizModule = (function () {
   'use strict';
 
   var BEST_KEY = 'htd_quiz_best';
-  var COUNTS = [10, 15, 20];
   var OPT_COLORS = ['sun', 'bubblegum', 'sky', 'grape', 'lime', 'cherry'];
   var LETTERS = 'ABCDEF';
+  // Icon + badge/điểm/độ khó chưa có trong dữ liệu chủ đề thật (API chỉ trả
+  // tên/slug/màu/số câu) — dùng mẫu xoay vòng để khớp thiết kế, chờ bổ sung
+  // dữ liệu thật sau.
+  var RECORD_ICONS = ['🧪', '⚛️', '🔗', '🧫', '💧', '🌡️', '🧬', '⚗️'];
+  var RECORD_DIFFS = [
+    { key: 'cao', label: 'CAO', icon: '🔥' },
+    { key: 'trung', label: 'TRUNG BÌNH', icon: '📶' },
+    { key: 'thap', label: 'THẤP', icon: '🌱' },
+  ];
+
+  function panelWrap(innerHtml) {
+    return '<div class="qz-hero-spacer"></div><div class="qz-setup-panel">' + innerHtml + '</div>';
+  }
 
   var st = null;      // trạng thái lượt chơi hiện tại
   var setup = {       // trạng thái màn chọn đề
@@ -20,8 +33,6 @@ window.QuizModule = (function () {
     total: 0,
     topic: null,      // slug tag, null = tất cả
     topicName: 'Tất cả chủ đề',
-    count: 10,
-    loading: false,
   };
 
   /* ── Helpers ────────────────────────────────────────────────── */
@@ -56,11 +67,7 @@ window.QuizModule = (function () {
   }
 
   function bestKeyOf() {
-    return (setup.topic || 'all') + '|' + setup.count;
-  }
-
-  function getBest() {
-    return bestMap()[bestKeyOf()] || null;
+    return setup.topic || 'all';
   }
 
   function saveBest(correct, total) {
@@ -106,21 +113,23 @@ window.QuizModule = (function () {
   function renderSetupLoading() {
     var body = setupBody();
     if (!body) return;
-    body.innerHTML =
+    body.innerHTML = panelWrap(
       '<div class="qz-hero"><span class="qz-hero-emoji">📖</span>' +
         '<p class="qz-hero-sub">Đang chuẩn bị kho câu hỏi…</p></div>' +
       '<div class="qz-skeleton-row">' +
         '<span class="qz-skeleton"></span><span class="qz-skeleton"></span><span class="qz-skeleton"></span>' +
-      '</div>';
+      '</div>'
+    );
   }
 
   function renderSetupError(msg) {
     var body = setupBody();
     if (!body) return;
-    body.innerHTML =
+    body.innerHTML = panelWrap(
       '<div class="qz-hero"><span class="qz-hero-emoji">🙈</span>' +
         '<p class="qz-hero-sub">' + esc(msg || 'Không tải được dữ liệu.') + '</p></div>' +
-      '<button type="button" class="qz-cta" id="qzRetryBtn">Thử lại</button>';
+      '<button type="button" class="qz-cta" id="qzRetryBtn">Thử lại</button>'
+    );
     document.getElementById('qzRetryBtn').addEventListener('click', function () {
       sfx('tap');
       renderSetupLoading();
@@ -133,92 +142,114 @@ window.QuizModule = (function () {
     if (!body) return;
 
     if (!setup.total) {
-      body.innerHTML =
+      body.innerHTML = panelWrap(
         '<div class="qz-hero"><span class="qz-hero-emoji">🌱</span>' +
-        '<p class="qz-hero-sub">Kho câu hỏi đang được thầy cô chuẩn bị.<br>Bạn quay lại sau nhé!</p></div>';
+        '<p class="qz-hero-sub">Kho câu hỏi đang được thầy cô chuẩn bị.<br>Bạn quay lại sau nhé!</p></div>'
+      );
       return;
     }
 
-    var chipsHtml =
-      '<button type="button" class="qz-topic-chip' + (setup.topic === null ? ' selected' : '') + '" data-topic="">' +
-        '<span class="qz-topic-name">🌈 Tất cả chủ đề</span>' +
-        '<span class="qz-topic-count">' + setup.total + ' câu</span>' +
-      '</button>' +
-      setup.topics.map(function (t) {
-        var sel = setup.topic === t.slug ? ' selected' : '';
-        return '<button type="button" class="qz-topic-chip' + sel + '" data-topic="' + esc(t.slug) + '" ' +
-          'style="--tag-c:' + esc(t.color || '#8B5CF6') + '">' +
-          '<span class="qz-topic-dot"></span>' +
-          '<span class="qz-topic-name">' + esc(t.name) + '</span>' +
-          '<span class="qz-topic-count">' + t.question_count + ' câu</span>' +
-          '</button>';
-      }).join('');
+    var allRow =
+      '<button type="button" class="qz-record" data-topic="" style="--tag-c:#8B5CF6">' +
+        '<span class="qz-record-icon">🌈</span>' +
+        '<span class="qz-record-main">' +
+          '<span class="qz-record-title-row"><span class="qz-record-title">Tất cả chủ đề</span></span>' +
+          '<span class="qz-record-meta">' + setup.total + ' câu hỏi</span>' +
+        '</span>' +
+        '<svg class="icon qz-record-chevron" aria-hidden="true"><use href="#i-back"/></svg>' +
+      '</button>';
 
-    var countHtml = COUNTS.map(function (n) {
-      return '<button type="button" class="qz-count-btn' + (setup.count === n ? ' selected' : '') + '" data-count="' + n + '">' +
-        n + '<small>câu</small></button>';
+    // Chủ đề Pro (mẫu, xen kẽ) đẩy xuống sau các chủ đề mở khoá thường —
+    // sort ổn định nên thứ tự trong từng nhóm vẫn giữ nguyên như từ API.
+    var topicRecords = setup.topics.map(function (t, i) {
+      var badge = i % 2 === 0 ? { cls: 'badge-pro', text: 'PRO' } : { cls: '', text: 'MỚI' };
+      return {
+        topic: t,
+        locked: badge.cls === 'badge-pro',
+        icon: RECORD_ICONS[i % RECORD_ICONS.length],
+        badge: badge,
+        diff: RECORD_DIFFS[i % RECORD_DIFFS.length],
+        points: (t.question_count || 1) * 10,
+      };
+    }).sort(function (a, b) { return (a.locked ? 1 : 0) - (b.locked ? 1 : 0); });
+
+    var topicRows = topicRecords.map(function (r) {
+      var t = r.topic;
+      var rightIcon = r.locked
+        ? '<span class="qz-record-lock" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2.2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></span>'
+        : '<svg class="icon qz-record-chevron" aria-hidden="true"><use href="#i-back"/></svg>';
+      return '<button type="button" class="qz-record' + (r.locked ? ' is-locked' : '') + '" ' +
+        'data-topic="' + esc(t.slug) + '" ' + (r.locked ? 'data-locked="1" ' : '') +
+        'style="--tag-c:' + esc(t.color || '#8B5CF6') + '">' +
+        '<span class="qz-record-icon">' + r.icon + '</span>' +
+        '<span class="qz-record-main">' +
+          '<span class="qz-record-title-row">' +
+            '<span class="qz-record-title">' + esc(t.name) + '</span>' +
+            '<span class="qz-record-badge ' + r.badge.cls + '">' + r.badge.text + '</span>' +
+          '</span>' +
+          '<span class="qz-record-meta">' +
+            '<span class="qz-record-points"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>' + r.points + ' điểm</span>' +
+            '<span class="qz-record-sep">|</span>' +
+            '<span class="qz-record-diff diff-' + r.diff.key + '"><span class="qz-record-diff-icon">' + r.diff.icon + '</span>' + r.diff.label + '</span>' +
+          '</span>' +
+        '</span>' +
+        rightIcon +
+        '</button>';
     }).join('');
 
-    body.innerHTML =
-      '<div class="qz-hero">' +
-        '<span class="qz-hero-emoji">🧠</span>' +
-        '<p class="qz-hero-sub">Chọn chủ đề và luyện mỗi ngày để lên trình nhé!</p>' +
-      '</div>' +
+    body.innerHTML = panelWrap(
       '<h3 class="qz-section-label">Chủ đề</h3>' +
-      '<div class="qz-topic-list">' + chipsHtml + '</div>' +
-      '<h3 class="qz-section-label">Số câu hỏi</h3>' +
-      '<div class="qz-count-row">' + countHtml + '</div>' +
-      '<div class="qz-best-line" id="qzBestLine"></div>' +
-      '<button type="button" class="qz-cta" id="qzStartBtn">Bắt đầu ôn ▸</button>';
+      '<div class="qz-topic-list" id="qzTopicList">' + allRow + topicRows + '</div>'
+    );
 
-    body.querySelectorAll('.qz-topic-chip').forEach(function (chip) {
+    body.querySelectorAll('.qz-record').forEach(function (chip) {
       chip.addEventListener('click', function () {
-        sfx('tap');
-        setup.topic = chip.dataset.topic || null;
-        setup.topicName = chip.dataset.topic
-          ? (setup.topics.find(function (t) { return t.slug === chip.dataset.topic; }) || {}).name || 'Chủ đề'
-          : 'Tất cả chủ đề';
-        body.querySelectorAll('.qz-topic-chip').forEach(function (c) { c.classList.remove('selected'); });
-        chip.classList.add('selected');
-        updateBestLine();
+        if (chip.dataset.locked) {
+          sfx('tap');
+          showTopicLockToast(chip.dataset.topic);
+          return;
+        }
+        startTopic(chip);
       });
     });
-
-    body.querySelectorAll('.qz-count-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        sfx('tap');
-        setup.count = Number(btn.dataset.count);
-        body.querySelectorAll('.qz-count-btn').forEach(function (b) { b.classList.remove('selected'); });
-        btn.classList.add('selected');
-        updateBestLine();
-      });
-    });
-
-    document.getElementById('qzStartBtn').addEventListener('click', startRun);
-    updateBestLine();
   }
 
-  function updateBestLine() {
-    var line = document.getElementById('qzBestLine');
-    if (!line) return;
-    var best = getBest();
-    line.innerHTML = best
-      ? '🏆 Kỷ lục của bạn: <strong>' + best.correct + '/' + best.total + '</strong> (' + best.pct + '%)'
-      : '✨ Lượt đầu tiên với lựa chọn này — cố lên!';
+  /* Chủ đề Pro bị khoá: không cho chọn, chỉ báo cho HS biết cần nâng cấp
+   * (giống cách bảng tuần hoàn báo ô yêu cầu Pro). */
+  function showTopicLockToast(slug) {
+    var t = setup.topics.find(function (x) { return x.slug === slug; });
+    var name = t ? t.name : 'Chủ đề này';
+    if (typeof window.showCartoonToast === 'function') {
+      window.showCartoonToast(name + ' nằm trong gói Pro. Nâng cấp để mở khoá và luyện thêm nhé!', '🔒');
+    }
   }
 
-  /* ── Tải đề & bắt đầu ───────────────────────────────────────── */
-  function startRun() {
-    var btn = document.getElementById('qzStartBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Đang tải đề…'; }
+  /* ── Chạm chủ đề → tải đề & vào bài luôn ────────────────────────
+   * Số câu mỗi đề do server quyết định (giáo viên quản lý), HS không
+   * còn chọn số câu nữa. */
+  function startTopic(chip) {
+    var list = document.getElementById('qzTopicList');
+    if (list && list.classList.contains('is-busy')) return; // chặn bấm dồn dập
     sfx('countdown-go');
 
-    HTDApi.practiceQuestions({ topic: setup.topic, count: setup.count }).then(function (data) {
+    setup.topic = chip.dataset.topic || null;
+    setup.topicName = chip.dataset.topic
+      ? (setup.topics.find(function (t) { return t.slug === chip.dataset.topic; }) || {}).name || 'Chủ đề'
+      : 'Tất cả chủ đề';
+
+    if (list) list.classList.add('is-busy');
+    chip.classList.add('is-starting');
+    chip.insertAdjacentHTML('beforeend', '<span class="qz-record-spinner" aria-hidden="true"></span>');
+
+    HTDApi.practiceQuestions({ topic: setup.topic }).then(function (data) {
       var questions = (data && data.questions) || [];
       if (!questions.length) throw new Error('Chưa có câu hỏi cho chủ đề này.');
       beginQuestions(questions, 'normal');
     }).catch(function (err) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Bắt đầu ôn ▸'; }
+      if (list) list.classList.remove('is-busy');
+      chip.classList.remove('is-starting');
+      var spinner = chip.querySelector('.qz-record-spinner');
+      if (spinner) spinner.remove();
       if (typeof showCartoonToast === 'function') {
         showCartoonToast((err && err.message) || 'Không tải được đề, thử lại nhé!', '😢');
       }

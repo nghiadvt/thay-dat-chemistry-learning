@@ -10,6 +10,9 @@ use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\Admin\GroupController as AdminGroupController;
 use App\Http\Controllers\Admin\ImageCropperController as AdminImageCropperController;
 use App\Http\Controllers\Admin\KeyboardController as AdminKeyboardController;
+use App\Http\Controllers\Admin\PracticeGradeController as AdminPracticeGradeController;
+use App\Http\Controllers\Admin\PracticeQuizController as AdminPracticeQuizController;
+use App\Http\Controllers\Admin\PracticeTopicController as AdminPracticeTopicController;
 use App\Http\Controllers\Admin\QuestionBankController as AdminQuestionBankController;
 use App\Http\Controllers\Admin\QuestionController as AdminQuestionController;
 use App\Http\Controllers\Admin\QuizController as AdminQuizController;
@@ -179,6 +182,32 @@ Route::middleware('auth')->group(function () {
         Route::patch('question-bank/bulk-tags', [AdminQuestionBankController::class, 'bulkUpdateTags'])->name('question-bank.bulk-tags');
         Route::patch('question-bank/{question_bank}/tags', [AdminQuestionBankController::class, 'updateTags'])->name('question-bank.update-tags');
         Route::resource('question-bank', AdminQuestionBankController::class)->except(['show']);
+
+        // --- Ôn trắc nghiệm: Khối → Chủ đề → Bài trắc nghiệm ---
+        Route::get('practice', [AdminPracticeTopicController::class, 'index'])->name('practice.index');
+
+        // Khối (CRUD, nút "+ Thêm khối" ở header trang practice.index)
+        Route::post('practice-grades', [AdminPracticeGradeController::class, 'store'])->name('practice.grades.store');
+        Route::put('practice-grades/{practiceGrade}', [AdminPracticeGradeController::class, 'update'])->name('practice.grades.update');
+        Route::delete('practice-grades/{practiceGrade}', [AdminPracticeGradeController::class, 'destroy'])->name('practice.grades.destroy');
+
+        // Chủ đề — quản lý inline ngay trên practice.index (đóng/mở accordion), không có trang riêng.
+        Route::post('practice/topics', [AdminPracticeTopicController::class, 'store'])->name('practice.topics.store');
+        Route::put('practice/topics/{practiceTopic}', [AdminPracticeTopicController::class, 'update'])->name('practice.topics.update');
+        Route::delete('practice/topics/{practiceTopic}', [AdminPracticeTopicController::class, 'destroy'])->name('practice.topics.destroy');
+        Route::post('practice/topics/{practiceTopic}/apply-class', [AdminPracticeTopicController::class, 'applyClass'])->name('practice.topics.apply-class');
+
+        // Bài trắc nghiệm
+        Route::post('practice/topics/{practiceTopic}/quizzes', [AdminPracticeQuizController::class, 'store'])->name('practice.quizzes.store');
+        Route::post('practice/quizzes/{practiceQuiz}/questions', [AdminPracticeQuizController::class, 'attachQuestions'])->name('practice.quizzes.questions.attach');
+        Route::delete('practice/quizzes/{practiceQuiz}/questions/{question_bank}', [AdminPracticeQuizController::class, 'detachQuestion'])->name('practice.quizzes.questions.detach');
+        Route::patch('practice/quizzes/{practiceQuiz}/questions/reorder', [AdminPracticeQuizController::class, 'reorderQuestions'])->name('practice.quizzes.questions.reorder');
+        Route::put('practice/quizzes/{practiceQuiz}/classes', [AdminPracticeQuizController::class, 'syncClasses'])->name('practice.quizzes.classes.sync');
+        Route::patch('practice/quizzes/{practiceQuiz}/active', [AdminPracticeQuizController::class, 'toggleActive'])->name('practice.quizzes.toggle-active');
+        Route::patch('practice/quizzes/{practiceQuiz}/pro', [AdminPracticeQuizController::class, 'togglePro'])->name('practice.quizzes.toggle-pro');
+        Route::put('practice/quizzes/{practiceQuiz}', [AdminPracticeQuizController::class, 'update'])->name('practice.quizzes.update');
+        Route::delete('practice/quizzes/{practiceQuiz}', [AdminPracticeQuizController::class, 'destroy'])->name('practice.quizzes.destroy');
+        Route::get('practice/quizzes/{practiceQuiz}', [AdminPracticeQuizController::class, 'show'])->name('practice.quizzes.show');
 
         // Nhóm dùng để gom quiz / bộ câu hỏi / phòng chơi, mỗi trang một danh sách riêng (scope)
         Route::get('groups', [AdminGroupController::class, 'index'])->name('groups.index');

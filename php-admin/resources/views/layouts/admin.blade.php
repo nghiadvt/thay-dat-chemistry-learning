@@ -65,6 +65,10 @@
                 <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.5c-1.5-1-4-1.5-6-1.5v13c2 0 4.5.5 6 1.5m0-13c1.5-1 4-1.5 6-1.5v13c-2 0-4.5.5-6 1.5m0-13v13"/></svg>
                 <span>Bộ câu hỏi</span>
             </a>
+            <a href="{{ route('admin.practice.index') }}" class="{{ request()->routeIs('admin.practice.*') ? 'active' : '' }}" title="Ôn trắc nghiệm">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4h9l4 4v12a1 1 0 01-1 1H6a1 1 0 01-1-1V5a1 1 0 011-1z"/><path stroke-linecap="round" d="M8.5 12.5l2 2 4-4.2"/></svg>
+                <span>Ôn trắc nghiệm</span>
+            </a>
             <a href="{{ route('admin.periodic.index') }}" class="{{ request()->routeIs('admin.periodic.*') ? 'active' : '' }}" title="Bảng nguyên tố">
                 <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
                 <span>Bảng nguyên tố</span>

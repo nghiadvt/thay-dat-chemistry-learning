@@ -5,18 +5,25 @@ html, body {
 body {
     margin: 0;
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #12296b;
     box-sizing: border-box;
+    overflow-x: hidden;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* Trên điện thoại: chiều cao ảnh phải bằng đúng 100% màn hình,
+   giữ nguyên tỉ lệ gốc 860x1829 nên chiều rộng có thể tràn ra
+   ngoài viewport một chút (bị cắt 2 bên, giống hiệu ứng zoom). */
 .sl-stage {
     position: relative;
-    width: 100%;
-    aspect-ratio: 954 / 1649;
+    height: 100vh;
+    height: 100dvh;
+    width: auto;
+    aspect-ratio: 860 / 1829;
     background-image: url('/htd-admin/assets/student-login-bg.png');
     background-size: cover;
     background-position: center;
@@ -31,20 +38,22 @@ body {
     }
 
     .sl-stage {
+        height: auto;
+        width: 100%;
         max-width: 480px;
         border-radius: 20px;
         box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
     }
 }
 
-/* Vùng khung trắng trong ảnh nền: đo theo pixel gốc 954x1649
-   (top 819px, left 95px, right 872px, bottom 1609px). */
+/* Vùng khung trắng trong ảnh nền: đo theo pixel gốc 860x1829
+   (top 1067px, left 87px, right 787px, bottom 1795px). */
 .sl-panel {
     position: absolute;
-    top: 49.7%;
-    left: 9.96%;
-    right: 8.6%;
-    bottom: 2.43%;
+    top: 58.34%;
+    left: 10.12%;
+    right: 8.49%;
+    bottom: 1.86%;
     display: flex;
     flex-direction: column;
     padding: 4% 7% 5%;

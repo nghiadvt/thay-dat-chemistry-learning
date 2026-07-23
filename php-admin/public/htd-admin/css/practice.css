@@ -1,0 +1,182 @@
+/* Ôn trắc nghiệm — Khối / Chủ đề (accordion) / Bài trắc nghiệm */
+
+/* Panel "+ Thêm khối" ở page header */
+.practice-grade-add-toggle {
+  position: relative;
+}
+
+.practice-grade-add-toggle > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.practice-grade-add-toggle > summary::-webkit-details-marker {
+  display: none;
+}
+
+.practice-grade-add-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  width: 320px;
+  max-width: 90vw;
+  background: #fff;
+  border: 1px solid #d7dbe7;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+/* Tab khối, mỗi tab có menu ⋮ sửa/xóa riêng */
+.practice-grade-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.practice-grade-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.practice-grade-tab > a {
+  padding: 6px 14px;
+  border: 1px solid #d7dbe7;
+  border-radius: 999px 0 0 999px;
+  color: #4b5563;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.practice-grade-tab > a.active {
+  border-color: #2d46d6;
+  background: #2d46d6;
+  color: #fff;
+}
+
+.practice-grade-tab__menu {
+  position: relative;
+}
+
+.practice-grade-tab__menu > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border: 1px solid #d7dbe7;
+  border-left: none;
+  border-radius: 0 999px 999px 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.practice-grade-tab__menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.practice-grade-tab__menu-body {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: 280px;
+  background: #fff;
+  border: 1px solid #d7dbe7;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Accordion chủ đề — full width, click title để mở/đóng */
+.practice-topic-accordion {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.practice-topic-accordion__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+
+.practice-topic-accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+.practice-topic-accordion__summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 10px;
+  color: #9ca3af;
+  transition: transform 0.15s ease;
+}
+
+.practice-topic-accordion[open] > .practice-topic-accordion__summary::before {
+  transform: rotate(90deg);
+}
+
+.practice-topic-accordion__title {
+  flex: 1;
+}
+
+.practice-topic-accordion__body {
+  padding: 0 20px 20px;
+  border-top: 1px solid #eef0f5;
+}
+
+.practice-topic-accordion__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.practice-topic-accordion__apply-class {
+  margin-top: 12px;
+}
+
+/* Bảng bài trắc nghiệm — sửa nhanh tại chỗ */
+.practice-quiz-table td {
+  vertical-align: middle;
+}
+
+.practice-quiz-table__name-cell .group-row-form {
+  flex-wrap: nowrap;
+}
+
+.practice-quiz-table__name-cell input[type="text"] {
+  min-width: 160px;
+}
+
+.practice-pro-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.tag-chip--neutral {
+  background: #f1f2f6;
+  color: #4b5563;
+  border-color: #d7dbe7;
+}

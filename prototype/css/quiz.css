@@ -7,14 +7,46 @@
   color: #fff;
 }
 
-/* ═══ Màn 1: chọn đề ═══════════════════════════════════════════ */
+/* Màn chọn đề: nền vẽ sẵn tiêu đề + mascot ở nửa trên, cỏ trống ở nửa dưới
+   để danh sách chủ đề "đứng" lên trên như biển gỗ. */
+.quiz-screen[data-screen="quiz-setup"] {
+  background-image: url('../assets/quiz/setup-bg.png');
+  background-size: cover;
+  /* đẩy ảnh lên để phần mascot/tiêu đề nhích ra khỏi khung — chỉnh số âm này khi có ảnh mới */
+  background-position: center -56px;
+  background-repeat: no-repeat;
+}
+.quiz-screen[data-screen="quiz-setup"] .el-title {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.quiz-screen[data-screen="quiz-setup"] .el-back {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* ═══ Màn 1: chọn đề ═══════════════════════════════════════════
+   Toàn màn không cuộn — chỉ danh sách chủ đề cuộn trong chiều cao
+   cố định của nó; nhãn "Số câu hỏi" + nút CTA luôn đứng yên bên dưới. */
 .qz-setup-body {
   flex: 1;
-  overflow-y: auto;
-  padding: 4px 16px calc(24px + env(safe-area-inset-bottom));
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  overflow: hidden;
+}
+.qz-hero-spacer {
+  flex: 0 0 auto;
+  height: min(45dvh, 356px);
+}
+.qz-setup-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px calc(22px + env(safe-area-inset-bottom));
 }
 
 .qz-hero {
@@ -40,6 +72,7 @@
 }
 
 .qz-section-label {
+  flex-shrink: 0;
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 800;
@@ -49,105 +82,177 @@
   margin-top: 4px;
 }
 
-/* Chip chủ đề */
+/* Danh sách chủ đề — biển gỗ xếp chồng trong 1 khay kính mờ, cuộn trong
+   chiều cao cố định; mép trên/dưới mờ dần để gợi ý còn nội dung để cuộn. */
 .qz-topic-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding: 14px 10px 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
 }
-.qz-topic-chip {
+.qz-record {
   --tag-c: var(--grape);
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 12px 14px;
-  border: 3px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--ink);
+  min-height: 82px;
+  flex-shrink: 0;
+  padding: 10px 20px 10px 22px;
+  border: none;
+  border-radius: 16px;
+  background-color: transparent;
+  background-image: url('../assets/quiz/record-bg.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  color: #4A3418;
   font-family: inherit;
-  font-size: 15px;
-  font-weight: 700;
+  text-align: left;
   cursor: pointer;
-  box-shadow: 0 4px 0 rgba(38, 35, 92, 0.25);
-  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  filter: drop-shadow(0 6px 8px rgba(43, 30, 12, 0.35));
+  transition: transform 0.12s, filter 0.12s;
 }
-.qz-topic-chip:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(38, 35, 92, 0.25); }
-.qz-topic-chip.selected {
-  border-color: var(--sun);
-  background: #FFFBEA;
-  box-shadow: 0 4px 0 var(--sun-deep);
-}
-.qz-topic-chip.selected .qz-topic-name::after { content: ' ✓'; color: var(--lime-deep); }
-.qz-topic-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--tag-c);
-  flex-shrink: 0;
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
-}
-.qz-topic-name { flex: 1; text-align: left; }
-.qz-topic-count {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink-soft);
-  background: rgba(91, 87, 160, 0.12);
-  border-radius: var(--radius-pill);
-  padding: 3px 10px;
-  flex-shrink: 0;
-}
+.qz-record:active { transform: translateY(2px); filter: drop-shadow(0 2px 3px rgba(43, 30, 12, 0.3)); }
 
-/* Chọn số câu */
-.qz-count-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+/* Đang tải đề cho chủ đề vừa chạm: khoanh sáng + spinner, các record khác
+   mờ đi và không bấm được để tránh chạm dồn dập. */
+.qz-topic-list.is-busy .qz-record { pointer-events: none; }
+.qz-topic-list.is-busy .qz-record:not(.is-starting) { opacity: 0.5; }
+.qz-record.is-starting {
+  outline: 3px solid var(--sun);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(255, 201, 60, 0.35);
 }
-.qz-count-btn {
-  padding: 10px 0 8px;
-  border: 3px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 4px 0 rgba(38, 35, 92, 0.25);
-  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+.qz-record.is-starting .qz-record-chevron,
+.qz-record.is-starting .qz-record-lock { visibility: hidden; }
+.qz-record-spinner {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  margin-top: -10px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(74, 52, 24, 0.25);
+  border-top-color: #4A3418;
+  animation: spin 0.7s linear infinite;
+}
+.qz-record-icon {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--tag-c) 78%);
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15), 0 2px 4px rgba(74, 52, 24, 0.3);
+}
+.qz-record-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 5px;
+}
+.qz-record-title-row {
+  display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 7px;
 }
-.qz-count-btn small {
-  font-family: 'Be Vietnam Pro', sans-serif;
-  font-size: 11px;
+.qz-record-title {
+  font-size: 16px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qz-record-badge {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--lime);
+  color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+.qz-record-badge.badge-pro { background: var(--sun); color: #6B4A00; }
+.qz-record-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--ink-soft);
+  color: #7A5B33;
 }
-.qz-count-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(38, 35, 92, 0.25); }
-.qz-count-btn.selected {
-  border-color: var(--sun);
-  background: #FFFBEA;
-  box-shadow: 0 4px 0 var(--sun-deep);
-  color: var(--grape-deep);
+/* Cột điểm có bề rộng cố định để "|" và độ khó luôn thẳng hàng giữa
+   các record, bất kể số điểm dài ngắn khác nhau. */
+.qz-record-points {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 82px;
+  flex-shrink: 0;
+}
+.qz-record-points .icon { width: 13px; height: 13px; color: var(--gold); flex-shrink: 0; }
+.qz-record-sep { flex-shrink: 0; opacity: 0.5; }
+.qz-record-diff { display: flex; align-items: center; gap: 4px; }
+.qz-record-diff-icon { font-size: 12px; line-height: 1; }
+.qz-record-diff.diff-cao { color: var(--cherry-deep); }
+.qz-record-diff.diff-trung { color: #C87A1E; }
+.qz-record-diff.diff-thap { color: var(--lime-deep); }
+.qz-record-chevron {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  color: #9C7A45;
+  transform: rotate(180deg);
 }
 
-.qz-best-line {
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 1px 0 rgba(38, 35, 92, 0.25);
-  min-height: 18px;
+/* Chủ đề Pro chưa mở khoá: mờ xám nhẹ, khoá thay cho mũi tên; vẫn chạm
+   được để báo nâng cấp, nhưng không tô sáng khi chọn như chủ đề thường. */
+.qz-record.is-locked {
+  filter: grayscale(0.55) brightness(0.88) drop-shadow(0 6px 8px rgba(43, 30, 12, 0.3));
+}
+.qz-record.is-locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: rgba(60, 50, 40, 0.22);
+  pointer-events: none;
+}
+.qz-record.is-locked .qz-record-icon { filter: saturate(0.5); }
+.qz-record-lock {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6B4A00;
+  background: var(--sun);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
 }
 
-/* CTA lớn */
+/* CTA lớn (dùng ở màn lỗi tải đề + màn kết quả) */
 .qz-cta {
+  flex-shrink: 0;
   width: 100%;
   padding: 15px;
   border: none;
